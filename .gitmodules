@@ -1,0 +1,3 @@
+[submodule "concurrent-skiplist"]
+	path = concurrent-skiplist
+	url = git@github.com:rrnewton/concurrent-skiplist.git
