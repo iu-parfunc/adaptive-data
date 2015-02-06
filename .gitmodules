@@ -1,3 +1,6 @@
 [submodule "concurrent-skiplist"]
 	path = concurrent-skiplist
 	url = git@github.com:rrnewton/concurrent-skiplist.git
+[submodule "lockfree-test"]
+	path = lockfree-test
+	url = git@github.com:peter-fogg/lockfree-test.git
