@@ -97,10 +97,23 @@ transition bag = do
         forkIO $ do
           let copy _ [] = return ()
               copy v _ | V.null v = copy vec xs
-              copy v (x:xs) = atomicModifyIORefCAS_ (V.head v) (x:) >> copy (V.tail v) xs
+              copy v (x:xs) = casLoop_ (V.head v) (x:) >> copy (V.tail v) xs
           copy vec xs
-        atomicModifyIORefCAS_ bag (const $ LockFree vec)
+        casLoop_ bag (const $ LockFree vec)
     _ -> return ()
+
+casLoop_ :: IORef a -> (a -> a) -> IO ()
+casLoop_ ref f = casLoop ref f'
+  where f' x = (f x, ())
+
+casLoop :: IORef a -> (a -> (a, b)) -> IO b
+casLoop ref f = do
+  tick <- readForCAS ref
+  retryLoop tick
+  where retryLoop tick = do
+          let (new, ret) = f $! peekTicket tick
+          (success, tick') <- casIORef ref tick new
+          if success then return ret else retryLoop tick'
 
 -- Return the index in the vector that this thread should access.
 getIndex :: IO Int
