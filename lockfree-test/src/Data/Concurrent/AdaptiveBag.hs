@@ -10,7 +10,6 @@ module Data.Concurrent.AdaptiveBag
        )
        where
 
-import Control.Applicative ((<$>))
 import Control.Concurrent
 import Control.Monad
 import Data.Atomics
@@ -89,10 +88,3 @@ casLoop ref f = retryLoop =<< readForCAS ref
           let (new, ret) = f $! peekTicket tick
           (success, tick') <- casIORef ref tick new
           if success then return ret else retryLoop tick'
-
--- Return the index in the vector that this thread should access.
-getIndex :: IO Int
-getIndex = do
-  tid <- myThreadId
-  (idx, _) <- threadCapability tid
-  return idx
