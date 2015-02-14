@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Data.Concurrent.AdaptiveBag
        (
@@ -21,7 +22,7 @@ import Unsafe.Coerce
 import Data.Concurrent.ScalableBag (ScalableBag)
 import qualified Data.Concurrent.ScalableBag as SB
 
-data Hybrid a = Pure ![a]
+data Hybrid a = Pure { thresh :: Int, current :: ![a] }
               | Trans ![a] !(ScalableBag a)
               | LockFree !(ScalableBag a)
 
@@ -31,16 +32,21 @@ newBag :: IO (AdaptiveBag a)
 newBag = newBagThreshold 10
 
 newBagThreshold :: Int -> IO (AdaptiveBag a)
-newBagThreshold thresh = newIORef $ Pure []
+newBagThreshold thresh = newIORef $ Pure thresh []
 
 -- Push onto the bag.
 add :: AdaptiveBag a -> a -> IO ()
 add bag x = do
   tick <- readForCAS bag
   case peekTicket tick of
-    Pure xs -> do
-      (success, _) <- casIORef bag tick $ Pure (x:xs)
-      unless success $ transition bag >> add bag x -- make sure this write isn't dropped
+    Pure{thresh, current} ->
+      let loop 0 _ = transition bag >> add bag x
+          loop i t = do
+            (success, t') <- casIORef bag tick $ Pure thresh (x:current)
+            unless success $ loop (i-1) t'
+      in loop thresh tick
+      -- (success, _) <- casIORef bag tick $ Pure (x:current)
+      -- unless success $ transition bag >> add bag x -- make sure this write isn't dropped
     Trans xs bag -> SB.add bag x
     LockFree bag -> SB.add bag x
 
@@ -49,12 +55,13 @@ remove :: AdaptiveBag a -> IO (Maybe a)
 remove bag = do
   tick <- readForCAS bag
   case peekTicket tick of
-    Pure [] -> return Nothing
-    Pure (x:xs) -> do
-      (success, _) <- casIORef bag tick $ Pure xs
-      if success
-        then return $ Just x
-        else transition bag >> remove bag -- make sure this write isn't dropped
+    Pure _ [] -> return Nothing
+    Pure thresh (x:xs) ->
+      let loop 0 _ = transition bag >> remove bag
+          loop i t = do
+            (success, t') <- casIORef bag tick $ Pure thresh xs
+            if success then return $ Just x else loop (i-1) t'
+      in loop thresh tick
     Trans xs bag -> SB.remove bag
     LockFree bag -> SB.remove bag
 
@@ -62,7 +69,7 @@ transition :: AdaptiveBag a -> IO ()
 transition bag = do
   tick <- readForCAS bag
   case peekTicket tick of
-    Pure xs -> do
+    Pure _ xs -> do
       caps <- getNumCapabilities
       scalable <- SB.newBag
       (success, _) <- casIORef bag tick (Trans xs scalable)
