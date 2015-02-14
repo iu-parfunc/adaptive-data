@@ -9,50 +9,39 @@ module Data.Concurrent.ScalableBag
 
 import Control.Concurrent
 import Data.Atomics
+import Data.Atomics.Vector
 import Data.IORef
-import Data.Vector as V
+import Data.Vector.Mutable as V
 
-type ScalableBag a = Vector (IORef [a])
+type ScalableBag a = IOVector [a]
 
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  replicateM caps $ newIORef []
+  V.replicate caps []
 
 add :: ScalableBag a -> a -> IO ()
-add bag x = atomicModifyVectorLoop bag push
-  where push xs = (x:xs, Just ())
+add bag x = do
+  idx <- getIndex
+  tick <- unsafeReadVectorElem bag idx
+  casVectorLoop_ bag (x:) idx
 
 remove :: ScalableBag a -> IO (Maybe a)
-remove bag = retryLoop False bag
-  where
-    retryLoop hasContended vec | V.null vec = if hasContended then retryLoop False bag else return Nothing
-    retryLoop hasContended vec = do
-      let ref = V.head vec
-      tick <- readForCAS ref
-      case peekTicket tick of
-        [] -> retryLoop hasContended $ V.tail vec
-        (x:xs) -> do
-          (success, _) <- casIORef ref tick xs
-          if success then return $ Just x else retryLoop True $ V.tail vec
-
--- Helper for the add function. Loops through the vector, trying to
--- apply the function at each index in turn until it returns a Just
--- value and the CAS succeeds.
-atomicModifyVectorLoop :: ScalableBag a -> ([a] -> ([a], Maybe b)) -> IO b
-atomicModifyVectorLoop bag act = getIndex >>= retryLoop . (flip V.drop $ bag)
-  where retryLoop vec | V.null vec = retryLoop bag
-        retryLoop vec = do
-          let ref = V.head vec
-          tick <- readForCAS ref
-          let (new, ret) = act $! peekTicket tick
-          case ret of
-            Nothing -> retryLoop $ V.tail vec
-            Just val -> do
-              (success, _) <- casIORef ref tick new
-              if success
-                then return val
-                else retryLoop $ V.tail vec
+remove bag = do
+  idx <- getIndex
+  retryLoop bag idx idx
+  where retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
+        retryLoop vec ix start = do
+          tick <- unsafeReadVectorElem bag ix
+          case peekTicket tick of
+            [] -> let ix' = succ ix in
+              if ix' == start
+              then return Nothing -- looped around once, nothing to pop
+              else if ix' >= V.length vec && start == 0
+                   then return Nothing -- looped around once, nothing to pop
+                   else retryLoop vec (ix+1) start -- keep going
+            _ -> casVectorLoop bag pop ix
+        pop (x:xs) = (xs, Just x)
 
 -- Return the index in the vector that this thread should access.
 getIndex :: IO Int
@@ -60,3 +49,14 @@ getIndex = do
   tid <- myThreadId
   (idx, _) <- threadCapability tid
   return idx
+
+casVectorLoop_ :: IOVector a -> (a -> a) -> Int -> IO ()
+casVectorLoop_ vec f ix = casVectorLoop vec f' ix
+  where f' x = (f x, ())
+
+casVectorLoop :: IOVector a -> (a -> (a, b)) -> Int -> IO b
+casVectorLoop vec f ix = retryLoop =<< readVectorElem vec ix
+  where retryLoop tick = do
+          let (new, ret) = f $! peekTicket tick
+          (success, tick') <- casVectorElem vec ix tick new
+          if success then return ret else retryLoop tick'
