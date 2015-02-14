@@ -9,21 +9,29 @@ module Data.Concurrent.AdaptiveBag
        )
        where
 
+import Control.Applicative ((<$>))
 import Control.Concurrent
 import Control.Monad
 import Data.Atomics
+import Data.Atomics.Vector
 import Data.IORef
-import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as V
 import Unsafe.Coerce
 
+import Data.Concurrent.ScalableBag (ScalableBag)
+import qualified Data.Concurrent.ScalableBag as SB
+
 data Hybrid a = Pure ![a]
-              | Trans ![a] !(V.Vector (IORef [a]))
-              | LockFree !(V.Vector (IORef [a]))
+              | Trans ![a] !(ScalableBag a)
+              | LockFree !(ScalableBag a)
 
 type AdaptiveBag a = IORef (Hybrid a)
 
 newBag :: IO (AdaptiveBag a)
-newBag = newIORef $ Pure []
+newBag = newBagThreshold 10
+
+newBagThreshold :: Int -> IO (AdaptiveBag a)
+newBagThreshold thresh = newIORef $ Pure []
 
 -- Push onto the bag.
 add :: AdaptiveBag a -> a -> IO ()
@@ -33,20 +41,8 @@ add bag x = do
     Pure xs -> do
       (success, _) <- casIORef bag tick $ Pure (x:xs)
       unless success $ transition bag >> add bag x -- make sure this write isn't dropped
-    Trans xs vec -> pushVec vec
-    LockFree vec -> pushVec vec
-  where pushVec vec =
-          -- Start at the index corresponding to this thread's HEC,
-          -- under the assumption that contention is least likely
-          -- there, then sweep through the vector trying to find a
-          -- spot to push to if that fails.
-          let retryLoop v | V.null v = retryLoop vec
-              retryLoop v = do
-                let ref = V.head v
-                tick <- readForCAS ref
-                (success, _) <- casIORef ref tick (x:peekTicket tick)
-                if success then return () else retryLoop $ V.tail v
-          in getIndex >>= retryLoop . (flip V.drop $ vec)
+    Trans xs bag -> SB.add bag x
+    LockFree bag -> SB.add bag x
 
 -- Attempt to pop from the bag, returning Nothing if it's empty.
 remove :: AdaptiveBag a -> IO (Maybe a)
@@ -59,30 +55,8 @@ remove bag = do
       if success
         then return $ Just x
         else transition bag >> remove bag -- make sure this write isn't dropped
-    Trans xs vec -> popVec vec
-    LockFree vec -> popVec vec
-  where popVec vec =
-          -- Loop through the vector, trying to find an index that can
-          -- be popped from. If the list at an index is empty, move on
-          -- through the vector. If it's full, attempt to pop. Move on
-          -- under contention. If the loops hits the end of the
-          -- vector, there are two cases: either we've seen no
-          -- contention, so the whole vector is empty, or we have, and
-          -- we're at the end because we've contended each time. In
-          -- the first case, return Nothing; in the second, loop
-          -- again.
-          let retryLoop hasContended v | V.null v = if hasContended
-                                                    then retryLoop False vec
-                                                    else return Nothing
-              retryLoop hasContended v = do
-                let ref = V.head v
-                tick <- readForCAS ref
-                case peekTicket tick of
-                  [] -> retryLoop hasContended $ V.tail v
-                  (x:xs) -> do
-                    (success, _) <- casIORef ref tick xs
-                    if success then return $ Just x else retryLoop True $ V.tail v
-          in retryLoop False vec
+    Trans xs bag -> SB.remove bag
+    LockFree bag -> SB.remove bag
 
 transition :: AdaptiveBag a -> IO ()
 transition bag = do
@@ -90,16 +64,12 @@ transition bag = do
   case peekTicket tick of
     Pure xs -> do
       caps <- getNumCapabilities
-      vec <- V.replicateM caps $ newIORef []
-      (success, _) <- casIORef bag tick (Trans xs vec)
+      scalable <- SB.newBag
+      (success, _) <- casIORef bag tick (Trans xs scalable)
       when success $ do
         putStrLn $ "[TRANSITION]" ++ show (unsafeCoerce bag :: Int) -- beware!
-        forkIO $ do
-          let copy _ [] = return ()
-              copy v _ | V.null v = copy vec xs
-              copy v (x:xs) = casLoop_ (V.head v) (x:) >> copy (V.tail v) xs
-          copy vec xs
-        casLoop_ bag (const $ LockFree vec)
+        forkIO $ forM_ xs (SB.add scalable)
+        casLoop_ bag (const $ LockFree scalable)
     _ -> return ()
 
 casLoop_ :: IORef a -> (a -> a) -> IO ()
@@ -107,9 +77,7 @@ casLoop_ ref f = casLoop ref f'
   where f' x = (f x, ())
 
 casLoop :: IORef a -> (a -> (a, b)) -> IO b
-casLoop ref f = do
-  tick <- readForCAS ref
-  retryLoop tick
+casLoop ref f = retryLoop =<< readForCAS ref
   where retryLoop tick = do
           let (new, ret) = f $! peekTicket tick
           (success, tick') <- casIORef ref tick new
