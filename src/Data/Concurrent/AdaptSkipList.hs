@@ -48,9 +48,9 @@ insert dm k v = do
       let new = M.insert k v m -- TODO loop some number of times (n > 1) to detect contention
       (success, tick') <- casIORef dm tick $ Pure new
       unless success $ transition dm
-    LockFree slm -> putIfAbsent slm k (return v) >> return ()
-    Trans slm m -> do -- TODO finish
-      undefined
+    LockFree slm -> putOverwrite slm k (return v)
+    Trans slm m -> do
+      putOverwrite slm k (return v)
 
 transition :: Ord k => DynMap k v -> IO ()
 transition dm = do
