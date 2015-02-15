@@ -67,8 +67,8 @@ REPORT=report_${executable}
 # Remove old versions to prevent inconsistent data
 for i in 1 2 4 8 16 32; do
     CRITREPORT=$REPORT-N$i.crit
-    rm $CRITREPORT
-    rm $CRITREPORT.html
+    rm -f $CRITREPORT
+    rm -f $CRITREPORT.html
 done
 
 for i in 1 2 4 8 16 32; do
