@@ -18,49 +18,37 @@ import Data.Atomics
 import Data.Atomics.Vector
 import qualified Data.Atomics.Counter as C
 import Data.IORef
-import Data.TLS.GHC
-import qualified Data.TLS.PThread as PThread
+import Data.TLS.PThread
 import Data.Vector.Mutable as V
 import System.IO.Unsafe (unsafePerformIO)
 
-data ScalableBag a = ScalableBag {
-  tls :: TLS TLSData
-  , bag :: (IOVector [a])
-  }
-
-data TLSData = TLSData {
-  idx :: !Int
-  , lastRemoved :: !(IORef Int)
-  }
+type ScalableBag a = IOVector [a]
 
 {-# NOINLINE osThreadID #-}
-osThreadID :: PThread.TLS Int
-osThreadID = unsafePerformIO $ PThread.mkTLS $ C.incrCounter 1 threadCounter
+osThreadID :: TLS Int
+osThreadID = unsafePerformIO $ mkTLS $ C.incrCounter 1 threadCounter
 
 {-# NOINLINE threadCounter #-}
 threadCounter :: C.AtomicCounter
 threadCounter = unsafePerformIO $ C.newCounter 0
 
--- foreign import ccall gettid :: IO Int
-
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  tid <- myThreadId
-  (idx, _) <- threadCapability tid  
-  tls <- mkTLS $ TLSData idx <$> newIORef idx
-  ScalableBag tls <$> V.replicate caps []
+  V.replicate caps []
 
 add :: ScalableBag a -> a -> IO ()
-add ScalableBag{tls, bag} x = do
-  TLSData{idx} <- getTLS tls
+add bag x = do
+  tid <- getTLS osThreadID
+  let idx = tid `mod` V.length bag
   tick <- unsafeReadVectorElem bag idx
   casVectorLoop_ bag (x:) idx
 
 remove :: ScalableBag a -> IO (Maybe a)
-remove ScalableBag{tls,bag} = do
-  TLSData{lastRemoved} <- getTLS tls
-  let retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
+remove bag = do
+  tid <- getTLS osThreadID
+  let idx = tid `mod` V.length bag
+      retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
       retryLoop vec ix start = do
         tick <- unsafeReadVectorElem bag ix
         case peekTicket tick of
@@ -71,14 +59,12 @@ remove ScalableBag{tls,bag} = do
                  then return Nothing -- looped around once, nothing to pop
                  else retryLoop vec (ix+1) start -- keep going
           _ -> do
-            writeIORef (lastRemoved) ix
             res <- casVectorLoop bag pop ix
             case res of
               Nothing -> retryLoop vec ix start -- someone else stole what we were going to pop
               jx -> return jx
       pop [] = ([], Nothing)
       pop (x:xs) = (xs, Just x)
-  idx <- readIORef lastRemoved
   retryLoop bag idx idx
 
 casVectorLoop_ :: IOVector a -> (a -> a) -> Int -> IO ()
