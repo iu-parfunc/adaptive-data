@@ -64,6 +64,20 @@ cabal build ${executable}
 
 REPORT=report_${executable}
 
+TABLENAME=AdaptivelyScalable
+CID=
+SEC=
+
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.7
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.7
+# If we don't have the Criterion uploader, don't bother trying
+if [ -x `which $CRITUPLOAD`]; then
+    CRITUPLOAD=:
+    CSVUPLOAD=:
+fi
+
+
+
 # Remove old versions to prevent inconsistent data
 for i in 1 2 4 8 16 32; do
     CRITREPORT=$REPORT-N$i.crit
@@ -73,6 +87,7 @@ done
 
 for i in 1 2 4 8 16 32; do
     CRITREPORT=$REPORT-N$i.crit
+    CSVREPORT=$CRITREPORT.csv
     ./dist/build/$executable/$executable \
         "new/PureBag" \
         "new/ScalableBag" \
@@ -84,6 +99,10 @@ for i in 1 2 4 8 16 32; do
         "hotkey/ScalableBag" \
         "hotkey/AdaptiveBag" \
         --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+
+    $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion
+
+    $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME --clientid=$CID --clientsecret=$SEC --threads=$i
 done
 
 if [ $? = 0 ]; then
