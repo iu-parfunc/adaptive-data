@@ -8,7 +8,6 @@ module Data.Concurrent.ScalableBag
        , newBag
        , add
        , remove
-
        , osThreadID
        )
        where
@@ -39,10 +38,10 @@ osThreadID :: PThread.TLS Int
 osThreadID = unsafePerformIO $ PThread.mkTLS $ C.incrCounter 1 threadCounter
 
 {-# NOINLINE threadCounter #-}
-threadCounter :: C.AtomicCounter 
+threadCounter :: C.AtomicCounter
 threadCounter = unsafePerformIO $ C.newCounter 0
 
--- foreign import ccall gettid :: IO Int 
+-- foreign import ccall gettid :: IO Int
 
 newBag :: IO (ScalableBag a)
 newBag = do
@@ -71,7 +70,13 @@ remove ScalableBag{tls,bag} = do
             else if ix' >= V.length vec && start == 0
                  then return Nothing -- looped around once, nothing to pop
                  else retryLoop vec (ix+1) start -- keep going
-          _ -> writeIORef (lastRemoved) ix >> casVectorLoop bag pop ix
+          _ -> do
+            writeIORef (lastRemoved) ix
+            res <- casVectorLoop bag pop ix
+            case res of
+              Nothing -> retryLoop vec ix start -- someone else stole what we were going to pop
+              jx -> return jx
+      pop [] = ([], Nothing)
       pop (x:xs) = (xs, Just x)
   idx <- readIORef lastRemoved
   retryLoop bag idx idx
