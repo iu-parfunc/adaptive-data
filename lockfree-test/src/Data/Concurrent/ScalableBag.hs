@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Data.Concurrent.ScalableBag
        (
@@ -7,6 +8,8 @@ module Data.Concurrent.ScalableBag
        , newBag
        , add
        , remove
+
+       , osThreadID
        )
        where
 
@@ -14,9 +17,12 @@ import Control.Applicative
 import Control.Concurrent
 import Data.Atomics
 import Data.Atomics.Vector
+import qualified Data.Atomics.Counter as C
 import Data.IORef
 import Data.TLS.GHC
+import qualified Data.TLS.PThread as PThread
 import Data.Vector.Mutable as V
+import System.IO.Unsafe (unsafePerformIO)
 
 data ScalableBag a = ScalableBag {
   tls :: TLS TLSData
@@ -27,6 +33,16 @@ data TLSData = TLSData {
   idx :: !Int
   , lastRemoved :: !(IORef Int)
   }
+
+{-# NOINLINE osThreadID #-}
+osThreadID :: PThread.TLS Int
+osThreadID = unsafePerformIO $ PThread.mkTLS $ C.incrCounter 1 threadCounter
+
+{-# NOINLINE threadCounter #-}
+threadCounter :: C.AtomicCounter 
+threadCounter = unsafePerformIO $ C.newCounter 0
+
+-- foreign import ccall gettid :: IO Int 
 
 newBag :: IO (ScalableBag a)
 newBag = do
