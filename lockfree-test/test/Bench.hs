@@ -11,6 +11,8 @@ import Criterion.Types
 import Data.Int
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Storable as VS
+import System.Environment (getEnvironment)
+import System.IO.Unsafe (unsafePerformIO)
 import System.Random
 
 import qualified Data.Concurrent.PureQueue as PQ
@@ -81,9 +83,11 @@ main = do
   -- Initialize randomness for fork5050
   randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
   -- Initialize vector of Nothing for hotKeyOrRandom
-  pureNothingVec <- VM.replicate splits Nothing -- TODO how big should this vector be?
-  scalableNothingVec <- VM.replicate splits Nothing
-  adaptiveNothingVec <- VM.replicate splits Nothing
+  let vecSize = getNumEnvVar 100 "VEC_SIZE"
+  pureNothingVec <- VM.replicate vecSize Nothing -- TODO how big should this vector be?
+  scalableNothingVec <- VM.replicate vecSize Nothing
+  adaptiveNothingVec <- VM.replicate vecSize Nothing
+  let adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
   putStrLn $ "using " ++ show splits ++ " capabilities"
   defaultMain [
     bgroup "PureQueue" [
@@ -107,7 +111,7 @@ main = do
     bgroup "new" [
       bench "PureBag" $ Benchmarkable $ rep PB.newBag,
       bench "ScalableBag" $ Benchmarkable $ rep SB.newBag,
-      bench "AdaptiveBag" $ Benchmarkable $ rep AB.newBag
+      bench "AdaptiveBag" $ Benchmarkable $ rep AB.newBagThreshold
       ],
     bgroup "random-50-50" $ [
       bench ("PureBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
@@ -116,13 +120,13 @@ main = do
       bench ("ScalableBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
       | elems <- parSizes
       ] ++ [
-      bench ("AdaptiveBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 AB.newBag AB.add AB.remove elems splits randomVec)
+      bench ("AdaptiveBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 AB.newBagThreshold adaptThresh AB.add AB.remove elems splits randomVec)
       | elems <- parSizes
       ],
     bgroup "hotkey" $ [
       bench "PureBag" $ Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec),
       bench "ScalableBag" $ Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec),
-      bench "AdaptiveBag" $ Benchmarkable $ rep (hotKeyOrRandom AB.newBag AB.add hotkeySize splits adaptiveNothingVec)
+      bench "AdaptiveBag" $ Benchmarkable $ rep (hotKeyOrRandom AB.newBagThreshold AB.add hotkeySize splits adaptiveNothingVec)
       ]
     ]
   where sizes = [10^e | e <- [0..4]]
@@ -135,6 +139,16 @@ for_ start end fn = loop start
   where loop !i | i > end = return ()
                 | otherwise = fn i >> loop (i+1)
 {-# INLINE for_ #-}
+
+getNumEnvVar :: Int -> String -> Int
+getNumEnvVar deflt name =
+  case lookup name theEnv of
+    Nothing -> deflt
+    Just s -> read s
+
+{-# NOINLINE theEnv #-}
+theEnv :: [(String, String)]
+theEnv = unsafePerfomIO getEnvironment
 
 -- | Run N copies of an IO action in parallel. Pass in a number from
 -- 0..N-1, letting the worker know which it is.
