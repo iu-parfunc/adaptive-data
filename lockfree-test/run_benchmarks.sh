@@ -59,7 +59,7 @@ TAG=`date +'%s'`
 
 which -a ghc-$JENKINS_GHC
 cabal install -w ghc-$JENKINS_GHC --with-ghc-pkg=ghc-pkg-$JENKINS_GHC --enable-benchmarks $EXTRAARGS
-cabal configure --enable-benchmarks
+cabal configure --enable-benchmarks -f-debug
 cabal build ${executable}
 
 REPORT=report_${executable}
@@ -71,7 +71,7 @@ for i in 1 2 4 8 16 32; do
     rm -f $CRITREPORT.html
 done
 
-for i in 1 2; do
+for i in 1 2 4 8 16 32; do
     CRITREPORT=$REPORT-N$i.crit
     ./dist/build/$executable/$executable \
         "new/PureBag" \
