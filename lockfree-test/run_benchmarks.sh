@@ -1,66 +1,29 @@
+#!/bin/bash
+
 echo "Begin benchmarks for lockfree-test."
-set -x
-set -e
+set -xe
 
 EXTRAARGS=$*
+
+if [ "$BENCHCOMPILER" == "" ]; then
+    export BENCHCOMPILER=ghc-7.8.3
+    echo "BENCHCOMPILER unset, defaulting to $BENCHCOMPILER"
+fi
+export PATH=$HOME/opt/$BENCHCOMPILER/bin:$PATH
+which $BENCHCOMPILER
+which cabal
+cabal --version
+which ghc
+ghc --version
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
 --regress=numGcs:iters --regress=mutatorWallSeconds:iters --regress=gcWallSeconds:iters \
 --regress=cpuTime:iters "
 
-if [ "$MACHINECLASS" == "" ]; then
-    export MACHINECLASS=`hostname -s`
-fi
-
-echo "On linux platforms, check CPU affinity:"
-taskset -pc $$ || echo ok
-
-echo "Also check load:"
-sar 2 2 || echo ok
-
-echo "And who"
-who -a || echo ok
-
-# Switch to the top of the repo:
-cd `dirname $0`
-
-echo "\nReturned to benchmarking script."
-
-# CONVENTION: The working directory is passed as the first argument.
-CHECKOUT=$1
-shift || echo ok
-if [ "$CHECKOUT" == "" ]; then
-    CHECKOUT=`pwd`
-fi
-
-if [ "$JENKINS_GHC" == "" ]; then
-    echo "JENKINS_GHC unset"
-    export JENKINS_GHC=7.8.3
-fi
-
-echo "Running benchmarks remotely on server `hostname`"
-if [ -f "$HOME/continuous_testing_setup/rn_jenkins_scripts/acquire_ghc.sh" ]; then
-    source $HOME/continuous_testing_setup/rn_jenkins_scripts/acquire_ghc.sh
-fi
-
-which cabal
-cabal --version
-which ghc
-ghc --version
-
 executable=bench-lockfree-test
 
-cabal sandbox init
-
-echo "Installing benchmark program."
-
 TAG=`date +'%s'`
-
-which -a ghc-$JENKINS_GHC
-cabal install -w ghc-$JENKINS_GHC --with-ghc-pkg=ghc-pkg-$JENKINS_GHC --enable-benchmarks $EXTRAARGS
-cabal configure --enable-benchmarks -f-debug
-cabal build ${executable}
 
 REPORT=report_${executable}
 
@@ -76,40 +39,66 @@ if [ -x `which $CRITUPLOAD`]; then
     CSVUPLOAD=:
 fi
 
+CABAL=cabal-1.20
+CONFOPTS="--enable-benchmarks --allow-newer"
 
+function go() {    
+    WHICHBENCH=$*
 
-# Remove old versions to prevent inconsistent data
-for i in 1 2 4 8 16 32; do
-    CRITREPORT=$REPORT-N$i.crit
-    rm -f $CRITREPORT
-    rm -f $CRITREPORT.html
-done
+    echo "Installing benchmark program."
+    # Put the sandbox here in the lockfree-test/ subdir.
+    $CABAL sandbox init
+    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS 
+    $CABAL configure $CONFOPTS -f-debug
+    $CABAL build ${executable}
+    
+    # Remove old versions to prevent inconsistent data
+    for i in 1 2 4 8 16 32; do
+	CRITREPORT=$REPORT-N$i.crit
+	rm -f $CRITREPORT
+	rm -f $CRITREPORT.html
+    done
 
-for i in 1 2 4 8 16 32; do
-    CRITREPORT=$REPORT-N$i.crit
-    CSVREPORT=$CRITREPORT.csv
-    ./dist/build/$executable/$executable \
-        "new/PureBag" \
-        "new/ScalableBag" \
-        "new/AdaptiveBag" \
-        "random-50-50/PureBag" \
-        "random-50-50/ScalableBag" \
-        "random-50-50/AdaptiveBag" \
-        "hotkey/PureBag" \
-        "hotkey/ScalableBag" \
-        "hotkey/AdaptiveBag" \
-        --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+    for i in 1 2 4 8 16 32; do
+	CRITREPORT=$REPORT-N$i.crit
+	./dist/build/$executable/$executable \
+	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
 
-    $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion
+        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion
 
-    $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME --clientid=$CID --clientsecret=$SEC --threads=$i
-done
+        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME --clientid=$CID --clientsecret=$SEC --threads=$i
+    done
 
-if [ $? = 0 ]; then
-    mkdir -p reports
-    cp *.html reports
-    cp *.crit reports
-    tar -cvf reports.tar reports/
-else
-    echo "Some benchmarks errored out! Don't expect good data."
-fi
+    if [ $? = 0 ]; then
+	mkdir -p reports
+	cp *.html reports
+	cp *.crit reports
+	tar -cvf reports.tar reports/
+    else
+	echo "Some benchmarks errored out! Don't expect good data."
+    fi
+}
+
+case $BENCHVARIANT in
+    pure)
+	echo "Running pure-in-a-box benchmarks..."
+	# FIXME: use standardized names:
+	go new/PureBag random-50-50/PureBag hotkey/PureBag
+	;;
+    scalable)
+	echo "FINISHME: run scalable benchmarks here"
+	    # "new/ScalableBag" \
+	    # "random-50-50/ScalableBag" \
+	    # "hotkey/ScalableBag" \
+	;;
+    hybrid)
+	echo "FINISHME: run hybrid benchmarks here"
+	    # "new/AdaptiveBag" \
+    	    # "random-50-50/AdaptiveBag" \
+	    # "hotkey/AdaptiveBag" \
+	;;
+    *)
+	echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
+	exit 1
+	;;
+esac
