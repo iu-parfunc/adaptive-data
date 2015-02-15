@@ -71,9 +71,19 @@ for i in 1 2 4 8 16 32; do
     rm -f $CRITREPORT.html
 done
 
-for i in 1 2 4 8 16 32; do
+for i in 1 2; do
     CRITREPORT=$REPORT-N$i.crit
-    ./dist/build/$executable/$executable "new/PureBag" "new/ScalableBag" "random-50-50/PureBag" "random-50-50/ScalableBag" "hotkey/PureBag" "hotkey/ScalableBag" --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+    ./dist/build/$executable/$executable \
+        "new/PureBag" \
+        "new/ScalableBag" \
+        "new/AdaptiveBag" \
+        "random-50-50/PureBag" \
+        "random-50-50/ScalableBag" \
+        "random-50-50/AdaptiveBag" \
+        "hotkey/PureBag" \
+        "hotkey/ScalableBag" \
+        "hotkey/AdaptiveBag" \
+        --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
 done
 
 if [ $? = 0 ]; then
