@@ -15,7 +15,7 @@ import Control.Concurrent
 import Data.Atomics
 import Data.Atomics.Vector
 import Data.IORef
-import Data.TLS.PThread
+import Data.TLS.GHC
 import Data.Vector.Mutable as V
 
 data ScalableBag a = ScalableBag {
