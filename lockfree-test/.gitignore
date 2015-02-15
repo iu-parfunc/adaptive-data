@@ -4,3 +4,4 @@ dist/
 *.crit.html
 *.eventlog
 *.crit
+*.tar
