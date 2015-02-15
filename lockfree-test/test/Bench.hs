@@ -131,7 +131,7 @@ main = do
     ]
   where sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
-        hotkeySize = 100
+        hotkeySize = 1000
 
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
 for_ start end _ | start > end = error "start greater than end"
@@ -148,7 +148,7 @@ getNumEnvVar deflt name =
 
 {-# NOINLINE theEnv #-}
 theEnv :: [(String, String)]
-theEnv = unsafePerfomIO getEnvironment
+theEnv = unsafePerformIO getEnvironment
 
 -- | Run N copies of an IO action in parallel. Pass in a number from
 -- 0..N-1, letting the worker know which it is.
