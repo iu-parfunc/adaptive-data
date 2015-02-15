@@ -5,6 +5,7 @@ module Data.Concurrent.AdaptiveBag
        (
          AdaptiveBag
        , newBag
+       , newBagThreshold
        , add
        , remove
        )
