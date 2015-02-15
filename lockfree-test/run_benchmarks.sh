@@ -23,21 +23,22 @@ REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycle
 
 executable=bench-lockfree-test
 
-# Put the sandbox here in the lockfree-test/ subdir.
-cabal sandbox init
-
-echo "Installing benchmark program."
-
 TAG=`date +'%s'`
-
-cabal install   --enable-benchmarks $EXTRAARGS
-cabal configure --enable-benchmarks -f-debug
-cabal build ${executable}
 
 REPORT=report_${executable}
 
-function go() {
+CABAL=cabal-1.20
+CONFOPTS="--enable-benchmarks --allow-newer"
+
+function go() {    
     WHICHBENCH=$*
+
+    echo "Installing benchmark program."
+    # Put the sandbox here in the lockfree-test/ subdir.
+    $CABAL sandbox init
+    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS 
+    $CABAL configure $CONFOPTS -f-debug
+    $CABAL build ${executable}
     
     # Remove old versions to prevent inconsistent data
     for i in 1 2 4 8 16 32; do
