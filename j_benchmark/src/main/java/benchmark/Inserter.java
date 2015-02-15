@@ -15,6 +15,7 @@ public class Inserter extends Thread {
 			randomColdKeyMax;
 	@SuppressWarnings("rawtypes")
 	Map map;
+	
 	ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
 	ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
 	String mapValueType, concurrentMapType;
