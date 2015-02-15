@@ -74,7 +74,6 @@ transition bag = do
       scalable <- SB.newBag
       (success, _) <- casIORef bag tick (Trans xs scalable)
       when success $ do
-        putStrLn $ "[TRANSITION]" ++ show (unsafeCoerce bag :: Int) -- beware!
         forkIO $ forM_ xs (SB.add scalable)
         casLoop_ bag (const $ LockFree scalable)
     _ -> return ()
