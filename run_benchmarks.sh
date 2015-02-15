@@ -47,7 +47,7 @@ case $BENCHCOMPILER in
     java)
 	echo "Running Java version of benchmarks"
 	cd j_benchmark
-	echo "FINISHME: put a script here."
+	./run_benchmarks.sh	
 	;;
     ghc-*)
 	echo "Running GHC version of benchmarks."
