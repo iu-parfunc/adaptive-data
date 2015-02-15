@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Data.Concurrent.PureBag
        (
          PureBag
@@ -12,15 +13,19 @@ import Data.IORef
 
 type PureBag a = IORef [a]
 
+{-# INLINABLE newBag #-}
 newBag :: IO (PureBag a)
 newBag = newIORef []
 
+{-# INLINABLE add #-}
 add :: PureBag a -> a -> IO ()
 add bag x = do
   tick <- readForCAS bag
-  (success, _) <- casIORef bag tick (x:peekTicket tick)
+  let !rst = peekTicket tick
+  (success, _) <- casIORef bag tick (x:rst)
   if success then return () else add bag x
 
+{-# INLINABLE remove #-}
 remove :: PureBag a -> IO (Maybe a)
 remove bag = do
   tick <- readForCAS bag
