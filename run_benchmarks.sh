@@ -52,8 +52,7 @@ case $BENCHCOMPILER in
     ghc-*)
 	echo "Running GHC version of benchmarks."
 	cd lockfree-test
-	# ./run_benchmarks.sh
-	echo "FINISHME: not running script yet"
+	./run_benchmarks.sh
 	;;
     *)
 	echo "ERROR: unrecognized BENCHCOMPILER: $BENCHCOMPILER"
