@@ -12,7 +12,7 @@ cabal-version: >=1.10
 
 flag debug
   description: Do a debug compile.
-  default: True
+  default: False
   manual: True
 
 library
@@ -27,8 +27,10 @@ library
                  , thread-local-storage >= 0.1
                  , vector >= 0.10
   hs-source-dirs: src/
+  ghc-options: -O2 
   default-language: Haskell2010
   if flag(debug)
+      ghc-options: -eventlog
       ghc-options: -keep-tmp-files -dsuppress-module-prefixes -ddump-to-file -ddump-core-stats -ddump-simpl-stats -dcore-lint -dcmm-lint -ddump-ds -ddump-simpl -ddump-stg -ddump-asm -ddump-bcos -ddump-cmm -ddump-opt-cmm -ddump-inlinings
 
 benchmark bench-lockfree-test

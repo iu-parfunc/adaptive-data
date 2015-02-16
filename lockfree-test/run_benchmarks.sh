@@ -52,8 +52,8 @@ CABAL=cabal-1.22
 CONFOPTS="--enable-benchmarks --allow-newer"
 
 function go() {    
-    WHICHBENCH=$*
-
+    VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
+    
     echo "Installing benchmark program."
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
@@ -72,10 +72,10 @@ function go() {
 	CRITREPORT=${TAG}_${REPORT}-N$i.crit
 	CSVREPORT=${TAG}_${REPORT}-N$i.csv
 	
-	./dist/build/$executable/$executable \
+	./dist/build/$executable/$executable $BENCHVARIANT \
 	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
 
-        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion --threads=$i $CRITREPORT
+        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT --threads=$i $CRITREPORT
 	# --args=""
 
 	# NOTE: could aggregate these to ONE big CSV and then do the upload.
@@ -95,20 +95,15 @@ function go() {
 case $BENCHVARIANT in
     pure)
 	echo "Running pure-in-a-box benchmarks..."
-	# FIXME: use standardized names:
-	go new/PureBag random-50-50/PureBag hotkey/PureBag
+	go 
 	;;
     scalable)
-	echo "FINISHME: run scalable benchmarks here"
-	    # "new/ScalableBag" \
-	    # "random-50-50/ScalableBag" \
-	    # "hotkey/ScalableBag" \
+	echo "Running regular scalable/lock-free benchmarks..."	
+	go 
 	;;
     hybrid)
-	echo "FINISHME: run hybrid benchmarks here"
-	    # "new/AdaptiveBag" \
-    	    # "random-50-50/AdaptiveBag" \
-	    # "hotkey/AdaptiveBag" \
+	echo "Running hybrid benchmarks..."
+	go 
 	;;
     *)
 	echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"

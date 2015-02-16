@@ -11,7 +11,7 @@ import Criterion.Types
 import Data.Int
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Storable as VS
-import System.Environment (getEnvironment)
+import System.Environment (getEnvironment, getArgs, withArgs)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Random
 
@@ -90,7 +90,8 @@ main = do
   adaptiveNothingVec <- VM.replicate vecSize Nothing
   let adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
   putStrLn $ "using " ++ show splits ++ " capabilities"
-  defaultMain $ [
+  args <- getArgs
+  -- when (null args) (error "Expected at least one command line arg: pure, scalable, hybrid")
 -- RRN: disabling queues for now.  We're off queues.
 {-    
     bgroup "PureQueue" [
@@ -112,28 +113,45 @@ main = do
           | elems <- parSizes]
       ],
 -}
-    bench "pureBag_new" $ Benchmarkable $ rep PB.newBag,
-    bench "scalableBag_new" $ Benchmarkable $ rep SB.newBag,
-    bench "hybridBag_new" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++
-    [ bench ("pureBag_random--" ++ show elems) $
-      Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
-    | elems <- parSizes
-    ] ++ 
-    [ bench ("scalableBag_random-" ++ show elems) $
-      Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
-    | elems <- parSizes
-    ] ++
-    [ bench ("hybridBag_random-" ++ show elems) $
-      Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
-    | elems <- parSizes
-    ] ++
-    [ bench "array-pureBag_hotcold-insert" $
-      Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec),
-      bench "array-scalableBag_hotcold-insert" $
-      Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec),
-      bench "array-hybridBag_hotcold-insert" $ 
-      Benchmarkable $ rep (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec)
-    ]
+  let pure =
+        [ bench "bag_new" $ Benchmarkable $ rep PB.newBag ] ++
+        [ bench ("bag_random--" ++ show elems) $
+          Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
+        | elems <- parSizes
+        ] ++
+        [ bench "array-bag_hotcold-insert" $
+          Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec) ]
+        
+      scalable =
+        [ bench "bag_new" $ Benchmarkable $ rep SB.newBag ]  ++    
+        [ bench ("bag_random-" ++ show elems) $
+          Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
+        | elems <- parSizes
+        ] ++
+        [ bench "array-bag_hotcold-insert" $
+          Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec) ]
+        
+      hybrid = 
+        [ bench "bag_new" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++    
+        [ bench ("bag_random-" ++ show elems) $
+          Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
+        | elems <- parSizes ] ++
+        [ bench "array-bag_hotcold-insert" $ 
+          Benchmarkable $ rep
+          (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec) ]
+         
+   -- Hack to make the names come out right in the upload:
+  let (args',list) =
+       case args of
+       "pure":t     -> (t,pure)
+       "scalable":t -> (t,scalable)
+       "hybrid":t   -> (t,hybrid)
+       t            -> (t,[ bgroup "pure"     pure,
+                            bgroup "scalable" scalable,
+                            bgroup "hybrid"   hybrid ])
+
+  withArgs args' $ defaultMain list
+
   where sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
         hotkeySize = 1000
