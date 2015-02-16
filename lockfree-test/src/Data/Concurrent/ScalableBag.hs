@@ -52,12 +52,12 @@ remove bag = do
       retryLoop vec ix start = do
         tick <- unsafeReadVectorElem bag ix
         case peekTicket tick of
-          [] -> let ix' = succ ix in
+          [] -> let ix' = ix + 1 in
             if ix' == start
             then return Nothing -- looped around once, nothing to pop
             else if ix' >= V.length vec && start == 0
                  then return Nothing -- looped around once, nothing to pop
-                 else retryLoop vec (ix+1) start -- keep going
+                 else retryLoop vec ix' start -- keep going
           _ -> do
             res <- casVectorLoop bag pop ix
             case res of
