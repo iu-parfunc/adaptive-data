@@ -115,7 +115,7 @@ main = do
 -}
   let pure =
         [ bench "bag_new" $ Benchmarkable $ rep PB.newBag ] ++
-        [ bench ("bag_random--" ++ show elems) $
+        [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
         | elems <- parSizes
         ] ++
