@@ -8,6 +8,8 @@ import Control.Concurrent.Async (wait, withAsyncOn)
 import Control.Monad
 import Criterion.Main
 import Criterion.Types
+import Data.Atomics
+import Data.Atomics.Vector
 import Data.Int
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Storable as VS
@@ -69,14 +71,16 @@ hotKeyOrRandom newBag push reps splits vec = do
   forkJoin splits (\chunk -> for_ 1 (fromIntegral quota) $ \i -> do
                       flip <- randomRIO (0, 1) :: IO Float
                       idx <- if flip < 0.5 then randomRIO (0, VM.length vec - 1) else return 0
-                      elem <- VM.read vec idx
-                      b <- case elem of
-                          Nothing -> do
-                            b <- newBag
-                            -- FIXME, DATA RACE:
-                            VM.write vec idx $ Just b
-                            return b
-                          Just b -> return b
+                      tick <- readVectorElem vec idx
+                      b <- case peekTicket tick of
+                        Nothing -> do
+                          b <- newBag
+                          (success, tick') <- casVectorElem vec idx tick $ Just b
+                          if success
+                            then return b else case peekTicket tick' of
+                            Nothing -> error "shouldn't see this"
+                            Just b' -> return b'
+                        Just b -> return b
                       push b i)
 
 main :: IO ()
