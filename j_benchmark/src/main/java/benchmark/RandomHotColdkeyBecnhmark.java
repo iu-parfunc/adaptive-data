@@ -141,12 +141,14 @@ public class RandomHotColdkeyBecnhmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
-				System.out.println("*** >>> " + outerMutableIntTreeMap);
+
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			performanceData.get(mapConfig).put(new Integer(numOfThreads),
 					new Integer((int) (elapsed / runRepetitions)));
+			// System.out.println(numOfThreads + "*** >>> "
+			// + outerMutableIntTreeMap);
 		}
 	}
 

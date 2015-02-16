@@ -85,8 +85,6 @@ public class SimpleInsertionBenchmark {
 			throws InterruptedException, IOException {
 		benchmark(cuncorrencyType, valueType, runRepetitions, numofInsertions,
 				maxNumberOfThreads);
-		benchmark(cuncorrencyType, valueType, runRepetitions, numofInsertions,
-				maxNumberOfThreads);
 		writePerfData(numofInsertions, runRepetitions);
 	}
 
@@ -138,8 +136,9 @@ public class SimpleInsertionBenchmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
-				System.out.println("*** >>> " + mutableIntTreeMap);
 			}
+			// System.out.println(numOfThreads + " *** >>> " +
+			// mutableIntTreeMap);
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			performanceData.get(mapConfig).put(new Integer(numOfThreads),
@@ -217,9 +216,6 @@ public class SimpleInsertionBenchmark {
 			int numofInsertions, int runRepetitions, int maxNumberOfThreads)
 			throws InterruptedException, IOException {
 
-		benchmark(cuncorrencyType, valueType,
-				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
-				numofInsertions, maxNumberOfThreads);
 		benchmark(cuncorrencyType, valueType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
 				numofInsertions, maxNumberOfThreads);
