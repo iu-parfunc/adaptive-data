@@ -10,6 +10,7 @@ public class Util {
 	public static final String SYNCHRONIZED_MAP = "SYNCHRONIZED_HASH_MAP";
 	public static final String CONCURRENT_MAP = "CONCURRENT_HASH_MAP";
 	public static final String SKIP_LIST_MAP = "SKIP_LIST_MAP";
+	public static final String HYBRID_MAP = "HYBRID";
 	public static final String MUTABLE_INT_TREE_MAP = "MUTABLE_INT_TREE_MAP";
 	public static final String INT_TO_INT = "INT_TO_INT";
 	public static final String INT_TO_MUTABLE_INT_TREE_MAP = "INT_TO_MUTABLE_INT_TREE_MAP";

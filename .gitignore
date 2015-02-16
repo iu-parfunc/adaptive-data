@@ -1,0 +1,6 @@
+j_benchmark/target/
+j_benchmark/*.csv
+j_benchmark/*.*~
+j_benchmark/*.log
+
+
