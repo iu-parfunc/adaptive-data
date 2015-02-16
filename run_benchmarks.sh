@@ -21,7 +21,8 @@ if [ "$MACHINECLASS" == "" ]; then
     export MACHINECLASS=`hostname -s`
 fi
 
-echo "Running at GIT_DEPTH: "`git log --pretty=oneline | wc -l`
+export GIT_DEPTH=`git log --pretty=oneline | wc -l`
+echo "Running at GIT_DEPTH:" $GIT_DEPTH
 
 echo "On linux platforms, check CPU affinity:"
 taskset -pc $$ || echo ok

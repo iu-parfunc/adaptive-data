@@ -28,7 +28,7 @@ TAG=`date +'%s'`
 TABLENAME=AdaptivelyScalable
 
 REPORT=report_${executable}
-BAKDIR=$HOME/benchdata_bak/$TABLENAME/$executable
+BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
 WINDIR=$BAKDIR/uploaded
 FAILDIR=$BAKDIR/failed_upload
 
