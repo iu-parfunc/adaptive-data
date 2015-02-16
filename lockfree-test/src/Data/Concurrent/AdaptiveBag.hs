@@ -45,8 +45,6 @@ add bag x = do
             (success, t') <- casIORef bag tick $ Pure thresh (x:current)
             unless success $ loop (i-1) t'
       in loop thresh tick
-      -- (success, _) <- casIORef bag tick $ Pure (x:current)
-      -- unless success $ transition bag >> add bag x -- make sure this write isn't dropped
     Trans xs bag -> SB.add bag x
     LockFree bag -> SB.add bag x
 

@@ -25,14 +25,42 @@ executable=bench-lockfree-test
 
 TAG=`date +'%s'`
 
-REPORT=report_${executable}
+TABLENAME=AdaptivelyScalable
 
-CABAL=cabal-1.20
+REPORT=report_${executable}
+BAKDIR=$HOME/benchdata_bak/$TABLENAME/$executable
+WINDIR=$BAKDIR/uploaded
+FAILDIR=$BAKDIR/failed_upload
+
+mkdir -p $WINDIR
+mkdir -p $FAILDIR
+
+
+
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.9
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
+# If we don't have the Criterion uploader, don't bother trying
+if ! [ -x `which $CRITUPLOAD` ]; then
+    echo "Error: no $CRITUPLOAD found"
+    exit 1
+fi
+
+# CABAL=cabal-1.20
+# Cabal 1.20 has working parallel builds but it is too old to drive
+# GHC 7.10 it seems.  We get this error:
+#
+#    ghc: ghc no longer supports single-file style package databases
+#    (dist/package.conf.inplace) use 'ghc-pkg init' to create the
+#    database with the correct format.
+#
+# E.g. in build #7.
+CABAL=cabal-1.22
+
 CONFOPTS="--enable-benchmarks --allow-newer"
 
 function go() {    
-    WHICHBENCH=$*
-
+    VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
+    
     echo "Installing benchmark program."
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
@@ -41,23 +69,36 @@ function go() {
     $CABAL build ${executable}
     
     # Remove old versions to prevent inconsistent data
-    for i in 1 2 4 8 16 32; do
-	CRITREPORT=$REPORT-N$i.crit
-	rm -f $CRITREPORT
-	rm -f $CRITREPORT.html
-    done
+    # for i in 1 2 4 8 16 32; do
+    # 	CRITREPORT=$REPORT-N$i.crit
+    # 	rm -f $CRITREPORT
+    # 	rm -f $CRITREPORT.html
+    # done
 
     for i in 1 2 4 8 16 32; do
-	CRITREPORT=$REPORT-N$i.crit
-	./dist/build/$executable/$executable \
+	CRITREPORT=${TAG}_${REPORT}-N$i.crit
+	CSVREPORT=${TAG}_${REPORT}-N$i.csv
+	
+	./dist/build/$executable/$executable $BENCHVARIANT \
 	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+
+        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT --threads=$i $CRITREPORT
+	# --args=""
+
+	# NOTE: could aggregate these to ONE big CSV and then do the upload.
+        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+	if [ "$FAILED" == 1 ]; then
+	    cp $CSVREPORT $FAILDIR/
+	else
+	    cp $CSVREPORT $WINDIR/
+	fi
     done
 
     if [ $? = 0 ]; then
 	mkdir -p reports
-	cp *.html reports
-	cp *.crit reports
-	tar -cvf reports.tar reports/
+	cp ${TAG}_*.html reports
+	cp ${TAG}_*.crit reports
+	tar -cvf reports_${TAG}.tar reports/
     else
 	echo "Some benchmarks errored out! Don't expect good data."
     fi
@@ -66,20 +107,15 @@ function go() {
 case $BENCHVARIANT in
     pure)
 	echo "Running pure-in-a-box benchmarks..."
-	# FIXME: use standardized names:
-	go new/PureBag random-50-50/PureBag hotkey/PureBag
+	go 
 	;;
     scalable)
-	echo "FINISHME: run scalable benchmarks here"
-	    # "new/ScalableBag" \
-	    # "random-50-50/ScalableBag" \
-	    # "hotkey/ScalableBag" \
+	echo "Running regular scalable/lock-free benchmarks..."	
+	go 
 	;;
     hybrid)
-	echo "FINISHME: run hybrid benchmarks here"
-	    # "new/AdaptiveBag" \
-    	    # "random-50-50/AdaptiveBag" \
-	    # "hotkey/AdaptiveBag" \
+	echo "Running hybrid benchmarks..."
+	go 
 	;;
     *)
 	echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
