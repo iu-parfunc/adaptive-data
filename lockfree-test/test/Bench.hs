@@ -114,29 +114,29 @@ main = do
       ],
 -}
   let pure =
-        [ bench "bag_new" $ Benchmarkable $ rep PB.newBag ] ++
+        [ bench "bag_new-1" $ Benchmarkable $ rep PB.newBag ] ++
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
         | elems <- parSizes
         ] ++
-        [ bench "array-bag_hotcold-insert" $
+        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec) ]
         
       scalable =
-        [ bench "bag_new" $ Benchmarkable $ rep SB.newBag ]  ++    
+        [ bench "bag_new-1" $ Benchmarkable $ rep SB.newBag ]  ++ 
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
         | elems <- parSizes
         ] ++
-        [ bench "array-bag_hotcold-insert" $
+        [ bench ("array-bag_hotcold-insert-"++show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec) ]
         
       hybrid = 
-        [ bench "bag_new" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++    
+        [ bench "bag_new-1" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++    
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
         | elems <- parSizes ] ++
-        [ bench "array-bag_hotcold-insert" $ 
+        [ bench ("array-bag_hotcold-insert-"++show hotkeySize) $ 
           Benchmarkable $ rep
           (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec) ]
          
@@ -154,7 +154,7 @@ main = do
 
   where sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
-        hotkeySize = 1000
+        hotkeySize = 100000
 
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
 for_ start end _ | start > end = error "start greater than end"
