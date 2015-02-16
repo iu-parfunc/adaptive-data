@@ -18,6 +18,7 @@ flag debug
 library
   exposed-modules: Data.Concurrent.PureQueue
                    , Data.Concurrent.PureBag
+                   , Data.Concurrent.OldBag
                    , Data.Concurrent.ScalableBag
                    , Data.Concurrent.AdaptiveBag
   build-depends: base >= 4.6

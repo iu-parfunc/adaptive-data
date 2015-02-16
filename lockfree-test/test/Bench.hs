@@ -21,13 +21,14 @@ import qualified Data.Concurrent.PureQueue as PQ
 import qualified Data.Concurrent.Queue.MichaelScott as MS
 import qualified Data.Concurrent.AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
+import qualified Data.Concurrent.OldBag as OB
 import qualified Data.Concurrent.ScalableBag as SB
 
 --------------------------------------------------------------------------------
 -- Queue benchmarks:
 
 fillN :: IO a -> (a -> Int64 -> IO ()) -> Int64 -> IO ()
-fillN newQ insert num = do
+fillN newQ insert num = do 
   q <- newQ
   for_ 1 num $ \i -> insert q i
 
@@ -35,6 +36,7 @@ forkNFill :: IO a -> (a -> Int64 -> IO ()) -> Int -> Int -> IO ()
 forkNFill newQ insert elems splits = do
   q <- newQ
   let quota = fromIntegral $ elems `quot` splits
+  -- putStrLn$ "Splitting into this many ops per thread : "++show quota
   forkJoin splits (\chunk -> do
                       let offset = fromIntegral $ chunk * fromIntegral quota
                       for_ offset (offset + quota - 1) $
@@ -146,18 +148,36 @@ main = do
         | elems <- parSizes ] ++
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec) ]
-        
+
+      oldpure =
+        [ bench "bag_new-1" $ Benchmarkable $ rep OB.newBag ] ++
+        [ bench ("bag_insert-" ++ show elems) $
+          Benchmarkable $ rep (forkNFill OB.newBag OB.add elems splits)
+        | elems <- parSizes ] ++ 
+        [ bench ("bag_random5050-" ++ show elems) $
+          Benchmarkable $ rep (fork5050 OB.newBag OB.add OB.remove elems splits randomVec)
+        | elems <- parSizes ] ++
+        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
+          Benchmarkable $ rep (hotKeyOrRandom OB.newBag OB.add hotkeySize splits pureNothingVec) ]      
+      
       scalable =
-        [ bench "bag_new-1" $ Benchmarkable $ rep SB.newBag ]  ++ 
+        [ bench "bag_new-1" $ Benchmarkable $ rep SB.newBag ]  ++
+        [ bench ("bag_insert-" ++ show elems) $
+          Benchmarkable $ rep (forkNFill SB.newBag SB.add elems splits)
+        | elems <- parSizes ] ++ 
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
         | elems <- parSizes
         ] ++
         [ bench ("array-bag_hotcold-insert-0.5-"++show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec) ]
-        
+
+  -- TODO: FURTHER DEDUPLICATE these three blocks of code!
       hybrid = 
-        [ bench "bag_new-1" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++    
+        [ bench "bag_new-1" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++
+        [ bench ("bag_insert-" ++ show elems) $
+          Benchmarkable $ rep (forkNFill AB.newBag AB.add elems splits)
+        | elems <- parSizes ] ++         
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
         | elems <- parSizes ] ++
@@ -169,9 +189,11 @@ main = do
   let (args',list) =
        case args of
        "pure":t     -> (t,pure)
+       "oldpure":t  -> (t,oldpure)
        "scalable":t -> (t,scalable)
        "hybrid":t   -> (t,hybrid)
        t            -> (t,[ bgroup "pure"     pure,
+                            bgroup "oldpure"  oldpure,
                             bgroup "scalable" scalable,
                             bgroup "hybrid"   hybrid ])
 
