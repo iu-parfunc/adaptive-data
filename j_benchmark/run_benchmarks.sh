@@ -4,6 +4,9 @@ echo "FINISHME: invoke java benchmarks here and then upload"
 set -xe
 
 case $BENCHVARIANT in
+    oldpure)
+	echo "This variant is only for Haskell, it does nothing on the Java side."
+	;;    
     pure)
 	echo "FINISHME: Run pure-in-a-box benchmarks here..."
 	;;
