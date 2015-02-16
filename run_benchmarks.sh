@@ -13,6 +13,10 @@ set -e
 
 EXTRAARGS=$*
 
+# Use LVish uploader for now. These env vars are picked up by hsbencher-fusion:
+export HSBENCHER_GOOGLE_CLIENTID=820162629229-kp29aklebt6ucos5a71u8tu3hu8unres.apps.googleusercontent.com
+export HSBENCHER_GOOGLE_CLIENTSECRET=pSsMxVAJCFKyWsazuxZVRZwX
+
 if [ "$MACHINECLASS" == "" ]; then
     export MACHINECLASS=`hostname -s`
 fi
