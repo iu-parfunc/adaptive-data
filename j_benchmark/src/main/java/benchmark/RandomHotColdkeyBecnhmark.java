@@ -27,12 +27,13 @@ public class RandomHotColdkeyBecnhmark {
 			int maxNumberOfThreads, double coldKeyProbability)
 			throws IOException, InterruptedException {
 		String outputFileName = String.format(
-				"random_hot_cold_key_selection_benchmark_%d_%d>_<%d_%d.csv",
+				"random_hot_cold_key_selection_benchmark_%f_%d_%f_%d.csv",
 				coldKeyProbability, numofInsertions, hotKeyPercentage,
 				maxNumberOfThreads);
 		writer = new BufferedWriter(new FileWriter(new File(outputFileName)));
 
-		// warmUp(coldKeyProbability, hotKeyPercentage);
+		warmUp(numofInsertions, hotKeyPercentage, runRepetitions,
+				maxNumberOfThreads, coldKeyProbability);
 		runBenchmark(numofInsertions, hotKeyPercentage, runRepetitions,
 				maxNumberOfThreads, coldKeyProbability);
 		writer.close();
@@ -42,21 +43,19 @@ public class RandomHotColdkeyBecnhmark {
 	private void runBenchmark(int numofInsertions, double hotKeyPercentage,
 			int runRepetitions, int maxNumberOfThreads,
 			double coldKeyProbability) throws InterruptedException, IOException {
-		boolean warmUp = false;
 		benchmark(Util.SKIP_LIST_MAP, runRepetitions, numofInsertions,
-				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability,
-				warmUp);
+				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability);
 		benchmark(Util.CONCURRENT_MAP, runRepetitions, numofInsertions,
-				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability,
-				warmUp);
+				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability);
 		benchmark(Util.MUTABLE_INT_TREE_MAP, runRepetitions, numofInsertions,
-				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability,
-				warmUp);
+				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability);
+		
+		writePerfData(numofInsertions, hotKeyPercentage, coldKeyProbability);
 	}
 
 	private void benchmark(String concurrencyType, int runRepetitions,
 			int numofInsertions, double hotKeyPercentage,
-			int maxNumberOfThreads, double coldKeyProbability, boolean warmUp)
+			int maxNumberOfThreads, double coldKeyProbability)
 			throws InterruptedException, IOException {
 
 		String mapValueType = "INT_TO_" + concurrencyType + "INT_TO_INT";
@@ -74,7 +73,7 @@ public class RandomHotColdkeyBecnhmark {
 			randomInsertRepetitions = numofInsertions / numOfThreads;
 
 			startTime = System.currentTimeMillis();
-			for (int i = 0; i < runRepetitions; i++) {
+			for (int i = 1; i <= runRepetitions; i++) {
 
 				outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 				outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
@@ -119,14 +118,13 @@ public class RandomHotColdkeyBecnhmark {
 			performanceData.get(mapConfig).put(new Integer(numOfThreads),
 					new Integer((int) (elapsed / runRepetitions)));
 		}
-		if (!warmUp) {
-			writePerfData(numofInsertions, hotKeyPercentage, coldKeyProbability);
-		}
 	}
 
 	private void writePerfData(int numofInsertions, double hotKeyPercentage,
 			double coldKeyProbability) throws IOException {
 
+		Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
+		
 		Integer numerOfThreads, timeTaken;
 		TreeMap<Integer, Integer> perfDataPerMapType;
 		Iterator<Integer> numberOfThreadsITR;
@@ -150,22 +148,27 @@ public class RandomHotColdkeyBecnhmark {
 		}
 	}
 
-	private void warmUp(double coldKeyProbability, double hotKeyPercentage)
-			throws InterruptedException, IOException {
-		boolean warmUp = true;
-		benchmark(Util.SKIP_LIST_MAP, 10, 10000, hotKeyPercentage, 64,
-				coldKeyProbability, warmUp);
-		benchmark(Util.CONCURRENT_MAP, 10, 10000, hotKeyPercentage, 64,
-				coldKeyProbability, warmUp);
-		benchmark(Util.MUTABLE_INT_TREE_MAP, 10, 10000, hotKeyPercentage, 64,
-				coldKeyProbability, warmUp);
+	private void warmUp(int numofInsertions, double hotKeyPercentage,
+			int runRepetitions, int maxNumberOfThreads,
+			double coldKeyProbability) throws InterruptedException, IOException {
+		benchmark(Util.SKIP_LIST_MAP,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, hotKeyPercentage, maxNumberOfThreads,
+				coldKeyProbability);
+		benchmark(Util.CONCURRENT_MAP,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, hotKeyPercentage, maxNumberOfThreads,
+				coldKeyProbability);
+		benchmark(Util.MUTABLE_INT_TREE_MAP,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, hotKeyPercentage, maxNumberOfThreads,
+				coldKeyProbability);
 	}
 
-	public static void main(String[] args) throws InterruptedException,
-			NumberFormatException, IOException {
+	public static void main(String[] args) {
 
 		try {
-
+ 
 			int numofInsertions = Integer.parseInt(args[0]);
 			double hotKeyPercentage = Double.parseDouble(args[1]);
 			int runRepetitions = Integer.parseInt(args[2]);
@@ -174,7 +177,9 @@ public class RandomHotColdkeyBecnhmark {
 			new RandomHotColdkeyBecnhmark(numofInsertions, hotKeyPercentage,
 					runRepetitions, maxNumberOfThreads, coldKeyProbability);
 
-		} catch (Exception e) {
+		} catch (InterruptedException | IOException e) {
+			e.printStackTrace();
+		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
 			System.out
 					.println("Please enter the folowing input data:\n"
 							+ " 1-Number of insertions\n"

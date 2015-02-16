@@ -31,9 +31,8 @@ public class SimpleInsertionBenchmark {
 				"simple_insertion_benchmark_%d_%d.csv", numofInsertions,
 				maxNumberOfThreads);
 		writer = new BufferedWriter(new FileWriter(new File(outputFileName)));
-		Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
 
-		// warmUp();
+		warmUp(numofInsertions, runRepetitions, maxNumberOfThreads);
 		runBenchmark(numofInsertions, runRepetitions, maxNumberOfThreads);
 
 		writer.close();
@@ -41,28 +40,27 @@ public class SimpleInsertionBenchmark {
 
 	private void runBenchmark(int numofInsertions, int runRepetitions,
 			int maxNumberOfThreads) throws InterruptedException, IOException {
-		boolean warmUp = false;
 		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT, runRepetitions,
-				numofInsertions, maxNumberOfThreads, warmUp);
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
+				runRepetitions, numofInsertions, maxNumberOfThreads);
 		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_INT, runRepetitions,
-				numofInsertions, maxNumberOfThreads, warmUp);
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
+				runRepetitions, numofInsertions, maxNumberOfThreads);
 		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_INT, runRepetitions,
-				numofInsertions, maxNumberOfThreads, warmUp);
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
+				runRepetitions, numofInsertions, maxNumberOfThreads);
 		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_INT, runRepetitions,
-				numofInsertions, maxNumberOfThreads, warmUp);
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_MUTABLE_INT_TREE_MAP,
-				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
+				runRepetitions, numofInsertions, maxNumberOfThreads);
+		writePerfData(numofInsertions, runRepetitions);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
-			int runRepetitions, int numofInsertions, int maxNumberOfThreads,
-			boolean warmUp) throws InterruptedException, IOException {
+			int runRepetitions, int numofInsertions, int maxNumberOfThreads) throws InterruptedException, IOException {
 
 		initiatlizeMap(concurrencyType, mapValueType);
 		String mapConfig = concurrencyType + "_" + mapValueType;
@@ -79,10 +77,10 @@ public class SimpleInsertionBenchmark {
 			numOfInsretionsPerThread = numofInsertions / numOfThreads;
 
 			startTime = System.currentTimeMillis();
-			for (int i = 0; i < runRepetitions; i++) {
+			for (int i = 1; i <= runRepetitions; i++) {
 
 				mutableIntTreeMap = new AtomicReference(IntTreePMap.empty());
-				// threadSafeMap.clear();
+				threadSafeMap.clear();
 
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
@@ -107,15 +105,11 @@ public class SimpleInsertionBenchmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
-				System.out.println(mutableIntTreeMap);
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			performanceData.get(mapConfig).put(new Integer(numOfThreads),
 					new Integer((int) (elapsed / runRepetitions)));
-		}
-		if (!warmUp) {
-			writePerfData(numofInsertions, runRepetitions);
 		}
 	}
 
@@ -162,6 +156,8 @@ public class SimpleInsertionBenchmark {
 	private void writePerfData(int numofInsertions, int runRepetitions)
 			throws IOException {
 
+		Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
+		
 		Integer numerOfThreads, timeTaken;
 		TreeMap<Integer, Integer> perfDataPerMapType;
 		Iterator<Integer> numberOfThreadsITR;
@@ -182,25 +178,36 @@ public class SimpleInsertionBenchmark {
 		}
 	}
 
-	private void warmUp() throws InterruptedException, IOException {
-		boolean warmUp = true;
-		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
+	private void warmUp(int numofInsertions, int runRepetitions,
+			int maxNumberOfThreads) throws InterruptedException, IOException {
+		
+		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				10, 10000, 64, warmUp);
-		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
+		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_INT,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				10, 10000, 64, warmUp);
-		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
-		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT, 10,
-				10000, 64, warmUp);
-		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_INT, 10, 10000, 64,
-				warmUp);
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
+		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_INT,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
+		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
+		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_INT,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
 		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_MUTABLE_INT_TREE_MAP,
-				10, 10000, 64, warmUp);
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads);
 	}
 
-	public static void main(String[] args) throws InterruptedException,
-			NumberFormatException, IOException {
+	public static void main(String[] args) {
 
 		try {
 			int numofInsertions = Integer.parseInt(args[0]);
@@ -208,7 +215,9 @@ public class SimpleInsertionBenchmark {
 			int maxNumberOfThreads = Integer.parseInt(args[2]);
 			new SimpleInsertionBenchmark(numofInsertions, runRepetitions,
 					maxNumberOfThreads);
-		} catch (Exception e) {
+		} catch (InterruptedException | IOException e) {
+			e.printStackTrace();
+		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
 			System.out
 					.println("Please enter the folowing input data:\n"
 							+ " 1-Number of insertions\n"
@@ -217,5 +226,6 @@ public class SimpleInsertionBenchmark {
 							+ " Output will be put in "
 							+ "\"simple_insertion_benchmark_<Number of insertions>_<Maximum number of threads>.csv\"");
 		}
+
 	}
 }
