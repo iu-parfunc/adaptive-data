@@ -8,65 +8,109 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.pcollections.IntTreePMap;
 
 public class Inserter extends Thread {
 
-	int insertionStratIndex, insertionEndIndex, numberOfRandomInsertionTries,
-			randomColdKeyMax;
 	@SuppressWarnings("rawtypes")
-	Map map;
-	
-	ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
-	ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
-	String mapValueType, concurrentMapType;
-	CountDownLatch startSignal, doneSignal;
+	private Map map;
+	private CountDownLatch startSignal, doneSignal;
+	private int threadID;
+	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
+	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
+	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap;
+	private AtomicReference<IntTreePMap<?>> mutableIntTreeMap;
 
-	boolean randomInsertionToInnerSLMap = false;
-	double hotOrRandomKeyThreshold;
+	private String mapValueType, concurrentMapType, benchmarkType;
+	private double hotOrRandomKeyThreshold, hotKeyPercentage;
+	private int insertionStratIndex, insertionEndIndex,
+			numberOfRandomInsertionTries, hotColdKeyRangeMax;
+
+	Random innerMapKeyValGen = new Random();
+	Random hotOrRandomKeyGen = new Random();
+	Random coldKeyGen = new Random();
+	Random hotKeyGen = new Random();
+
+	public Inserter(AtomicReference<IntTreePMap<?>> mutableIntTreeMap,
+			int insertionStartIndex, int insertionEndIndex,
+			String mapValuetype, CountDownLatch startSignal,
+			CountDownLatch doneSignal) {
+
+		benchmarkType = Util.INSERT_TO_MUTABLE_INT_TREE_MAP;
+		this.mutableIntTreeMap = mutableIntTreeMap;
+		this.mapValueType = mapValuetype;
+		this.insertionStratIndex = insertionStartIndex;
+		this.insertionEndIndex = insertionEndIndex;
+		initializeSynchLatches(startSignal, doneSignal);
+	}
 
 	public Inserter(@SuppressWarnings("rawtypes") Map map,
 			int insertionStartIndex, int insertionEndIndex,
 			String mapValuetype, CountDownLatch startSignal,
 			CountDownLatch doneSignal) {
+		benchmarkType = Util.SIMPLE_INSERTION_BENCHMARK;
 		this.map = map;
 		this.mapValueType = mapValuetype;
 		this.insertionStratIndex = insertionStartIndex;
 		this.insertionEndIndex = insertionEndIndex;
-		this.startSignal = startSignal;
-		this.doneSignal = doneSignal;
+		initializeSynchLatches(startSignal, doneSignal);
 	}
 
 	public Inserter(
-			ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> map,
-			int randomInsertRepetitions, int randomColdKeyMax,
-			double hotOrRandomKeyThreshold, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap,
+			int numberOfRandomInsertionTries, int hotColdKeyRangeMax,
+			double hotKeyPercentage, double hotOrRandomKeyThreshold,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
-		this.outerConcSkipListMap = map;
-		this.startSignal = startSignal;
-		this.doneSignal = doneSignal;
-		this.numberOfRandomInsertionTries = randomInsertRepetitions;
+		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		this.outerConcSkipListMap = outerConcSkipListMap;
+		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
 		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
-		this.randomColdKeyMax = randomColdKeyMax;
-		randomInsertionToInnerSLMap = true;
+		this.hotKeyPercentage = hotKeyPercentage;
+		this.hotColdKeyRangeMax = hotColdKeyRangeMax;
 		concurrentMapType = Util.SKIP_LIST_MAP;
+		initializeSynchLatches(startSignal, doneSignal);
 	}
 
 	public Inserter(
-			ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> map,
-			int randomInsertRepetitions, int randomColdKeyMax,
-			double hotOrRandomKeyThreshold, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap,
+			int numberOfRandomInsertionTries, int hotColdKeyRangeMax,
+			double hotKeyPercentage, double hotOrRandomKeyThreshold,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
-		this.outerConcHashMap = map;
+		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		this.outerConcHashMap = outerConcHashMap;
+		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
+		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
+		this.hotKeyPercentage = hotKeyPercentage;
+		this.hotColdKeyRangeMax = hotColdKeyRangeMax;
+		concurrentMapType = Util.CONCURRENT_MAP;
+		initializeSynchLatches(startSignal, doneSignal);
+	}
+
+	public Inserter(
+			AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap,
+			int numberOfRandomInsertionTries, int hotColdKeyRangeMax,
+			double hotKeyPercentage, double hotOrRandomKeyThreshold,
+			CountDownLatch startSignal, CountDownLatch doneSignal, int threadID) {
+
+		this.threadID = threadID;
+		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		this.outerMutableIntTreeMap = outerMutableIntTreeMap;
+		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
+		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
+		this.hotKeyPercentage = hotKeyPercentage;
+		this.hotColdKeyRangeMax = hotColdKeyRangeMax;
+		concurrentMapType = Util.MUTABLE_INT_TREE_MAP;
+		initializeSynchLatches(startSignal, doneSignal);
+	}
+
+	private void initializeSynchLatches(CountDownLatch startSignal,
+			CountDownLatch doneSignal) {
 		this.startSignal = startSignal;
 		this.doneSignal = doneSignal;
-		this.numberOfRandomInsertionTries = randomInsertRepetitions;
-		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
-		this.randomColdKeyMax = randomColdKeyMax;
-		randomInsertionToInnerSLMap = true;
-		concurrentMapType = Util.CONCURRENT_MAP;
-
 	}
 
 	@SuppressWarnings("unchecked")
@@ -77,35 +121,56 @@ public class Inserter extends Thread {
 
 			/* Wait for start signal from the calling thread */
 			startSignal.await();
-			if (!randomInsertionToInnerSLMap) {
+			switch (benchmarkType) {
+			case Util.SIMPLE_INSERTION_BENCHMARK:
 				switch (mapValueType) {
 				case Util.INT_TO_INT:
-
-					insertToMapOfNonCollectionTypes();
+					for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+						map.put(new Integer(i), new Integer(i));
+					}
 					break;
-
 				case Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT:
-					insertToMapOfMaps();
+					for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+						map.put(new Integer(i), Collections
+								.synchronizedMap(new HashMap<String, String>()));
+					}
 					break;
-
 				default:
 					break;
 				}
-			} else {
+				break;
+			case Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP:
 				switch (concurrentMapType) {
 				case Util.SKIP_LIST_MAP:
-
-					insertToConcSKipListMapOfConcSKipListMap(randomColdKeyMax);
+					randomInsertionToConcSKipListMapOfConcSKipListMap();
 					break;
-
 				case Util.CONCURRENT_MAP:
-					insertToConcHahsMapOfConcHahsMap(randomColdKeyMax);
+					randomInsertionToConcHahsMapOfConcHahsMap();
 					break;
-
+				case Util.MUTABLE_INT_TREE_MAP:
+					randomInsertionToMutableIntTreeOfIntTreeValus();
+					break;
 				default:
 					break;
 				}
+				break;
+			case Util.INSERT_TO_MUTABLE_INT_TREE_MAP:
+
+				switch (mapValueType) {
+				case Util.INT_TO_INT:
+					simpleInsertionBenchmarkONMutableIntTreeOfIntValus();
+					break;
+				case Util.INT_TO_MUTABLE_INT_TREE_MAP:
+					simpleInsertionBenchmarkONMutableIntTreeOfIntTreeValus();
+					break;
+				default:
+					break;
+				}
+				break;
+			default:
+				break;
 			}
+
 			/* Signal that this thread is done */
 			doneSignal.countDown();
 
@@ -114,94 +179,151 @@ public class Inserter extends Thread {
 		}
 	}
 
-	private void insertToConcSKipListMapOfConcSKipListMap(int range) {
+	@SuppressWarnings("unchecked")
+	private void simpleInsertionBenchmarkONMutableIntTreeOfIntValus() {
 
-		Random hotOrRandomKeyGen = new Random();
-		Random coldKeyGen = new Random();
-		Random hotKeyGen = new Random();
+		IntTreePMap<Integer> lastSnapSot;
+		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
-		Integer coldKey, hotKey;
-		for (int i = 0; i < numberOfRandomInsertionTries; i++) {
-
-			double hotOrRandomKey = hotOrRandomKeyGen.nextDouble();
-			if (hotOrRandomKey < hotOrRandomKeyThreshold) {
-				coldKey = new Integer(coldKeyGen.nextInt(range));
-				putToOuterAndInnerConcSkipListMap(outerConcSkipListMap,
-						coldKey, 1000000);
-
-			} else {
-				hotKey = new Integer(Util.HOT_KEYS.get(hotKeyGen
-						.nextInt(Util.HOT_KEYS.size())));
-				putToOuterAndInnerConcSkipListMap(outerConcSkipListMap, hotKey,
-						1000000);
+			Integer key = new Integer(i);
+			Integer value = new Integer(i);
+			lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMap.get();
+			while (!mutableIntTreeMap.compareAndSet(lastSnapSot,
+					lastSnapSot.plus(key, value))) {
+				lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMap.get();
 			}
 		}
 	}
 
-	private void insertToConcHahsMapOfConcHahsMap(int range) {
+	@SuppressWarnings("unchecked")
+	private void simpleInsertionBenchmarkONMutableIntTreeOfIntTreeValus() {
 
-		Random hotOrRandomKeyGen = new Random();
-		Random coldKeyGen = new Random();
-		Random hotKeyGen = new Random();
+		IntTreePMap<IntTreePMap<Integer>> lastSnapSot;
+		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
-		Integer coldKey, hotKey;
-		for (int i = 0; i < numberOfRandomInsertionTries; i++) {
-
-			double hotOrRandomKey = hotOrRandomKeyGen.nextDouble();
-			if (hotOrRandomKey < hotOrRandomKeyThreshold) {
-
-				coldKey = new Integer(coldKeyGen.nextInt(range));
-				putToOuterAndInnerConcHashMap(outerConcHashMap, coldKey, range);
-
-			} else {
-				hotKey = new Integer(Util.HOT_KEYS.get(hotKeyGen
-						.nextInt(Util.HOT_KEYS.size())));
-				putToOuterAndInnerConcHashMap(outerConcHashMap, hotKey, range);
+			Integer key = new Integer(i);
+			IntTreePMap<Integer> value = IntTreePMap.empty();
+			lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
+					.get();
+			while (!mutableIntTreeMap.compareAndSet(lastSnapSot,
+					lastSnapSot.plus(key, value))) {
+				lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
+						.get();
 			}
 		}
 	}
 
-	private void putToOuterAndInnerConcSkipListMap(
-			ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerCSLMap,
-			Integer key, int range) {
-		Random innerMapKeyValGen = new Random();
-		ConcurrentSkipListMap<Integer, Integer> newMap = new ConcurrentSkipListMap<Integer, Integer>();
-		ConcurrentSkipListMap<Integer, Integer> innerMap = (ConcurrentSkipListMap<Integer, Integer>) outerCSLMap
-				.putIfAbsent(key, newMap);
-		if (innerMap == null) {
-			innerMap = newMap;
-		}
-		innerMap.put(new Integer(innerMapKeyValGen.nextInt(range)),
-				new Integer(innerMapKeyValGen.nextInt(range)));
-	}
+	private void randomInsertionToConcSKipListMapOfConcSKipListMap() {
 
-	private void putToOuterAndInnerConcHashMap(
-			ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerCHMap,
-			Integer key, int range) {
-		Random innerMapKeyValGen = new Random();
-		ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<Integer, Integer>();
-		ConcurrentHashMap<Integer, Integer> innerMap = (ConcurrentHashMap<Integer, Integer>) outerCHMap
-				.putIfAbsent(key, newMap);
-		if (innerMap == null) {
-			innerMap = newMap;
-		}
-		innerMap.put(new Integer(innerMapKeyValGen.nextInt(range)),
-				new Integer(innerMapKeyValGen.nextInt(range)));
-	}
+		Integer randomKey;
+		for (int i = 0; i < numberOfRandomInsertionTries; i++) {
 
-	private void insertToMapOfNonCollectionTypes() {
-
-		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-
-			map.put(new Integer(i), new Integer(i));
+			double hotOrColdKey = hotOrRandomKeyGen.nextDouble();
+			if (hotOrColdKey < hotOrRandomKeyThreshold) {
+				randomKey = new Integer(coldKeyGen.nextInt(hotColdKeyRangeMax));
+			} else {
+				randomKey = Util.getNextHotKey(hotKeyGen, 0,
+						hotColdKeyRangeMax, hotKeyPercentage);
+			}
+			
+			ConcurrentSkipListMap<Integer, Integer> newMap = new ConcurrentSkipListMap<Integer, Integer>();
+			ConcurrentSkipListMap<Integer, Integer> innerMap = (ConcurrentSkipListMap<Integer, Integer>) outerConcSkipListMap
+					.putIfAbsent(randomKey, newMap);
+			if (innerMap == null) {
+				innerMap = newMap;
+			}
+			innerMap.put(nextRandomInnerMapKeyOrValue(),
+					nextRandomInnerMapKeyOrValue());
 		}
 	}
 
-	private void insertToMapOfMaps() {
-		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+	private void randomInsertionToConcHahsMapOfConcHahsMap() {
 
-			map.put(new Integer(i),
-					Collections.synchronizedMap(new HashMap<String, String>()));
+		Integer randomKey;
+		for (int i = 0; i < numberOfRandomInsertionTries; i++) {
+
+			double hotOrColdKey = hotOrRandomKeyGen.nextDouble();
+			if (hotOrColdKey < hotOrRandomKeyThreshold) {
+				randomKey = new Integer(coldKeyGen.nextInt(hotColdKeyRangeMax));
+
+			} else {
+				randomKey = Util.getNextHotKey(hotKeyGen, 0,
+						hotColdKeyRangeMax, hotKeyPercentage);
+			}
+			
+			ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<Integer, Integer>();
+			ConcurrentHashMap<Integer, Integer> innerMap = (ConcurrentHashMap<Integer, Integer>) outerConcHashMap
+					.putIfAbsent(randomKey, newMap);
+			if (innerMap == null) {
+				innerMap = newMap;
+			}
+			innerMap.put(nextRandomInnerMapKeyOrValue(),
+					nextRandomInnerMapKeyOrValue());
 		}
+	}
+
+
+	private void randomInsertionToMutableIntTreeOfIntTreeValus() {
+
+		Integer randomKey;
+		for (int i = 0; i < numberOfRandomInsertionTries; i++) {
+
+			double hotOrRandomKey = hotOrRandomKeyGen.nextDouble();
+			if (hotOrRandomKey < hotOrRandomKeyThreshold) {
+				randomKey = new Integer(coldKeyGen.nextInt(hotColdKeyRangeMax));
+			} else {
+				randomKey = Util.getNextHotKey(hotKeyGen, 0,
+						hotColdKeyRangeMax, hotKeyPercentage);
+			}
+			putToOuterAndInnerMutableIntMap(outerMutableIntTreeMap, randomKey);
+		}
+	}
+
+	private void putToOuterAndInnerMutableIntMap(
+			AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap,
+			Integer key) {
+
+		AtomicReference<IntTreePMap<Integer>> newMap = new AtomicReference(
+				IntTreePMap.empty());
+		AtomicReference<IntTreePMap<Integer>> innerMutableIntTreeMap;
+
+		IntTreePMap<AtomicReference<IntTreePMap<Integer>>> outerIntTreeMap = outerMutableIntTreeMap
+				.get();
+		innerMutableIntTreeMap = outerIntTreeMap.get(key);
+		if (innerMutableIntTreeMap == null) {
+			innerMutableIntTreeMap = newMap;
+		}
+		IntTreePMap<Integer> innerIntTreeMap = innerMutableIntTreeMap.get();
+
+		Integer innerKey = nextRandomInnerMapKeyOrValue();
+		Integer innerValue = nextRandomInnerMapKeyOrValue();
+
+		try {
+
+			while (!innerMutableIntTreeMap.compareAndSet(innerIntTreeMap,
+					innerIntTreeMap.plus(innerKey, innerValue))
+					|| !outerMutableIntTreeMap.compareAndSet(outerIntTreeMap,
+							outerIntTreeMap.plus(key, innerMutableIntTreeMap))) {
+				// System.out.println(this.threadID + " >>> "
+				// + doneSignal.getCount() + " >>> " + key + " >>> "
+				// + outerMutableIntTreeMap.get()
+				// + " >>> innerMutableIntTreeMap is "
+				// + innerMutableIntTreeMap);
+				outerIntTreeMap = outerMutableIntTreeMap.get();
+				innerMutableIntTreeMap = outerIntTreeMap.get(key);
+				if (innerMutableIntTreeMap == null) {
+					innerMutableIntTreeMap = newMap;
+				}
+				innerIntTreeMap = innerMutableIntTreeMap.get();
+			}
+			innerIntTreeMap = innerMutableIntTreeMap.get();
+
+		} catch (NullPointerException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private Integer nextRandomInnerMapKeyOrValue() {
+		return new Integer(innerMapKeyValGen.nextInt(hotColdKeyRangeMax));
 	}
 }
