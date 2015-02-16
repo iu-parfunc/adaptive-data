@@ -25,13 +25,20 @@ executable=bench-lockfree-test
 
 TAG=`date +'%s'`
 
-REPORT=report_${executable}
-
 TABLENAME=AdaptivelyScalable
 
+REPORT=report_${executable}
+BAKDIR=$HOME/benchdata_bak/$TABLENAME/$executable
+WINDIR=$BAKDIR/uploaded
+FAILDIR=$BAKDIR/failed_upload
 
-CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.8
-CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.8
+mkdir -p $WINDIR
+mkdir -p $FAILDIR
+
+
+
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.9
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 # If we don't have the Criterion uploader, don't bother trying
 if ! [ -x `which $CRITUPLOAD` ]; then
     echo "Error: no $CRITUPLOAD found"
@@ -79,14 +86,19 @@ function go() {
 	# --args=""
 
 	# NOTE: could aggregate these to ONE big CSV and then do the upload.
-        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME 
+        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+	if [ "$FAILED" == 1 ]; then
+	    cp $CSVREPORT $FAILDIR/
+	else
+	    cp $CSVREPORT $WINDIR/
+	fi
     done
 
     if [ $? = 0 ]; then
 	mkdir -p reports
 	cp ${TAG}_*.html reports
 	cp ${TAG}_*.crit reports
-	tar -cvf reports.tar reports/
+	tar -cvf reports_${TAG}.tar reports/
     else
 	echo "Some benchmarks errored out! Don't expect good data."
     fi
