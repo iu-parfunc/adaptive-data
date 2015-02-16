@@ -75,7 +75,7 @@ function go() {
     # 	rm -f $CRITREPORT.html
     # done
 
-    for i in 1 2 4 8 16 32; do
+    for i in 1 2 4 8 16 24 32; do
 	CRITREPORT=${TAG}_${REPORT}-N$i.crit
 	CSVREPORT=${TAG}_${REPORT}-N$i.csv
 	
