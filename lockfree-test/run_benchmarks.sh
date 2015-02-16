@@ -69,13 +69,14 @@ function go() {
     # done
 
     for i in 1 2 4 8 16 32; do
-	CRITREPORT=$TAG_$REPORT-N$i.crit
-	CSVREPORT=$TAG_$REPORT-N$i.csv
+	CRITREPORT=${TAG}_${REPORT}-N$i.crit
+	CSVREPORT=${TAG}_${REPORT}-N$i.csv
 	
 	./dist/build/$executable/$executable \
 	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
 
-        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion --threads=$i --args=""
+        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=criterion --threads=$i $CRITREPORT
+	# --args=""
 
 	# NOTE: could aggregate these to ONE big CSV and then do the upload.
         $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME 
