@@ -38,7 +38,7 @@ public class Inserter extends Thread {
 			String mapValuetype, CountDownLatch startSignal,
 			CountDownLatch doneSignal) {
 
-		benchmarkType = Util.INSERT_TO_MUTABLE_INT_TREE_MAP;
+		benchmarkType = Util.SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP;
 		this.mutableIntTreeMap = mutableIntTreeMap;
 		this.mapValueType = mapValuetype;
 		this.insertionStratIndex = insertionStartIndex;
@@ -50,7 +50,7 @@ public class Inserter extends Thread {
 			int insertionStartIndex, int insertionEndIndex,
 			String mapValuetype, CountDownLatch startSignal,
 			CountDownLatch doneSignal) {
-		benchmarkType = Util.SIMPLE_INSERTION_BENCHMARK;
+		benchmarkType = Util.SIMPLE_INSERTION;
 		this.map = map;
 		this.mapValueType = mapValuetype;
 		this.insertionStratIndex = insertionStartIndex;
@@ -64,7 +64,7 @@ public class Inserter extends Thread {
 			double hotKeyPercentage, double hotOrRandomKeyThreshold,
 			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
-		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		benchmarkType = Util.RANDOM_HOT_COLD;
 		this.outerConcSkipListMap = outerConcSkipListMap;
 		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
 		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
@@ -80,7 +80,7 @@ public class Inserter extends Thread {
 			double hotKeyPercentage, double hotOrRandomKeyThreshold,
 			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
-		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		benchmarkType = Util.RANDOM_HOT_COLD;
 		this.outerConcHashMap = outerConcHashMap;
 		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
 		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
@@ -97,7 +97,7 @@ public class Inserter extends Thread {
 			CountDownLatch startSignal, CountDownLatch doneSignal, int threadID) {
 
 		this.threadID = threadID;
-		benchmarkType = Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP;
+		benchmarkType = Util.RANDOM_HOT_COLD;
 		this.outerMutableIntTreeMap = outerMutableIntTreeMap;
 		this.numberOfRandomInsertionTries = numberOfRandomInsertionTries;
 		this.hotOrRandomKeyThreshold = hotOrRandomKeyThreshold;
@@ -122,7 +122,7 @@ public class Inserter extends Thread {
 			/* Wait for start signal from the calling thread */
 			startSignal.await();
 			switch (benchmarkType) {
-			case Util.SIMPLE_INSERTION_BENCHMARK:
+			case Util.SIMPLE_INSERTION:
 				switch (mapValueType) {
 				case Util.INT_TO_INT:
 					for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
@@ -139,7 +139,7 @@ public class Inserter extends Thread {
 					break;
 				}
 				break;
-			case Util.RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP:
+			case Util.RANDOM_HOT_COLD:
 				switch (concurrentMapType) {
 				case Util.SKIP_LIST_MAP:
 					randomInsertionToConcSKipListMapOfConcSKipListMap();
@@ -154,8 +154,8 @@ public class Inserter extends Thread {
 					break;
 				}
 				break;
-			case Util.INSERT_TO_MUTABLE_INT_TREE_MAP:
-
+				
+			case Util.SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP:
 				switch (mapValueType) {
 				case Util.INT_TO_INT:
 					simpleInsertionBenchmarkONMutableIntTreeOfIntValus();
@@ -200,7 +200,7 @@ public class Inserter extends Thread {
 
 		IntTreePMap<IntTreePMap<Integer>> lastSnapSot;
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-
+			
 			Integer key = new Integer(i);
 			IntTreePMap<Integer> value = IntTreePMap.empty();
 			lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
@@ -225,7 +225,7 @@ public class Inserter extends Thread {
 				randomKey = Util.getNextHotKey(hotKeyGen, 0,
 						hotColdKeyRangeMax, hotKeyPercentage);
 			}
-			
+
 			ConcurrentSkipListMap<Integer, Integer> newMap = new ConcurrentSkipListMap<Integer, Integer>();
 			ConcurrentSkipListMap<Integer, Integer> innerMap = (ConcurrentSkipListMap<Integer, Integer>) outerConcSkipListMap
 					.putIfAbsent(randomKey, newMap);
@@ -250,7 +250,7 @@ public class Inserter extends Thread {
 				randomKey = Util.getNextHotKey(hotKeyGen, 0,
 						hotColdKeyRangeMax, hotKeyPercentage);
 			}
-			
+
 			ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<Integer, Integer>();
 			ConcurrentHashMap<Integer, Integer> innerMap = (ConcurrentHashMap<Integer, Integer>) outerConcHashMap
 					.putIfAbsent(randomKey, newMap);
@@ -261,7 +261,6 @@ public class Inserter extends Thread {
 					nextRandomInnerMapKeyOrValue());
 		}
 	}
-
 
 	private void randomInsertionToMutableIntTreeOfIntTreeValus() {
 
@@ -304,11 +303,6 @@ public class Inserter extends Thread {
 					innerIntTreeMap.plus(innerKey, innerValue))
 					|| !outerMutableIntTreeMap.compareAndSet(outerIntTreeMap,
 							outerIntTreeMap.plus(key, innerMutableIntTreeMap))) {
-				// System.out.println(this.threadID + " >>> "
-				// + doneSignal.getCount() + " >>> " + key + " >>> "
-				// + outerMutableIntTreeMap.get()
-				// + " >>> innerMutableIntTreeMap is "
-				// + innerMutableIntTreeMap);
 				outerIntTreeMap = outerMutableIntTreeMap.get();
 				innerMutableIntTreeMap = outerIntTreeMap.get(key);
 				if (innerMutableIntTreeMap == null) {

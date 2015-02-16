@@ -12,12 +12,14 @@ public class Util {
 	public static final String SKIP_LIST_MAP = "SKIP_LIST_MAP";
 	public static final String HYBRID_MAP = "HYBRID";
 	public static final String MUTABLE_INT_TREE_MAP = "MUTABLE_INT_TREE_MAP";
-	public static final String INT_TO_INT = "INT_TO_INT";
-	public static final String INT_TO_MUTABLE_INT_TREE_MAP = "INT_TO_MUTABLE_INT_TREE_MAP";
-	public static final String INT_TO_SYNCH_HASHMAP_INT_TO_INT = "INT_TO_SYNCH_HASHMAP_INT_TO_INT";
-	public static final String RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP = "RANDOM_HO_COLD_WITH_INSERTION_TO_INNETMAP";
-	public static final String SIMPLE_INSERTION_BENCHMARK = "SIMEPLE_INSERTION_BENCHMARK";
-	public static final String INSERT_TO_MUTABLE_INT_TREE_MAP = "INSERT_TO_MUTABLE_INT_TREE_MAP";
+
+	public static final String INT_TO_INT = "<INT,INT>";
+	public static final String INT_TO_MUTABLE_INT_TREE_MAP = "<INT,MUTABLE_INT_TREE_MAP>";
+	public static final String INT_TO_SYNCH_HASHMAP_INT_TO_INT = "<INT,SYNCH_HASHMAP_INT_TO_INT>";
+
+	public static final String RANDOM_HOT_COLD = "RANDOM_HOT_COLD";
+	public static final String SIMPLE_INSERTION = "SIMPLE_INSERTION";
+	public static final String SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP = "SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP";
 
 	public static void writeLine(BufferedWriter writer, String line)
 			throws IOException {

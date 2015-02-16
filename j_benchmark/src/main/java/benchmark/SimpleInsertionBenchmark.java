@@ -44,7 +44,7 @@ public class SimpleInsertionBenchmark {
 		switch (dsTypeToBeBenchmarked) {
 		case "pure":
 			cuncorrencyType = Util.MUTABLE_INT_TREE_MAP;
-			valueType = Util.INSERT_TO_MUTABLE_INT_TREE_MAP;
+			valueType = Util.INT_TO_MUTABLE_INT_TREE_MAP;
 			break;
 		case "scalable":
 			cuncorrencyType = Util.SKIP_LIST_MAP;
@@ -138,6 +138,7 @@ public class SimpleInsertionBenchmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
+				System.out.println("*** >>> " + mutableIntTreeMap);
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
@@ -245,6 +246,5 @@ public class SimpleInsertionBenchmark {
 							+ " Output will be put in "
 							+ "\"simple_insertion_<DS Type>_<Number of insertions>_<Maximum number of threads>.csv\"");
 		}
-
 	}
 }

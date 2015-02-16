@@ -141,6 +141,7 @@ public class RandomHotColdkeyBecnhmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
+				System.out.println("*** >>> " + outerMutableIntTreeMap);
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
