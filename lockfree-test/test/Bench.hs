@@ -72,6 +72,7 @@ hotKeyOrRandom newBag push reps splits vec = do
                       b <- case elem of
                           Nothing -> do
                             b <- newBag
+                            -- FIXME, DATA RACE:
                             VM.write vec idx $ Just b
                             return b
                           Just b -> return b
@@ -89,7 +90,9 @@ main = do
   adaptiveNothingVec <- VM.replicate vecSize Nothing
   let adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
   putStrLn $ "using " ++ show splits ++ " capabilities"
-  defaultMain [
+  defaultMain $ [
+-- RRN: disabling queues for now.  We're off queues.
+{-    
     bgroup "PureQueue" [
        bench "new" $ Benchmarkable $ rep PQ.newQ,
        bgroup "single-threaded" [
@@ -108,26 +111,28 @@ main = do
           bench ("push-"++show elems) $ Benchmarkable $ rep (forkNFill MS.newQ MS.pushL elems splits)
           | elems <- parSizes]
       ],
-    bgroup "new" [
-      bench "PureBag" $ Benchmarkable $ rep PB.newBag,
-      bench "ScalableBag" $ Benchmarkable $ rep SB.newBag,
-      bench "AdaptiveBag" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh
-      ],
-    bgroup "random-50-50" $ [
-      bench ("PureBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
-      | elems <- parSizes
-      ] ++ [
-      bench ("ScalableBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
-      | elems <- parSizes
-      ] ++ [
-      bench ("AdaptiveBag-" ++ show elems) $ Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
-      | elems <- parSizes
-      ],
-    bgroup "hotkey" $ [
-      bench "PureBag" $ Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec),
-      bench "ScalableBag" $ Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec),
-      bench "AdaptiveBag" $ Benchmarkable $ rep (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec)
-      ]
+-}
+    bench "pureBag_new" $ Benchmarkable $ rep PB.newBag,
+    bench "scalableBag_new" $ Benchmarkable $ rep SB.newBag,
+    bench "hybridBag_new" $ Benchmarkable $ rep $ AB.newBagThreshold adaptThresh ] ++
+    [ bench ("pureBag_random--" ++ show elems) $
+      Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
+    | elems <- parSizes
+    ] ++ 
+    [ bench ("scalableBag_random-" ++ show elems) $
+      Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
+    | elems <- parSizes
+    ] ++
+    [ bench ("hybridBag_random-" ++ show elems) $
+      Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
+    | elems <- parSizes
+    ] ++
+    [ bench "array-pureBag_hotcold-insert" $
+      Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec),
+      bench "array-scalableBag_hotcold-insert" $
+      Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec),
+      bench "array-hybridBag_hotcold-insert" $ 
+      Benchmarkable $ rep (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec)
     ]
   where sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
