@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Data.Concurrent.ScalableBag
        (
@@ -12,12 +11,10 @@ module Data.Concurrent.ScalableBag
        )
        where
 
-import Control.Applicative
 import Control.Concurrent
 import Data.Atomics
 import Data.Atomics.Vector
 import qualified Data.Atomics.Counter as C
-import Data.IORef
 import Data.TLS.PThread
 import Data.Vector.Mutable as V
 import System.IO.Unsafe (unsafePerformIO)
@@ -41,7 +38,6 @@ add :: ScalableBag a -> a -> IO ()
 add bag x = do
   tid <- getTLS osThreadID
   let idx = tid `mod` V.length bag
-  tick <- unsafeReadVectorElem bag idx
   casVectorLoop_ bag (x:) idx
 
 remove :: ScalableBag a -> IO (Maybe a)
@@ -52,12 +48,10 @@ remove bag = do
       retryLoop vec ix start = do
         tick <- unsafeReadVectorElem bag ix
         case peekTicket tick of
-          [] -> let ix' = succ ix in
-            if ix' == start
+          [] -> let ix' = ix + 1 in
+            if ix' == start || (ix' >= V.length vec && start == 0)
             then return Nothing -- looped around once, nothing to pop
-            else if ix' >= V.length vec && start == 0
-                 then return Nothing -- looped around once, nothing to pop
-                 else retryLoop vec (ix+1) start -- keep going
+            else retryLoop vec ix' start -- keep going
           _ -> do
             res <- casVectorLoop bag pop ix
             case res of
@@ -67,13 +61,16 @@ remove bag = do
       pop (x:xs) = (xs, Just x)
   retryLoop bag idx idx
 
+{-# INLINE casVectorLoop_ #-}
 casVectorLoop_ :: IOVector a -> (a -> a) -> Int -> IO ()
 casVectorLoop_ vec f ix = casVectorLoop vec f' ix
-  where f' x = (f x, ())
+  where f' !x = (f x, ())
 
+{-# INLINE casVectorLoop #-}
 casVectorLoop :: IOVector a -> (a -> (a, b)) -> Int -> IO b
 casVectorLoop vec f ix = retryLoop =<< readVectorElem vec ix
   where retryLoop tick = do
-          let (new, ret) = f $! peekTicket tick
-          (success, tick') <- casVectorElem vec ix tick new
+          let !val = peekTicket tick
+              !(newVal, ret) = f val
+          (success, tick') <- casVectorElem vec ix tick newVal
           if success then return ret else retryLoop tick'
