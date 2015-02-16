@@ -23,6 +23,9 @@ import qualified Data.Concurrent.AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.ScalableBag as SB
 
+--------------------------------------------------------------------------------
+-- Queue benchmarks:
+
 fillN :: IO a -> (a -> Int64 -> IO ()) -> Int64 -> IO ()
 fillN newQ insert num = do
   q <- newQ
@@ -37,11 +40,26 @@ forkNFill newQ insert elems splits = do
                       for_ offset (offset + quota - 1) $
                         \i -> insert q i)
 
+--------------------------------------------------------------------------------
+-- Bag benchmarks:
+
+-- Producer/consumer version with half producers half consumers:
 pushPopN :: IO a -> (a -> Int64 -> IO ()) -> (a -> IO (Maybe Int64)) -> Int64 -> IO ()
 pushPopN newBag push pop total = do
   bag <- newBag
   for_ 1 total $ \i -> do
     if even i then void $ pop bag else push bag i
+
+{-
+forkNFillBag ::  IO a -> (a -> Int64 -> IO ()) -> Int -> Int -> IO ()
+forkNFillBag newBag insert elems splits = do
+  q <- newBag
+  let quota = fromIntegral $ elems `quot` splits
+  forkJoin splits (\chunk -> do
+                      let offset = fromIntegral $ chunk * fromIntegral quota
+                      for_ offset (offset + quota - 1) $
+                        \i -> insert q i)
+-}
 
 forkNPushPop :: IO a -> (a -> Int64 -> IO ()) -> (a -> IO (Maybe Int64)) -> Int -> Int -> IO ()
 forkNPushPop newBag push pop elems splits = do
@@ -94,7 +112,7 @@ main = do
   scalableNothingVec <- VM.replicate vecSize Nothing
   adaptiveNothingVec <- VM.replicate vecSize Nothing
   let adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
-  putStrLn $ "using " ++ show splits ++ " capabilities"
+  putStrLn $ "[benchmark] using " ++ show splits ++ " capabilities"
   args <- getArgs
   -- when (null args) (error "Expected at least one command line arg: pure, scalable, hybrid")
 -- RRN: disabling queues for now.  We're off queues.
@@ -120,10 +138,12 @@ main = do
 -}
   let pure =
         [ bench "bag_new-1" $ Benchmarkable $ rep PB.newBag ] ++
-        [ bench ("bag_random-" ++ show elems) $
+        [ bench ("bag_insert-" ++ show elems) $
+          Benchmarkable $ rep (forkNFill PB.newBag PB.add elems splits)
+        | elems <- parSizes ] ++ 
+        [ bench ("bag_random5050-" ++ show elems) $
           Benchmarkable $ rep (fork5050 PB.newBag PB.add PB.remove elems splits randomVec)
-        | elems <- parSizes
-        ] ++
+        | elems <- parSizes ] ++
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom PB.newBag PB.add hotkeySize splits pureNothingVec) ]
         
@@ -133,7 +153,7 @@ main = do
           Benchmarkable $ rep (fork5050 SB.newBag SB.add SB.remove elems splits randomVec)
         | elems <- parSizes
         ] ++
-        [ bench ("array-bag_hotcold-insert-"++show hotkeySize) $
+        [ bench ("array-bag_hotcold-insert-0.5-"++show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom SB.newBag SB.add hotkeySize splits scalableNothingVec) ]
         
       hybrid = 
@@ -141,7 +161,7 @@ main = do
         [ bench ("bag_random-" ++ show elems) $
           Benchmarkable $ rep (fork5050 (AB.newBagThreshold adaptThresh) AB.add AB.remove elems splits randomVec)
         | elems <- parSizes ] ++
-        [ bench ("array-bag_hotcold-insert-"++show hotkeySize) $ 
+        [ bench ("array-bag_hotcold-insert-0.5-"++show hotkeySize) $ 
           Benchmarkable $ rep
           (hotKeyOrRandom (AB.newBagThreshold adaptThresh) AB.add hotkeySize splits adaptiveNothingVec) ]
          
@@ -189,5 +209,6 @@ forkJoin num act = loop2 num []
                     _ <- forkOn (n-1) (do act (n-1); putMVar mv ())
                     loop2 (n-1) (mv:ls)
 
+{-# INLINE rep #-}
 rep :: Monad m => m a -> Int64 -> m ()
 rep m n = for_ 1 n $ \_ -> m
