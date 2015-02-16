@@ -12,36 +12,36 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.pcollections.IntTreePMap;
 
 public class SimpleInsertionBenchmark {
 
 	@SuppressWarnings("rawtypes")
-	private Map map;
+	private Map threadSafeMap;
 	private BufferedWriter writer;
 	private HashMap<String, TreeMap<Integer, Integer>> performanceData = new HashMap<String, TreeMap<Integer, Integer>>();
+	private AtomicReference<IntTreePMap<?>> mutableIntTreeMap;
 
 	public SimpleInsertionBenchmark(int numofInsertions, int runRepetitions,
 			int maxNumberOfThreads) throws InterruptedException, IOException {
 
-		writer = new BufferedWriter(new FileWriter(new File(
-				"simple_insertion_benchmark_" + numofInsertions + "_"
-						+ maxNumberOfThreads + ".csv")));
+		String outputFileName = String.format(
+				"simple_insertion_benchmark_%d_%d.csv", numofInsertions,
+				maxNumberOfThreads);
+		writer = new BufferedWriter(new FileWriter(new File(outputFileName)));
 		Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
 
-		boolean warmUp = true;
-		/* Warm-up starts here */
-		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
-		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				10, 10000, 64, warmUp);
-		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
-		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
-				10, 10000, 64, warmUp);
-		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
-		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT, 10,
-				10000, 64, warmUp);
-		/* Warm-up ends here */
+		// warmUp();
+		runBenchmark(numofInsertions, runRepetitions, maxNumberOfThreads);
 
-		warmUp = false;
+		writer.close();
+	}
+
+	private void runBenchmark(int numofInsertions, int runRepetitions,
+			int maxNumberOfThreads) throws InterruptedException, IOException {
+		boolean warmUp = false;
 		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT, runRepetitions,
 				numofInsertions, maxNumberOfThreads, warmUp);
 		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
@@ -54,8 +54,10 @@ public class SimpleInsertionBenchmark {
 				numofInsertions, maxNumberOfThreads, warmUp);
 		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
 				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
-		writer.flush();
-		writer.close();
+		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_INT, runRepetitions,
+				numofInsertions, maxNumberOfThreads, warmUp);
+		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_MUTABLE_INT_TREE_MAP,
+				runRepetitions, numofInsertions, maxNumberOfThreads, warmUp);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
@@ -78,20 +80,34 @@ public class SimpleInsertionBenchmark {
 
 			startTime = System.currentTimeMillis();
 			for (int i = 0; i < runRepetitions; i++) {
-				map.clear();
+
+				mutableIntTreeMap = new AtomicReference(IntTreePMap.empty());
+				// threadSafeMap.clear();
 
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
-
 				for (int j = 0; j < numOfThreads; j++) {
-					threads[j] = new Inserter(map,
-							j * numOfInsretionsPerThread, (j + 1)
-									* numOfInsretionsPerThread, mapValueType,
-							startSignal, doneSignal);
-					threads[j].start();
+					switch (concurrencyType) {
+					case Util.MUTABLE_INT_TREE_MAP:
+						threads[j] = new Inserter(mutableIntTreeMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, mapValueType,
+								startSignal, doneSignal);
+						threads[j].start();
+						break;
+					default:
+						threads[j] = new Inserter(threadSafeMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, mapValueType,
+								startSignal, doneSignal);
+						threads[j].start();
+
+						break;
+					}
 				}
 				startSignal.countDown();
 				doneSignal.await();
+				System.out.println(mutableIntTreeMap);
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
@@ -109,14 +125,14 @@ public class SimpleInsertionBenchmark {
 		case Util.INT_TO_INT:
 			switch (ConcurrecyType) {
 			case Util.SYNCHRONIZED_MAP:
-				map = Collections
+				threadSafeMap = Collections
 						.synchronizedMap(new HashMap<Integer, Integer>());
 				break;
 			case Util.CONCURRENT_MAP:
-				map = new ConcurrentHashMap<Integer, Integer>();
+				threadSafeMap = new ConcurrentHashMap<Integer, Integer>();
 				break;
 			case Util.SKIP_LIST_MAP:
-				map = new ConcurrentSkipListMap<Integer, Integer>();
+				threadSafeMap = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
 			default:
 				break;
@@ -125,14 +141,14 @@ public class SimpleInsertionBenchmark {
 		case Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT:
 			switch (ConcurrecyType) {
 			case Util.SYNCHRONIZED_MAP:
-				map = Collections
+				threadSafeMap = Collections
 						.synchronizedMap(new HashMap<Integer, Map<String, String>>());
 				break;
 			case Util.CONCURRENT_MAP:
-				map = new ConcurrentHashMap<Integer, Map<String, String>>();
+				threadSafeMap = new ConcurrentHashMap<Integer, Map<String, String>>();
 				break;
 			case Util.SKIP_LIST_MAP:
-				map = new ConcurrentSkipListMap<Integer, Map<String, String>>();
+				threadSafeMap = new ConcurrentSkipListMap<Integer, Map<String, String>>();
 				break;
 			default:
 				break;
@@ -166,12 +182,32 @@ public class SimpleInsertionBenchmark {
 		}
 	}
 
+	private void warmUp() throws InterruptedException, IOException {
+		boolean warmUp = true;
+		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
+		benchmark(Util.SYNCHRONIZED_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
+				10, 10000, 64, warmUp);
+		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
+		benchmark(Util.CONCURRENT_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT,
+				10, 10000, 64, warmUp);
+		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_INT, 10, 10000, 64, warmUp);
+		benchmark(Util.SKIP_LIST_MAP, Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT, 10,
+				10000, 64, warmUp);
+		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_INT, 10, 10000, 64,
+				warmUp);
+		benchmark(Util.MUTABLE_INT_TREE_MAP, Util.INT_TO_MUTABLE_INT_TREE_MAP,
+				10, 10000, 64, warmUp);
+	}
+
 	public static void main(String[] args) throws InterruptedException,
 			NumberFormatException, IOException {
 
 		try {
-			new SimpleInsertionBenchmark(Integer.parseInt(args[0]),
-					Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+			int numofInsertions = Integer.parseInt(args[0]);
+			int runRepetitions = Integer.parseInt(args[1]);
+			int maxNumberOfThreads = Integer.parseInt(args[2]);
+			new SimpleInsertionBenchmark(numofInsertions, runRepetitions,
+					maxNumberOfThreads);
 		} catch (Exception e) {
 			System.out
 					.println("Please enter the folowing input data:\n"
