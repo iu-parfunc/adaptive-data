@@ -65,7 +65,8 @@ fork5050 newBag push pop elems splits vec = do
 
 hotKeyOrRandom :: IO a -> (a -> Int64 -> IO ()) -> Int -> Int -> VM.IOVector (Maybe a) -> IO ()
 hotKeyOrRandom newBag push reps splits vec = do
-  forkJoin splits (\chunk -> for_ 1 (fromIntegral reps) $ \i -> do
+  let quota = (fromIntegral reps) `quot` splits
+  forkJoin splits (\chunk -> for_ 1 (fromIntegral quota) $ \i -> do
                       flip <- randomRIO (0, 1) :: IO Float
                       idx <- if flip < 0.5 then randomRIO (0, VM.length vec - 1) else return 0
                       elem <- VM.read vec idx
