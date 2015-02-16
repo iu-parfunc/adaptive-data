@@ -109,6 +109,10 @@ case $BENCHVARIANT in
 	echo "Running pure-in-a-box benchmarks..."
 	go 
 	;;
+    oldpure)
+	echo "Running old-style pure-in-a-box benchmarks..."
+	go 
+	;;
     scalable)
 	echo "Running regular scalable/lock-free benchmarks..."	
 	go 

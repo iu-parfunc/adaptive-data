@@ -21,9 +21,6 @@ if [ "$MACHINECLASS" == "" ]; then
     export MACHINECLASS=`hostname -s`
 fi
 
-export GIT_DEPTH=`git log --pretty=oneline | wc -l`
-echo "Running at GIT_DEPTH:" $GIT_DEPTH
-
 echo "On linux platforms, check CPU affinity:"
 taskset -pc $$ || echo ok
 
@@ -35,6 +32,9 @@ who -a || echo ok
 
 # Switch to the top of the repo:
 cd `dirname $0`
+
+export GIT_DEPTH=`git log --pretty=oneline | wc -l`
+echo "Running at GIT_DEPTH:" $GIT_DEPTH
 
 # CONVENTION: The working directory is passed as the first argument.
 CHECKOUT=$1
