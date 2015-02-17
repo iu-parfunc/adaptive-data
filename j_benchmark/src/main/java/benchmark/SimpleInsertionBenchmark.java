@@ -137,7 +137,7 @@ public class SimpleInsertionBenchmark {
 			}
 			// System.out.println(numOfThreads + " *** >>> " +
 			// mutableIntTreeMap);
-			System.out.println(mutableIntTreeMap.get().size());
+			// System.out.println(mutableIntTreeMap.get().size());
 			// System.out.println(threadSafeMap.size());
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
