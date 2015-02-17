@@ -161,17 +161,20 @@ main = do
         [ bench "bag_new-1" $ Benchmarkable $ rep newBag ] ++
 
         -- These benchmarks should be equivalent but measured differently:
+        -- Doing BOTH just as a sanity check:
         ----------------------------------------
         -- This measures the marginal cost of one operation on ONE thread, under
         -- a varying amount of contention.        
-        -- [ bench "perop-fill-N" $ Benchmarkable $ \num -> do
-        --    -- putStrLn $ "Forking "++show splits++" threads to each insert "++show num++" elements"
-        --    forkJoin splits (\_ -> fillN newBag add num) ] ++
+        [ bench "perthreadop-parfill-N" $ Benchmarkable $ \num -> do
+           -- putStrLn $ "Forking "++show splits++" threads to each insert "++show num++" elements"
+           -- forkJoin splits (\_ -> fillN newBag add num)
+           forkNFill newBag add (fromIntegral num * splits) splits
+        ] ++
 
         -- This one measures something funny: the marginal cost of
         -- adding one work item to a pool which is completed by N
         -- separate workers.  This number should go down as N increases.
-        [ bench "fill-N" $ Benchmarkable $ \num -> do
+        [ bench "team-parfill-N" $ Benchmarkable $ \num -> do
            -- let quota = num `quot` fromIntegral splits
            -- putStrLn $ "Forking "++show splits++" threads to each insert "++show quota++" elements"
            -- forkJoin splits (\_ -> fillN newBag add quota)
