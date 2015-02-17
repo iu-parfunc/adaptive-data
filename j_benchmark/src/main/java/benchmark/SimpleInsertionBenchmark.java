@@ -213,7 +213,7 @@ public class SimpleInsertionBenchmark {
 				numerOfThreads = numberOfThreadsITR.next();
 				timeTaken = perfDataPerMapType.get(numerOfThreads);
 				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-"
-						+ dsTypeToBeBenchmarked + " -#inserts "
+						+ dsTypeToBeBenchmarked + "_" + mapType + " -#inserts "
 						+ numofInsertions + " -#threads " + numerOfThreads
 						+ " ," + timeTaken);
 			}

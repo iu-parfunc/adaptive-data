@@ -170,10 +170,10 @@ public class Inserter extends Thread {
 					break;
 				}
 				break;
-				
+
 			case Util.RANDOM_HOT_COLD:
 				switch (concurrentMapType) {
-				
+
 				case Util.SKIP_LIST_MAP:
 					randomInsertionToConcSKipListMapOfConcSKipListMap();
 					break;
@@ -184,6 +184,7 @@ public class Inserter extends Thread {
 					randomInsertionToMutableIntTreeOfIntTreeValus();
 					break;
 				}
+
 				break;
 			}
 
