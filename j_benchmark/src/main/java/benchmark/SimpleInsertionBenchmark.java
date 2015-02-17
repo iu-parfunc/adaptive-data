@@ -41,25 +41,20 @@ public class SimpleInsertionBenchmark {
 		switch (dsTypeToBeBenchmarked) {
 		case "pure":
 			cuncorrencyType = Util.MUTABLE_INT_TREE_MAP;
-			valueType = Util.INT_TO_MUTABLE_INT_TREE_MAP;
 			break;
 		case "scalable":
 			cuncorrencyType = Util.SKIP_LIST_MAP;
-			valueType = Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT;
 			break;
 		case "hybrid":
 			cuncorrencyType = Util.HYBRID_MAP;
-			valueType = Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT;
 			System.out.print("TBD");
 			System.exit(0);
 			break;
 		case "JavaSynch":
 			cuncorrencyType = Util.SYNCHRONIZED_MAP;
-			valueType = Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT;
 			break;
 		case "JavaConc":
 			cuncorrencyType = Util.CONCURRENT_MAP;
-			valueType = Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT;
 			break;
 		default:
 			System.out
@@ -69,6 +64,12 @@ public class SimpleInsertionBenchmark {
 			break;
 		}
 
+		valueType = Util.INT_TO_INT;
+		warmUp(cuncorrencyType, valueType, numofInsertions, runRepetitions,
+				maxNumberOfThreads);
+		runBenchmark(cuncorrencyType, valueType, numofInsertions,
+				runRepetitions, maxNumberOfThreads);
+		valueType = Util.INT_TO_INNER_MAP;
 		warmUp(cuncorrencyType, valueType, numofInsertions, runRepetitions,
 				maxNumberOfThreads);
 		runBenchmark(cuncorrencyType, valueType, numofInsertions,
@@ -81,16 +82,17 @@ public class SimpleInsertionBenchmark {
 			int numofInsertions, int runRepetitions, int maxNumberOfThreads)
 			throws InterruptedException, IOException {
 		benchmark(cuncorrencyType, valueType, runRepetitions, numofInsertions,
-				maxNumberOfThreads);
+				maxNumberOfThreads, false);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
-			int runRepetitions, int numofInsertions, int maxNumberOfThreads)
-			throws InterruptedException, IOException {
+			int runRepetitions, int numofInsertions, int maxNumberOfThreads,
+			boolean warmUp) throws InterruptedException, IOException {
 
 		initiatlizeMap(concurrencyType, mapValueType);
-		String mapConfig = concurrencyType + "_" + mapValueType;
-		performanceData.put(mapConfig, new TreeMap<Integer, Integer>());
+		if (!warmUp) {
+			performanceData.put(mapValueType, new TreeMap<Integer, Integer>());
+		}
 
 		CountDownLatch startSignal, doneSignal;
 
@@ -124,8 +126,8 @@ public class SimpleInsertionBenchmark {
 					for (int j = 0; j < numOfThreads; j++) {
 						threads[j] = new Inserter(threadSafeMap, j
 								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, mapValueType,
-								startSignal, doneSignal);
+								* numOfInsretionsPerThread, concurrencyType,
+								mapValueType, startSignal, doneSignal);
 						threads[j].start();
 					}
 					break;
@@ -135,12 +137,15 @@ public class SimpleInsertionBenchmark {
 			}
 			// System.out.println(numOfThreads + " *** >>> " +
 			// mutableIntTreeMap);
-			// System.out.println(mutableIntTreeMap.get().size());
+			System.out.println(mutableIntTreeMap.get().size());
 			// System.out.println(threadSafeMap.size());
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
-			performanceData.get(mapConfig).put(new Integer(numOfThreads),
-					new Integer((int) (elapsed / runRepetitions)));
+			if (!warmUp) {
+				performanceData.get(mapValueType).put(
+						new Integer(numOfThreads),
+						new Integer((int) (elapsed / runRepetitions)));
+			}
 		}
 	}
 
@@ -159,21 +164,25 @@ public class SimpleInsertionBenchmark {
 			case Util.SKIP_LIST_MAP:
 				threadSafeMap = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
+			case Util.MUTABLE_INT_TREE_MAP:
+				break;
 			default:
 				break;
 			}
 			break;
-		case Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT:
+		case Util.INT_TO_INNER_MAP:
 			switch (ConcurrecyType) {
 			case Util.SYNCHRONIZED_MAP:
 				threadSafeMap = Collections
-						.synchronizedMap(new HashMap<Integer, Map<String, String>>());
+						.synchronizedMap(new HashMap<Integer, Map<Integer, Integer>>());
 				break;
 			case Util.CONCURRENT_MAP:
-				threadSafeMap = new ConcurrentHashMap<Integer, Map<String, String>>();
+				threadSafeMap = new ConcurrentHashMap<Integer, Map<Integer, Integer>>();
 				break;
 			case Util.SKIP_LIST_MAP:
-				threadSafeMap = new ConcurrentSkipListMap<Integer, Map<String, String>>();
+				threadSafeMap = new ConcurrentSkipListMap<Integer, Map<Integer, Integer>>();
+				break;
+			case Util.MUTABLE_INT_TREE_MAP:
 				break;
 			default:
 				break;
@@ -217,7 +226,7 @@ public class SimpleInsertionBenchmark {
 
 		benchmark(cuncorrencyType, valueType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
-				numofInsertions, maxNumberOfThreads);
+				numofInsertions, maxNumberOfThreads, true);
 	}
 
 	public static void main(String[] args) {

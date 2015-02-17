@@ -75,17 +75,18 @@ public class RandomHotColdkeyBecnhmark {
 			throws InterruptedException, IOException {
 
 		benchmark(cuncorrencyType, runRepetitions, numofInsertions,
-				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability);
+				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability, false);
 	}
 
 	private void benchmark(String concurrencyType, int runRepetitions,
 			int numofInsertions, double hotKeyPercentage,
-			int maxNumberOfThreads, double coldKeyProbability)
+			int maxNumberOfThreads, double coldKeyProbability, boolean warmUp)
 			throws InterruptedException, IOException {
 
-		String mapValueType = "INT_TO_" + concurrencyType + "INT_TO_INT";
-		String mapConfig = concurrencyType + "_" + mapValueType;
-		performanceData.put(mapConfig, new TreeMap<Integer, Integer>());
+		String mapConfig = concurrencyType;
+		if (!warmUp) {
+			performanceData.put(mapConfig, new TreeMap<Integer, Integer>());
+		}
 
 		CountDownLatch startSignal, doneSignal;
 
@@ -141,8 +142,10 @@ public class RandomHotColdkeyBecnhmark {
 			}
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
-			performanceData.get(mapConfig).put(new Integer(numOfThreads),
-					new Integer((int) (elapsed / runRepetitions)));
+			if (!warmUp) {
+				performanceData.get(mapConfig).put(new Integer(numOfThreads),
+						new Integer((int) (elapsed / runRepetitions)));
+			}
 			// System.out.println(numOfThreads + "*** >>> "
 			// + outerMutableIntTreeMap);
 		}
@@ -187,7 +190,7 @@ public class RandomHotColdkeyBecnhmark {
 		benchmark(cuncorrencyType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
 				numofInsertions, hotKeyPercentage, maxNumberOfThreads,
-				coldKeyProbability);
+				coldKeyProbability, true);
 	}
 
 	public static void main(String[] args) {

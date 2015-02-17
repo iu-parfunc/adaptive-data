@@ -38,8 +38,9 @@ public class Inserter extends Thread {
 			String mapValuetype, CountDownLatch startSignal,
 			CountDownLatch doneSignal) {
 
-		benchmarkType = Util.SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP;
+		benchmarkType = Util.SIMPLE_INSERTION;
 		this.mutableIntTreeMap = mutableIntTreeMap;
+		this.concurrentMapType = Util.MUTABLE_INT_TREE_MAP;
 		this.mapValueType = mapValuetype;
 		this.insertionStratIndex = insertionStartIndex;
 		this.insertionEndIndex = insertionEndIndex;
@@ -48,10 +49,11 @@ public class Inserter extends Thread {
 
 	public Inserter(@SuppressWarnings("rawtypes") Map map,
 			int insertionStartIndex, int insertionEndIndex,
-			String mapValuetype, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			String concurrentMapType, String mapValuetype,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 		benchmarkType = Util.SIMPLE_INSERTION;
 		this.map = map;
+		this.concurrentMapType = concurrentMapType;
 		this.mapValueType = mapValuetype;
 		this.insertionStratIndex = insertionStartIndex;
 		this.insertionEndIndex = insertionEndIndex;
@@ -122,25 +124,56 @@ public class Inserter extends Thread {
 			/* Wait for start signal from the calling thread */
 			startSignal.await();
 			switch (benchmarkType) {
+
 			case Util.SIMPLE_INSERTION:
 				switch (mapValueType) {
+
 				case Util.INT_TO_INT:
-					for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-						map.put(new Integer(i), new Integer(i));
+					switch (concurrentMapType) {
+					case Util.MUTABLE_INT_TREE_MAP:
+						simpleInsertionBenchmarkONMutableIntTreeOfIntValus();
+						break;
+					default:
+						for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+							map.put(new Integer(i), new Integer(i));
+						}
+						break;
 					}
 					break;
-				case Util.INT_TO_SYNCH_HASHMAP_INT_TO_INT:
-					for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-						map.put(new Integer(i), Collections
-								.synchronizedMap(new HashMap<String, String>()));
+
+				case Util.INT_TO_INNER_MAP:
+					switch (concurrentMapType) {
+
+					case Util.SKIP_LIST_MAP:
+						for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+							map.put(new Integer(i),
+									new ConcurrentSkipListMap<Integer, Integer>());
+						}
+						break;
+					case Util.CONCURRENT_MAP:
+						for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+							map.put(new Integer(i),
+									new ConcurrentHashMap<Integer, Integer>());
+						}
+						break;
+					case Util.SYNCHRONIZED_MAP:
+						for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+							map.put(new Integer(i),
+									Collections
+											.synchronizedMap(new HashMap<Integer, Integer>()));
+						}
+						break;
+					case Util.MUTABLE_INT_TREE_MAP:
+						simpleInsertionBenchmarkONMutableIntTreeOfIntTreeValus();
+						break;
 					}
-					break;
-				default:
 					break;
 				}
 				break;
+				
 			case Util.RANDOM_HOT_COLD:
 				switch (concurrentMapType) {
+				
 				case Util.SKIP_LIST_MAP:
 					randomInsertionToConcSKipListMapOfConcSKipListMap();
 					break;
@@ -150,24 +183,7 @@ public class Inserter extends Thread {
 				case Util.MUTABLE_INT_TREE_MAP:
 					randomInsertionToMutableIntTreeOfIntTreeValus();
 					break;
-				default:
-					break;
 				}
-				break;
-
-			case Util.SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP:
-				switch (mapValueType) {
-				case Util.INT_TO_INT:
-					simpleInsertionBenchmarkONMutableIntTreeOfIntValus();
-					break;
-				case Util.INT_TO_MUTABLE_INT_TREE_MAP:
-					simpleInsertionBenchmarkONMutableIntTreeOfIntTreeValus();
-					break;
-				default:
-					break;
-				}
-				break;
-			default:
 				break;
 			}
 

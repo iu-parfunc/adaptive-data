@@ -10,7 +10,7 @@ JAVA_OPTS="-Xms4g -Xmx16g -d64"
 JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 
-BENCHMARK_ROUNDS=10
+BENCHMARK_ROUNDS=100
 MAX_NUMBER_OF_THREADS=64
 NUMBER_OF_INSERTS=1000000
 
@@ -26,7 +26,7 @@ case $BENCHVARIANT in
 	;;    
     "pure")
 	echo "Running pure-in-a-box benchmark"
-	for i in 1 2 4 8 16;
+	for i in 1;
     do
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
 	done
@@ -35,7 +35,7 @@ case $BENCHVARIANT in
 	;;
     "scalable")
 	echo "Running scalable benchmarks"
-	for i in 1 2 4 8 16;
+	for i in 1;
         do
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
 	done
