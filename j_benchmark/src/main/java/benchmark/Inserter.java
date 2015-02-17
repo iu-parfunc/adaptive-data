@@ -21,7 +21,10 @@ public class Inserter extends Thread {
 	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
 	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
 	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap;
-	private AtomicReference<IntTreePMap<?>> mutableIntTreeMap;
+	
+	private AtomicReference<IntTreePMap<Integer>> mutableIntTreeMapInt;
+	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> mutableIntTreeMapInnerMap;
+	// private AtomicReference<IntTreePMap<?>> mutableIntTreeMap;
 
 	private String mapValueType, concurrentMapType, benchmarkType;
 	private double hotOrRandomKeyThreshold, hotKeyPercentage;
@@ -33,15 +36,18 @@ public class Inserter extends Thread {
 	Random coldKeyGen = new Random();
 	Random hotKeyGen = new Random();
 
-	public Inserter(AtomicReference<IntTreePMap<?>> mutableIntTreeMap,
+	public Inserter(
+			AtomicReference<IntTreePMap<Integer>> mutableIntTreeMapInt,
+			AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> mutableIntTreeMapInnerMap,
 			int insertionStartIndex, int insertionEndIndex,
 			String mapValuetype, CountDownLatch startSignal,
 			CountDownLatch doneSignal) {
 
 		benchmarkType = Util.SIMPLE_INSERTION;
-		this.mutableIntTreeMap = mutableIntTreeMap;
 		this.concurrentMapType = Util.MUTABLE_INT_TREE_MAP;
 		this.mapValueType = mapValuetype;
+		this.mutableIntTreeMapInt = mutableIntTreeMapInt;
+		this.mutableIntTreeMapInnerMap = mutableIntTreeMapInnerMap;
 		this.insertionStratIndex = insertionStartIndex;
 		this.insertionEndIndex = insertionEndIndex;
 		initializeSynchLatches(startSignal, doneSignal);
@@ -131,7 +137,7 @@ public class Inserter extends Thread {
 				case Util.INT_TO_INT:
 					switch (concurrentMapType) {
 					case Util.MUTABLE_INT_TREE_MAP:
-						simpleInsertionBenchmarkONMutableIntTreeOfIntValus();
+						simpleInsertionToMutableIntTreeOfIntValus();
 						break;
 					default:
 						for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
@@ -197,17 +203,17 @@ public class Inserter extends Thread {
 	}
 
 	@SuppressWarnings("unchecked")
-	private void simpleInsertionBenchmarkONMutableIntTreeOfIntValus() {
+	private void simpleInsertionToMutableIntTreeOfIntValus() {
 
 		IntTreePMap<Integer> lastSnapSot;
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
 			Integer key = new Integer(i);
 			Integer value = new Integer(i);
-			lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMap.get();
-			while (!mutableIntTreeMap.compareAndSet(lastSnapSot,
+			lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMapInt.get();
+			while (!mutableIntTreeMapInt.compareAndSet(lastSnapSot,
 					lastSnapSot.plus(key, value))) {
-				lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMap.get();
+				lastSnapSot = (IntTreePMap<Integer>) mutableIntTreeMapInt.get();
 			}
 		}
 	}
@@ -215,18 +221,17 @@ public class Inserter extends Thread {
 	@SuppressWarnings("unchecked")
 	private void simpleInsertionBenchmarkONMutableIntTreeOfIntTreeValus() {
 
-		IntTreePMap<IntTreePMap<Integer>> lastSnapSot;
+		IntTreePMap<AtomicReference<IntTreePMap<Integer>>> lastSnapSot;
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
 			Integer key = new Integer(i);
-			IntTreePMap<Integer> value = IntTreePMap.empty();
-			lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
-					.get();
-			while (!mutableIntTreeMap.compareAndSet(lastSnapSot,
+			AtomicReference<IntTreePMap<Integer>> value = new AtomicReference(
+					IntTreePMap.empty());
+			lastSnapSot = mutableIntTreeMapInnerMap.get();
+			while (!mutableIntTreeMapInnerMap.compareAndSet(lastSnapSot,
 					lastSnapSot.plus(key, value))) {
 				// System.out.println("CONTENTION");
-				lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
-						.get();
+				lastSnapSot = mutableIntTreeMapInnerMap.get();
 			}
 		}
 	}

@@ -22,7 +22,8 @@ public class SimpleInsertionBenchmark {
 	private Map threadSafeMap;
 	private BufferedWriter writer;
 	private HashMap<String, TreeMap<Integer, Integer>> performanceData = new HashMap<String, TreeMap<Integer, Integer>>();
-	private AtomicReference<IntTreePMap<?>> mutableIntTreeMap;
+	private AtomicReference<IntTreePMap<Integer>> mutableIntTreeMapInt;
+	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> mutableIntTreeMapInnerMap;
 	private boolean append = true;
 
 	public SimpleInsertionBenchmark(String dsTypeToBeBenchmarked,
@@ -112,12 +113,16 @@ public class SimpleInsertionBenchmark {
 
 				switch (concurrencyType) {
 				case Util.MUTABLE_INT_TREE_MAP:
-					mutableIntTreeMap = new AtomicReference(IntTreePMap.empty());
+					mutableIntTreeMapInt = new AtomicReference(
+							IntTreePMap.empty());
+					mutableIntTreeMapInnerMap = new AtomicReference(
+							IntTreePMap.empty());
 					for (int j = 0; j < numOfThreads; j++) {
-						threads[j] = new Inserter(mutableIntTreeMap, j
-								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, mapValueType,
-								startSignal, doneSignal);
+						threads[j] = new Inserter(mutableIntTreeMapInt,
+								mutableIntTreeMapInnerMap, j
+										* numOfInsretionsPerThread, (j + 1)
+										* numOfInsretionsPerThread,
+								mapValueType, startSignal, doneSignal);
 						threads[j].start();
 					}
 					break;

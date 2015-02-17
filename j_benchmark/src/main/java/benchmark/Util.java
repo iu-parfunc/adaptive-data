@@ -3,6 +3,8 @@ package benchmark;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Random;
 
 public class Util {
@@ -35,5 +37,24 @@ public class Util {
 		return new Integer(
 				(int) (hotKeyRangeStartsAt + hotKeyGen.nextInt(numberOfHotKeys)
 						* (100 / hotKeyPercentage)));
+	}
+
+	public static void main(String[] args) {
+
+		Random hotKeyGen = new Random();
+		HashMap<Integer, Integer> hotKeys = new HashMap<Integer, Integer>();
+		Integer nextHotKey;
+		for (int i = 0; i < 10000; i++) {
+			nextHotKey = Util.getNextHotKey(hotKeyGen, 0, 1000000, 0.001);
+			hotKeys.putIfAbsent(nextHotKey, new Integer(0));
+			hotKeys.replace(nextHotKey, new Integer(hotKeys.get(nextHotKey)
+					.intValue() + 1));
+		}
+
+		Iterator<Integer> itr = hotKeys.keySet().iterator();
+		while (itr.hasNext()) {
+			nextHotKey = itr.next();
+			System.out.println(nextHotKey + " >>> " + hotKeys.get(nextHotKey));
+		}
 	}
 }
