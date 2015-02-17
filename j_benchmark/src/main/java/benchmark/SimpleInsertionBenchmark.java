@@ -30,9 +30,6 @@ public class SimpleInsertionBenchmark {
 			throws InterruptedException, IOException {
 
 		String outputFileName = "simple_insertion.csv";
-		// String outputFileName =
-		// String.format("simple_insertion_%s_%d_%d.csv",
-		// dsTypeToBeBenchmarked, numofInsertions, maxNumberOfThreads);
 
 		if (!new File(outputFileName).exists()) {
 			append = false;
@@ -76,7 +73,7 @@ public class SimpleInsertionBenchmark {
 				maxNumberOfThreads);
 		runBenchmark(cuncorrencyType, valueType, numofInsertions,
 				runRepetitions, maxNumberOfThreads);
-
+		writePerfData(dsTypeToBeBenchmarked, numofInsertions, runRepetitions);
 		writer.close();
 	}
 
@@ -85,7 +82,6 @@ public class SimpleInsertionBenchmark {
 			throws InterruptedException, IOException {
 		benchmark(cuncorrencyType, valueType, runRepetitions, numofInsertions,
 				maxNumberOfThreads);
-		writePerfData(numofInsertions, runRepetitions);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
@@ -139,6 +135,8 @@ public class SimpleInsertionBenchmark {
 			}
 			// System.out.println(numOfThreads + " *** >>> " +
 			// mutableIntTreeMap);
+			// System.out.println(mutableIntTreeMap.get().size());
+			// System.out.println(threadSafeMap.size());
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			performanceData.get(mapConfig).put(new Integer(numOfThreads),
@@ -186,8 +184,8 @@ public class SimpleInsertionBenchmark {
 		}
 	}
 
-	private void writePerfData(int numofInsertions, int runRepetitions)
-			throws IOException {
+	private void writePerfData(String dsTypeToBeBenchmarked,
+			int numofInsertions, int runRepetitions) throws IOException {
 
 		if (!append) {
 			Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
@@ -205,9 +203,10 @@ public class SimpleInsertionBenchmark {
 			while (numberOfThreadsITR.hasNext()) {
 				numerOfThreads = numberOfThreadsITR.next();
 				timeTaken = perfDataPerMapType.get(numerOfThreads);
-				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-" + mapType
-						+ " -#inserts " + numofInsertions + " -#threads "
-						+ numerOfThreads + " ," + timeTaken);
+				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-"
+						+ dsTypeToBeBenchmarked + " -#inserts "
+						+ numofInsertions + " -#threads " + numerOfThreads
+						+ " ," + timeTaken);
 			}
 		}
 	}

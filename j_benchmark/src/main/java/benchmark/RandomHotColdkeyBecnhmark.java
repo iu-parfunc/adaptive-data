@@ -28,10 +28,6 @@ public class RandomHotColdkeyBecnhmark {
 			int maxNumberOfThreads, double coldKeyProbability)
 			throws IOException, InterruptedException {
 		String outputFileName = "random_hot_cold_key.csv";
-		// String outputFileName = String.format(
-		// "random_hot_cold_key.csv",
-		// dsTypeToBeBenchmarked, coldKeyProbability, numofInsertions,
-		// hotKeyPercentage, maxNumberOfThreads);
 		if (!new File(outputFileName).exists()) {
 			append = false;
 		}
@@ -68,8 +64,9 @@ public class RandomHotColdkeyBecnhmark {
 		runBenchmark(cuncorrencyType, valueType, numofInsertions,
 				hotKeyPercentage, runRepetitions, maxNumberOfThreads,
 				coldKeyProbability);
+		writePerfData(dsTypeToBeBenchmarked, numofInsertions, hotKeyPercentage,
+				coldKeyProbability);
 		writer.close();
-
 	}
 
 	private void runBenchmark(String cuncorrencyType, String valueType,
@@ -79,7 +76,6 @@ public class RandomHotColdkeyBecnhmark {
 
 		benchmark(cuncorrencyType, runRepetitions, numofInsertions,
 				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability);
-		writePerfData(numofInsertions, hotKeyPercentage, coldKeyProbability);
 	}
 
 	private void benchmark(String concurrencyType, int runRepetitions,
@@ -152,7 +148,8 @@ public class RandomHotColdkeyBecnhmark {
 		}
 	}
 
-	private void writePerfData(int numofInsertions, double hotKeyPercentage,
+	private void writePerfData(String dsTypeToBeBenchmarked,
+			int numofInsertions, double hotKeyPercentage,
 			double coldKeyProbability) throws IOException {
 
 		if (!append) {
@@ -172,11 +169,12 @@ public class RandomHotColdkeyBecnhmark {
 			while (numberOfThreadsITR.hasNext()) {
 				numerOfThreads = numberOfThreadsITR.next();
 				timeTaken = perfDataPerMapType.get(numerOfThreads);
-				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-" + mapType
-						+ " -#inserts " + numofInsertions
-						+ " -hotKeyPercentage " + hotKeyPercentage
-						+ " -coldKeyProbability " + coldKeyProbability
-						+ " -#threads " + numerOfThreads + " ," + timeTaken);
+				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-"
+						+ dsTypeToBeBenchmarked + " -#inserts "
+						+ numofInsertions + " -hotKeyPercentage "
+						+ hotKeyPercentage + " -coldKeyProbability "
+						+ coldKeyProbability + " -#threads " + numerOfThreads
+						+ " ," + timeTaken);
 			}
 		}
 	}

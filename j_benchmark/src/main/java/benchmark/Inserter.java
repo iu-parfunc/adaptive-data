@@ -154,7 +154,7 @@ public class Inserter extends Thread {
 					break;
 				}
 				break;
-				
+
 			case Util.SIMPLE_INSERTION_TO_MUTABLE_INT_TREE_MAP:
 				switch (mapValueType) {
 				case Util.INT_TO_INT:
@@ -200,13 +200,14 @@ public class Inserter extends Thread {
 
 		IntTreePMap<IntTreePMap<Integer>> lastSnapSot;
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-			
+
 			Integer key = new Integer(i);
 			IntTreePMap<Integer> value = IntTreePMap.empty();
 			lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
 					.get();
 			while (!mutableIntTreeMap.compareAndSet(lastSnapSot,
 					lastSnapSot.plus(key, value))) {
+				// System.out.println("CONTENTION");
 				lastSnapSot = (IntTreePMap<IntTreePMap<Integer>>) mutableIntTreeMap
 						.get();
 			}
