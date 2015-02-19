@@ -3,8 +3,9 @@
 # Just a convenience script for running quick checks by hand.
 
 # MODES="pure scalable"
-MODES="scalable"
-BENCHES="perthreadop-parfill-N team-parfill-N"
+MODES="hybrid scalable"
+BENCHES="team-parfill-N"
+# perthreadop-parfill-N 
 
 # MODES=" basic "
 # BENCHES=" team-separate-bag "

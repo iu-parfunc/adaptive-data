@@ -19,8 +19,11 @@ import Data.IORef
 import qualified Data.Vector.Mutable as V
 import Unsafe.Coerce
 
-import Data.Concurrent.ScalableBag (ScalableBag)
-import qualified Data.Concurrent.ScalableBag as SB
+-- import Data.Concurrent.ScalableBag (ScalableBag)
+-- import qualified Data.Concurrent.ScalableBag as SB
+
+import Data.Concurrent.ScalableBagBoxed (ScalableBag)
+import qualified Data.Concurrent.ScalableBagBoxed as SB
 
 data Hybrid a = Pure { thresh :: Int, current :: ![a] }
               | Trans ![a] !(ScalableBag a)
