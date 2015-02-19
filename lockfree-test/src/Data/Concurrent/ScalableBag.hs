@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 
 module Data.Concurrent.ScalableBag
        (
@@ -13,11 +14,22 @@ module Data.Concurrent.ScalableBag
 
 import Control.Concurrent
 import Data.Atomics
+import Data.Bits
 import Data.Atomics.Vector
 import qualified Data.Atomics.Counter as C
 import Data.TLS.PThread
 import Data.Vector.Mutable as V
 import System.IO.Unsafe (unsafePerformIO)
+
+dbgPrint :: String -> IO ()
+#if 1
+dbgPrint s = putStrLn $ " [dbg] "++s
+#else
+dbgPrint _ = return ()
+{-# INLINE dbgPrint #-}
+#endif
+
+--------------------------------------------------------------------------------
 
 type ScalableBag a = IOVector [a]
 
@@ -29,16 +41,30 @@ osThreadID = unsafePerformIO $ mkTLS $ C.incrCounter 1 threadCounter
 threadCounter :: C.AtomicCounter
 threadCounter = unsafePerformIO $ C.newCounter 0
 
+-- | This padding factor prevents false sharing.  Cache lines on intel
+-- are 64 bytes / 8 words.
+padFactor :: Int
+padFactor = 8
+
+-- | Divide by the padding factor
+padDiv :: Int -> Int
+padDiv x = shiftR x 3
+
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  V.replicate caps []
+  V.replicate (padFactor * caps) []
 
 add :: ScalableBag a -> a -> IO ()
 add bag x = do
   tid <- getTLS osThreadID
-  let idx = tid `mod` V.length bag
-  casVectorLoop_ bag (x:) idx
+  let len = padDiv (V.length bag)
+  dbgPrint$ "tid "++show tid++"Length of bag: "++show len
+  -- This is NOT guaranteed to be collission-free:
+  let idx = tid `mod` len
+      idx' = padFactor * idx
+  dbgPrint$ "tid "++show tid++" going into CAS loop on index "++show idx'
+  casVectorLoop_ bag (x:) idx'
 
 remove :: ScalableBag a -> IO (Maybe a)
 remove bag = do
@@ -63,14 +89,18 @@ remove bag = do
 
 {-# INLINE casVectorLoop_ #-}
 casVectorLoop_ :: IOVector a -> (a -> a) -> Int -> IO ()
-casVectorLoop_ vec f ix = casVectorLoop vec f' ix
-  where f' !x = (f x, ())
+casVectorLoop_ vec f ix = retryLoop =<< readVectorElem vec ix
+  where retryLoop tick = do
+          let !val    = peekTicket tick
+              !newVal = f val
+          (success, tick') <- casVectorElem vec ix tick newVal
+          if success then return () else retryLoop tick'
 
 {-# INLINE casVectorLoop #-}
 casVectorLoop :: IOVector a -> (a -> (a, b)) -> Int -> IO b
 casVectorLoop vec f ix = retryLoop =<< readVectorElem vec ix
   where retryLoop tick = do
           let !val = peekTicket tick
-              !(newVal, ret) = f val
+              (!newVal, !ret) = f val
           (success, tick') <- casVectorElem vec ix tick newVal
           if success then return ret else retryLoop tick'

@@ -3,10 +3,12 @@
 # Just a convenience script for running quick checks by hand.
 
 # MODES="pure scalable"
-# BENCHES="perthreadop-parfill-N team-parfill-N"
+MODES="scalable"
+BENCHES="perthreadop-parfill-N team-parfill-N"
 
-MODES=" basic "
-BENCHES=" team-separate-bag "
+# MODES=" basic "
+# BENCHES=" team-separate-bag "
+
 RTSOPTS="-qa -T -s"
 
 set -xe

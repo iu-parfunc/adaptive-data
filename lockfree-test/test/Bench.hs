@@ -118,6 +118,7 @@ hotKeyOrRandom newBag push reps splits vec = do
 main :: IO ()
 main = do
   splits <- getNumCapabilities
+  
   -- Initialize randomness for fork5050
   randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
 
@@ -129,6 +130,11 @@ main = do
   let _adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
       
   putStrLn $ "[benchmark] using " ++ show splits ++ " capabilities"
+  putStr "[benchmark] OS thread ID of all current worker threads:\n  "
+  forkJoin splits (\ix -> do tid <- TLS.getTLS SB.osThreadID
+                             putStr $ show ix ++ ":" ++ show tid ++ "  ")
+  putStrLn ""
+  
   args <- getArgs
   -- when (null args) (error "Expected at least one command line arg: pure, scalable, hybrid")
 -- RRN: disabling queues for now.  We're off queues.
