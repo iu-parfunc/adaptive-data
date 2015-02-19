@@ -203,6 +203,11 @@ main = do
         , bench ("getOSTID") $ whnfIO $ TLS.getTLS SB.osThreadID
         , bench ("forkJoin-getOSTID-N") $ Benchmarkable $ \n ->
            forkJoin splits (\_ -> rep (TLS.getTLS SB.osThreadID) n)
+           -- Sanity check about scalability:
+        , bench ("team-separate-bags") $ Benchmarkable $ \ num ->
+          let quota = num `quot` fromIntegral splits in 
+          forkJoin splits (\_ -> do bg <- PB.newBag
+                                    for_ 1 quota (PB.add bg))
         ]
 
    -- Hack to make the names come out right in the upload:
@@ -227,7 +232,7 @@ main = do
 
 -- Inclusive/Inclusive
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
-for_ start end _ | start > end = error "start greater than end"
+-- for_ start end _ | start > end = error "start greater than end"
 for_ start end fn = loop start
   where loop !i | i > end = return ()
                 | otherwise = fn i >> loop (i+1)
