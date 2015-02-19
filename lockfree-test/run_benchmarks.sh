@@ -67,6 +67,8 @@ function go() {
     echo "Installing benchmark program."
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
+    # Grab the Chase-Lev deque packages from the submodule.
+    $CABAL install ../haskell-lockfree/chaselev-deque
     $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS 
     $CABAL configure $CONFOPTS -f-debug
     $CABAL build ${executable}
