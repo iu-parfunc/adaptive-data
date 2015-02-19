@@ -27,6 +27,9 @@ TAG=`date +'%s'`
 
 TABLENAME=AdaptivelyScalable
 
+# These are good settings for insert benchmarks on cutter:
+RTSOPTS=" -qa -qm -A1G -T -G1 "
+
 REPORT=report_${executable}
 BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
 WINDIR=$BAKDIR/uploaded
@@ -37,8 +40,8 @@ mkdir -p $FAILDIR
 
 
 
-CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.9
-CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.12
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.12
 # If we don't have the Criterion uploader, don't bother trying
 if ! [ -x `which $CRITUPLOAD` ]; then
     echo "Error: no $CRITUPLOAD found"
@@ -80,9 +83,13 @@ function go() {
 	CSVREPORT=${TAG}_${REPORT}-N$i.csv
 	
 	./dist/build/$executable/$executable $BENCHVARIANT \
-	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i \
+          +RTS $RTSOPTS -RTS
 
-        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT --threads=$i $CRITREPORT
+	# FIXME: does criterion uploader reorder for the server?
+	# If not, our archived file below will not match the server schema.
+        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
+		    --threads=$i $CRITREPORT --runflags="$RTSOPTS"
 	# --args=""
 
 	# NOTE: could aggregate these to ONE big CSV and then do the upload.

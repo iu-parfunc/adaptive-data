@@ -12,6 +12,9 @@ BENCHES="team-parfill-N"
 
 # RTSOPTS="-qa -T -s -A20M "
 
+# GHCVER=7.8.3
+GHCVER=7.10.rc2
+
 # These are the preferred GC settings for insert benchmarks:
 RTSOPTS=" -qa -qm -A1G -T -G1 "
 # -c doesn't hurt much, but it doesn't really help.
@@ -26,8 +29,12 @@ REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycle
 outdir="./html_reports/"
 mkdir -p $outdir
 
+CONFOPTS="--with-ghc=ghc-$GHCVER --with-ghc-pkg=ghc-pkg-$GHCVER -f-debug --enable-benchmarks --allow-newer"
+
+cabal clean
 if ! [ -e $CMD ]; then
-    cabal configure -f-debug --enable-benchmarks
+    cabal install --only-dependencies $CONFOPTS -j --ghc-option=-j3
+    cabal configure $CONFOPTS
     cabal build bench-lockfree-test
     $CMD -l
 fi
