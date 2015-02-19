@@ -20,6 +20,7 @@ library
                    , Data.Concurrent.PureBag
                    , Data.Concurrent.OldBag
                    , Data.Concurrent.ScalableBag
+                   , Data.Concurrent.ScalableBagBoxed
                    , Data.Concurrent.AdaptiveBag
   build-depends: base >= 4.6
                  , containers >= 0.5.5

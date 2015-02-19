@@ -26,7 +26,8 @@ import qualified Data.TLS.PThread as TLS
 import qualified Data.Concurrent.AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.OldBag as OB
-import qualified Data.Concurrent.ScalableBag as SB
+-- import qualified Data.Concurrent.ScalableBag as SB
+import qualified Data.Concurrent.ScalableBagBoxed  as SB
 
 --------------------------------------------------------------------------------
 -- Queue benchmarks:

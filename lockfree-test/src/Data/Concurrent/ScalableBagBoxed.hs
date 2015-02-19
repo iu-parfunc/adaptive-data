@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE CPP #-}
 
-module Data.Concurrent.ScalableBag
+-- | This version is an experiment to try to figure out what is
+-- destroying performance in ScalableBag
+
+module Data.Concurrent.ScalableBagBoxed
        (
          ScalableBag
        , newBag
@@ -21,17 +23,11 @@ import Data.TLS.PThread
 import Data.Vector.Mutable as V
 import System.IO.Unsafe (unsafePerformIO)
 
-dbgPrint :: String -> IO ()
-#if 0
-dbgPrint s = putStrLn $ " [dbg] "++s
-#else
-dbgPrint _ = return ()
-{-# INLINE dbgPrint #-}
-#endif
+import qualified Data.Concurrent.PureBag as PB
 
 --------------------------------------------------------------------------------
 
-type ScalableBag a = IOVector [a]
+type ScalableBag a = IOVector (Maybe (PB.PureBag a))
 
 {-# NOINLINE osThreadID #-}
 osThreadID :: TLS Int
@@ -41,32 +37,38 @@ osThreadID = unsafePerformIO $ mkTLS $ C.incrCounter 1 threadCounter
 threadCounter :: C.AtomicCounter
 threadCounter = unsafePerformIO $ C.newCounter 0
 
--- | This padding factor prevents false sharing.  Cache lines on intel
--- are 64 bytes / 8 words.
-padFactor :: Int
-padFactor = 8
-
--- | Divide by the padding factor
-padDiv :: Int -> Int
-padDiv x = shiftR x 3
-
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  V.replicate (padFactor * caps) []
+--  generateM caps (\_ -> fmap Just PB.newBag)
+  V.replicate caps Nothing
+
 
 add :: ScalableBag a -> a -> IO ()
 add bag x = do
   tid <- getTLS osThreadID
-  let len = padDiv (V.length bag)
-  dbgPrint$ "tid "++show tid++"Length of bag: "++show len
   -- We try to keep this collision-free:
-  let idx = tid `mod` len
-      idx' = padFactor * idx
-  dbgPrint$ "tid "++show tid++" going into CAS loop on index "++show idx'
-  casVectorLoop_ bag (x:) idx'
+  let idx = tid `mod` (V.length bag)
+  bg <- V.unsafeRead bag idx  
+  case bg of
+    Just b  -> PB.add b x
+    Nothing -> do tick <- unsafeReadVectorElem bag idx
+                  case peekTicket tick of
+                    Just b -> PB.add b x
+                    Nothing -> do
+                      !b <- PB.newBag
+                      (s,nt) <- casVectorElem bag idx tick (Just b)
+                      -- If we fail it's only because someone else wrote it:
+                      if s
+                        then PB.add b x
+                        else case peekTicket nt of
+                               Nothing -> error "IMPOSSIBLE!"
+                               Just b2 -> PB.add b2 x
+
 
 remove :: ScalableBag a -> IO (Maybe a)
+remove bag = error "FINISHME - remove"
+{-
 remove bag = do
   tid <- getTLS osThreadID
   let idx = tid `mod` V.length bag
@@ -104,3 +106,21 @@ casVectorLoop vec f ix = retryLoop =<< readVectorElem vec ix
               (!newVal, !ret) = f val
           (success, tick') <- casVectorElem vec ix tick newVal
           if success then return ret else retryLoop tick'
+-}
+
+-- FIXME: Vector.Mutable should really have generateM:
+generateM :: Int -> (Int -> a) -> IO (IOVector a)
+generateM num fn = do
+  vec <- V.new num
+  for_ 0 (num-1) $ \ix ->
+    V.unsafeWrite vec ix (fn ix)
+  return vec
+
+
+-- Inclusive/Inclusive
+for_ :: Monad m => Int -> Int -> (Int -> m a) -> m ()
+-- for_ start end _ | start > end = error "start greater than end"
+for_ start end fn = loop start
+  where loop !i | i > end = return ()
+                | otherwise = fn i >> loop (i+1)
+{-# INLINE for_ #-}
