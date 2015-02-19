@@ -26,7 +26,7 @@ import qualified Data.TLS.PThread as TLS
 import qualified Data.Concurrent.AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.OldBag as OB
--- import qualified Data.Concurrent.ScalableBag as SB
+import qualified Data.Concurrent.ScalableBag as UB
 import qualified Data.Concurrent.ScalableBagBoxed  as SB
 
 --------------------------------------------------------------------------------
@@ -203,6 +203,8 @@ main = do
   scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
   hybrid   <- mkBagBenchSet AB.newBag AB.add AB.remove
 
+  scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
+
   -- These are not specific to an implementation:
   let basicBenchmarks =
         [ bench ("emptyForkJoin") (whnfIO $ forkJoin splits (\_ -> return ()))
@@ -227,6 +229,7 @@ main = do
        t            -> (t,[ bgroup "pure"     pure,
                             bgroup "oldpure"  oldpure,
                             bgroup "scalable" scalable,
+                            bgroup "scalable-unbox" scalableUB,
                             bgroup "hybrid"   hybrid,
                             bgroup "basic"    basicBenchmarks
                           ])
