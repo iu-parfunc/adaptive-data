@@ -4,7 +4,7 @@
 
 # MODES="pure scalable"
 MODES="hybrid scalable"
-BENCHES="team-parfill-N"
+BENCHES="bag_team-parfill-N"
 # perthreadop-parfill-N 
 
 # MODES=" basic "
