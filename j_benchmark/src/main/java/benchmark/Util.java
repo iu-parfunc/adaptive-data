@@ -2,9 +2,6 @@ package benchmark;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Random;
 
 public class Util {
@@ -34,27 +31,22 @@ public class Util {
 
 		int hotKeyRangeLength = (hotKeyRangeEndsAt - hotKeyRangeStartsAt);
 		int numberOfHotKeys = (int) (((double) hotKeyRangeLength / (double) 100) * hotKeyPercentage);
+		int hotKeysInterval = (int) (100 / hotKeyPercentage);
 		return new Integer(
 				(int) (hotKeyRangeStartsAt + hotKeyGen.nextInt(numberOfHotKeys)
-						* (100 / hotKeyPercentage)));
+						* hotKeysInterval));
 	}
 
-	public static void main(String[] args) {
+	public static boolean isHotKey(int key, int hotKeyRangeStartsAt,
+			int hotKeyRangeEndsAt, double hotKeyPercentage) {
 
-		Random hotKeyGen = new Random();
-		HashMap<Integer, Integer> hotKeys = new HashMap<Integer, Integer>();
-		Integer nextHotKey;
-		for (int i = 0; i < 10000; i++) {
-			nextHotKey = Util.getNextHotKey(hotKeyGen, 0, 1000000, 0.001);
-			hotKeys.putIfAbsent(nextHotKey, new Integer(0));
-			hotKeys.replace(nextHotKey, new Integer(hotKeys.get(nextHotKey)
-					.intValue() + 1));
+		int hotKeyRangeLength = (hotKeyRangeEndsAt - hotKeyRangeStartsAt);
+		int hotKeysInterval = (int) (100 / hotKeyPercentage);
+		for (int i = hotKeyRangeStartsAt; i < hotKeyRangeEndsAt; i += hotKeysInterval) {
+			if (key == i) {
+				return true;
+			}
 		}
-
-		Iterator<Integer> itr = hotKeys.keySet().iterator();
-		while (itr.hasNext()) {
-			nextHotKey = itr.next();
-			System.out.println(nextHotKey + " >>> " + hotKeys.get(nextHotKey));
-		}
+		return false;
 	}
 }
