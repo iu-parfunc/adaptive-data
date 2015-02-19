@@ -1,5 +1,7 @@
 package benchmark;
 
+import hybrid_ds.HybridIntMap;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -19,6 +21,7 @@ public class RandomHotColdkeyBecnhmark {
 	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
 	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap;
+	private HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap;
 	private HashMap<String, TreeMap<Integer, Integer>> performanceData = new HashMap<String, TreeMap<Integer, Integer>>();
 	private BufferedWriter writer;
 	private boolean append = true;
@@ -45,8 +48,6 @@ public class RandomHotColdkeyBecnhmark {
 			break;
 		case "hybrid":
 			cuncorrencyType = Util.HYBRID_MAP;
-			System.out.print("TBD");
-			System.exit(0);
 			break;
 		case "JavaConc":
 			cuncorrencyType = Util.CONCURRENT_MAP;
@@ -96,15 +97,18 @@ public class RandomHotColdkeyBecnhmark {
 
 		for (int numOfThreads = 1; numOfThreads <= maxNumberOfThreads; numOfThreads *= 2) {
 
-			randomInsertRepetitions = numofInsertions / numOfThreads;
+			System.out.println(" *** " + numOfThreads + " *** ");
 
+			int numOfInsretionsPerThread = numofInsertions / numOfThreads;
 			startTime = System.currentTimeMillis();
+
 			for (int i = 1; i <= runRepetitions; i++) {
 
 				outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 				outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
 				outerMutableIntTreeMap = new AtomicReference(
 						IntTreePMap.empty());
+				outerHybridIntMapInnrMap = new HybridIntMap<HybridIntMap<Integer>>();
 
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
@@ -112,24 +116,35 @@ public class RandomHotColdkeyBecnhmark {
 				for (int j = 0; j < numOfThreads; j++) {
 					switch (concurrencyType) {
 					case Util.SKIP_LIST_MAP:
-						threads[j] = new Inserter(outerConcSkipListMap,
-								randomInsertRepetitions, numofInsertions,
+						threads[j] = new Inserter(outerConcSkipListMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, numofInsertions,
 								hotKeyPercentage, coldKeyProbability,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
 					case Util.CONCURRENT_MAP:
-						threads[j] = new Inserter(outerConcHashMap,
-								randomInsertRepetitions, numofInsertions,
+						threads[j] = new Inserter(outerConcHashMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, numofInsertions,
 								hotKeyPercentage, coldKeyProbability,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
 					case Util.MUTABLE_INT_TREE_MAP:
-						threads[j] = new Inserter(outerMutableIntTreeMap,
-								randomInsertRepetitions, numofInsertions,
+						threads[j] = new Inserter(outerMutableIntTreeMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, numofInsertions,
 								hotKeyPercentage, coldKeyProbability,
-								startSignal, doneSignal, j);
+								startSignal, doneSignal);
+						threads[j].start();
+						break;
+					case Util.HYBRID_MAP:
+						threads[j] = new Inserter(outerHybridIntMapInnrMap, j
+								* numOfInsretionsPerThread, (j + 1)
+								* numOfInsretionsPerThread, numofInsertions,
+								hotKeyPercentage, coldKeyProbability,
+								startSignal, doneSignal);
 						threads[j].start();
 						break;
 					default:
@@ -138,16 +153,60 @@ public class RandomHotColdkeyBecnhmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
-
+				// switch (concurrencyType) {
+				// case Util.SKIP_LIST_MAP:
+				// if (outerConcSkipListMap.get(new Integer(0)).size() !=
+				// numOfThreads) {
+				// System.out
+				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
+				// }
+				// break;
+				// case Util.CONCURRENT_MAP:
+				// break;
+				// case Util.MUTABLE_INT_TREE_MAP:
+				// if (outerMutableIntTreeMap.get().get(new Integer(0)).get()
+				// .size() != numOfThreads) {
+				// System.out
+				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
+				// }
+				// break;
+				// case Util.HYBRID_MAP:
+				// if (outerHybridIntMapInnrMap.get(new Integer(0)).size() !=
+				// numOfThreads) {
+				// System.out
+				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
+				// }
+				// break;
+				// default:
+				// break;
+				// }
 			}
+
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			if (!warmUp) {
 				performanceData.get(mapConfig).put(new Integer(numOfThreads),
 						new Integer((int) (elapsed / runRepetitions)));
 			}
-			// System.out.println(numOfThreads + "*** >>> "
-			// + outerMutableIntTreeMap);
+
+//			switch (concurrencyType) {
+//			case Util.SKIP_LIST_MAP:
+//				System.out.println(outerConcSkipListMap.size() + " >>> "
+//						+ outerConcSkipListMap);
+//				break;
+//			case Util.CONCURRENT_MAP:
+//				break;
+//			case Util.MUTABLE_INT_TREE_MAP:
+//				System.out.println(outerMutableIntTreeMap.get().size()
+//						+ " >>> " + outerMutableIntTreeMap);
+//				break;
+//			case Util.HYBRID_MAP:
+//				System.out.println(outerHybridIntMapInnrMap.size() + " >>> "
+//						+ outerHybridIntMapInnrMap);
+//				break;
+//			default:
+//				break;
+//			}
 		}
 	}
 

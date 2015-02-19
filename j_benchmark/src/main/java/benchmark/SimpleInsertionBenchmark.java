@@ -48,8 +48,6 @@ public class SimpleInsertionBenchmark {
 			break;
 		case "hybrid":
 			cuncorrencyType = Util.HYBRID_MAP;
-			System.out.print("TBD");
-			System.exit(0);
 			break;
 		case "JavaSynch":
 			cuncorrencyType = Util.SYNCHRONIZED_MAP;
@@ -98,12 +96,10 @@ public class SimpleInsertionBenchmark {
 		CountDownLatch startSignal, doneSignal;
 
 		long startTime, endTime, elapsed = 0;
-		int numOfInsretionsPerThread;
 		Thread[] threads = new Thread[64];
 
 		for (int numOfThreads = 1; numOfThreads <= maxNumberOfThreads; numOfThreads *= 2) {
-
-			numOfInsretionsPerThread = numofInsertions / numOfThreads;
+			int numOfInsretionsPerThread = numofInsertions / numOfThreads;
 
 			startTime = System.currentTimeMillis();
 			for (int i = 1; i <= runRepetitions; i++) {
@@ -126,6 +122,9 @@ public class SimpleInsertionBenchmark {
 						threads[j].start();
 					}
 					break;
+				case Util.HYBRID_MAP:
+
+					break;
 				default:
 					threadSafeMap.clear();
 					for (int j = 0; j < numOfThreads; j++) {
@@ -140,10 +139,17 @@ public class SimpleInsertionBenchmark {
 				startSignal.countDown();
 				doneSignal.await();
 			}
-			// System.out.println(numOfThreads + " *** >>> " +
-			// mutableIntTreeMap);
-			// System.out.println(mutableIntTreeMap.get().size());
-			// System.out.println(threadSafeMap.size());
+			// switch (mapValueType) {
+			// case Util.INT_TO_INT:
+			// System.out.println(numOfThreads + " *** >>> "
+			// + mutableIntTreeMapInt);
+			// break;
+			// case Util.INT_TO_INNER_MAP:
+			// System.out.println(numOfThreads + " *** >>> "
+			// + mutableIntTreeMapInnerMap);
+			// break;
+			// }
+
 			endTime = System.currentTimeMillis();
 			elapsed = (endTime - startTime);
 			if (!warmUp) {
