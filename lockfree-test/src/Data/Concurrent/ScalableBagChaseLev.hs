@@ -3,13 +3,13 @@
 {-# LANGUAGE CPP #-}
 
 module Data.Concurrent.ScalableBagChaseLev
-       -- (
-       --   ScalableBag
-       -- , newBag
-       -- , add
-       -- , remove
-       -- , osThreadID
-       -- )
+       (
+         ScalableBag
+       , newBag
+       , add
+       , remove
+       , osThreadID
+       )
        where
 
 import Control.Concurrent
