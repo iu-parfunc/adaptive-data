@@ -9,7 +9,7 @@ BENCHES="perthreadop-parfill-N team-parfill-N"
 # MODES=" basic "
 # BENCHES=" team-separate-bag "
 
-RTSOPTS="-qa -T -s"
+RTSOPTS="-qa -T -s -A20M "
 
 set -xe
 
@@ -20,9 +20,9 @@ outdir="./html_reports/"
 mkdir -p $outdir
 
 if ! [ -e $CMD ]; then
-    cabal configure --enable-benchmarks
+    cabal configure -f-debug --enable-benchmarks
     cabal build bench-lockfree-test
-    ./dist/build/bench-lockfree-test/bench-lockfree-test -l
+    $CMD -l
 fi
 
 for bench in $BENCHES; do 

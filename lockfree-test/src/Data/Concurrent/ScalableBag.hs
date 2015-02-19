@@ -22,7 +22,7 @@ import Data.Vector.Mutable as V
 import System.IO.Unsafe (unsafePerformIO)
 
 dbgPrint :: String -> IO ()
-#if 1
+#if 0
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
