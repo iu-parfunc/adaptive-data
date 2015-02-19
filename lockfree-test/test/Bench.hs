@@ -28,6 +28,7 @@ import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.OldBag as OB
 import qualified Data.Concurrent.ScalableBag as UB
 import qualified Data.Concurrent.ScalableBagBoxed  as SB
+import qualified Data.Concurrent.ScalableBagChaseLev as SBCL
 
 --------------------------------------------------------------------------------
 -- Queue benchmarks:
@@ -204,6 +205,7 @@ main = do
   hybrid   <- mkBagBenchSet AB.newBag AB.add AB.remove
 
   scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
+  scalableCL <- mkBagBenchSet SBCL.newBag SBCL.add SBCL.remove
 
   -- These are not specific to an implementation:
   let basicBenchmarks =
@@ -225,6 +227,7 @@ main = do
        "pure":t     -> (t,pure ++ basicBenchmarks)
        "oldpure":t  -> (t,oldpure)
        "scalable":t -> (t,scalable)
+       "scalable-chaselev":t -> (t,scalableCL)
        "hybrid":t   -> (t,hybrid)
        t            -> (t,[ bgroup "pure"     pure,
                             bgroup "oldpure"  oldpure,
