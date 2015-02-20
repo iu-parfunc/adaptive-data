@@ -236,6 +236,7 @@ main = do
        t            -> (t,[ bgroup "pure"     pure,
                             bgroup "oldpure"  oldpure,
                             bgroup "scalable" scalable,
+                            bgroup "scalable-chaselev" scalableCL, 
                             bgroup "scalable-unbox" scalableUB,
                             bgroup "hybrid"   hybrid,
                             bgroup "basic"    basicBenchmarks
