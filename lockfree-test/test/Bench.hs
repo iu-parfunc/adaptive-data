@@ -196,9 +196,13 @@ main = do
         [ bench ("bag_random5050-" ++ show elems) $
           Benchmarkable $ rep (fork5050 newBag add remove elems splits randomVec)
         | elems <- parSizes ] ++
-        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
-          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec) ]
 
+        [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
+          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec) ] ++ 
+        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
+          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec) ] 
+
+  
   pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
   oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
   scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
