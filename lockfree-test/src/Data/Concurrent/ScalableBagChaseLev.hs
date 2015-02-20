@@ -60,64 +60,25 @@ newBag = do
 add :: ScalableBag a -> a -> IO ()
 add bag x = do
   tid <- getTLS osThreadID
-  let len = padDiv (V.length bag)
+  let !len = padDiv (V.length bag)
   dbgPrint$ "tid "++show tid++"Length of bag: "++show len
   -- We try to keep this collision-free:
-  let idx = tid `mod` len
-      idx' = padFactor * idx
+  let !idx = tid `mod` len
+      !idx' = padFactor * idx
   dbgPrint$ "tid "++show tid++" going into CAS loop on index "++show idx'
   pushL (bag V.! idx') x
 
 remove :: ScalableBag a -> IO (Maybe a)
 remove bag = do
   tid <- getTLS osThreadID
-  let idx = tid `mod` V.length bag
-      loop vec ix start | ix >= V.length vec = loop vec 0 start
-      loop vec ix start = do
-        elt <- tryPopR (vec V.! (ix*padFactor))
+  let !idx = (tid `mod` V.length bag) * padFactor
+      loop !ix start | ix >= V.length bag = loop 0 start
+      loop !ix start = do
+        elt <- tryPopR (bag V.! ix)
         case elt of
-          Nothing -> let ix' = ix + 1 in
-            if ix' == start || (ix' >= V.length vec && start == 0)
+          Nothing -> let ix' = ix + padFactor in
+            if ix' == start || (ix' >= V.length bag && start == 0)
             then return Nothing -- looped around once, nothing to pop
-            else loop vec ix' start -- keep going
+            else loop ix' start -- keep going
           jx -> return jx
-  loop bag idx idx
-
--- remove :: ScalableBag a -> IO (Maybe a)
--- remove bag = do
---   tid <- getTLS osThreadID
---   let idx = tid `mod` V.length bag
---       retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
---       retryLoop vec ix start = do
---         tick <- unsafeReadVectorElem bag ix
---         case peekTicket tick of
---           [] -> let ix' = ix + 1 in
---             if ix' == start || (ix' >= V.length vec && start == 0)
---             then return Nothing -- looped around once, nothing to pop
---             else retryLoop vec ix' start -- keep going
---           _ -> do
---             res <- casVectorLoop bag pop ix
---             case res of
---               Nothing -> retryLoop vec ix start -- someone else stole what we were going to pop
---               jx -> return jx
---       pop [] = ([], Nothing)
---       pop (x:xs) = (xs, Just x)
---   retryLoop bag idx idx
-
--- {-# INLINE casVectorLoop_ #-}
--- casVectorLoop_ :: Vector a -> (a -> a) -> Int -> IO ()
--- casVectorLoop_ vec f ix = retryLoop =<< readVectorElem vec ix
---   where retryLoop tick = do
---           let !val    = peekTicket tick
---               !newVal = f val
---           (success, tick') <- casVectorElem vec ix tick newVal
---           if success then return () else retryLoop tick'
-
--- {-# INLINE casVectorLoop #-}
--- casVectorLoop :: IOVector a -> (a -> (a, b)) -> Int -> IO b
--- casVectorLoop vec f ix = retryLoop =<< readVectorElem vec ix
---   where retryLoop tick = do
---           let !val = peekTicket tick
---               (!newVal, !ret) = f val
---           (success, tick') <- casVectorElem vec ix tick newVal
---           if success then return ret else retryLoop tick'
+  loop idx idx
