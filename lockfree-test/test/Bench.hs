@@ -99,12 +99,23 @@ fork5050 newBag push pop elems splits vec = do
                         else push bag i)
 
 hotKeyOrRandom :: forall a .
-                  IO a -> (a -> Int64 -> IO ()) -> Int -> Int -> VM.IOVector (Maybe a) -> IO ()
-hotKeyOrRandom newBag push reps splits vec = do
+                  IO a
+                  -> (a -> Int64 -> IO ())
+                  -> Int
+                  -> Int
+                  -> VM.IOVector (Maybe a)
+                  -> VS.Vector Int
+                  -> VS.Vector Float
+                  -> IO ()
+hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
   let quota = (fromIntegral reps) `quot` splits
   forkJoin splits (\ _chunkID -> for_ 1 (fromIntegral quota) $ \i -> do
-                      flp <- randomRIO (0, 1) :: IO Float
-                      idx <- if flp < 0.5 then randomRIO (0, VM.length vec - 1) else return 0
+                      let ix :: Int -> Int
+                          ix vecLen = (fromIntegral i + (quota* splits) `mod` vecLen)
+                          flp = randomFlips VS.! ix (VS.length randomFlips)
+                          idx = round $ if flp == 0 then 0
+                                        else (randomIndices VS.! (ix $ VS.length randomIndices))
+                                             * (fromIntegral $ VM.length vec)
                       tick <- readVectorElem vec idx
                       b <- case peekTicket tick of
                         Nothing -> do
@@ -117,12 +128,17 @@ hotKeyOrRandom newBag push reps splits vec = do
                         Just b -> return b
                       push b i)
 
+numRandoms :: Int
+numRandoms = 100000
+
 main :: IO ()
 main = do
   splits <- getNumCapabilities
   
   -- Initialize randomness for fork5050
-  randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
+  -- randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
+  randomInts <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Int)
+  randomFloats <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Float)
 
   -- Initialize vector of Nothing for hotKeyOrRandom.  This is the
   -- outer collection of a nested collection.
@@ -194,13 +210,13 @@ main = do
           Benchmarkable $ rep (forkNFill newBag add elems splits)
         | elems <- parSizes ] ++  -}
         [ bench ("bag_random5050-" ++ show elems) $
-          Benchmarkable $ rep (fork5050 newBag add remove elems splits randomVec)
+          Benchmarkable $ rep (fork5050 newBag add remove elems splits randomInts)
         | elems <- parSizes ] ++
 
         [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
-          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec) ] ++ 
+          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomInts randomFloats) ] ++ 
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
-          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec) ] 
+          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomInts randomFloats) ] 
 
   
   pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
