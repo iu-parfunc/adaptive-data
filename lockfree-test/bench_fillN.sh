@@ -12,8 +12,8 @@ BENCHES="bag_team-parfill-N"
 
 # RTSOPTS="-qa -T -s -A20M "
 
-# GHCVER=7.8.3
-GHCVER=7.10.rc2
+GHCVER=7.8.3
+# GHCVER=7.10.rc2
 
 # These are the preferred GC settings for insert benchmarks:
 RTSOPTS=" -qa -qm -A1G -T -G1 "

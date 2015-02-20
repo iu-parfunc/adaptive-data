@@ -190,9 +190,9 @@ main = do
         ] ++
         ----------------------------------------
   
-        [ bench ("bag_insert-" ++ show elems) $
+        {- [ bench ("bag_insert-" ++ show elems) $
           Benchmarkable $ rep (forkNFill newBag add elems splits)
-        | elems <- parSizes ] ++ 
+        | elems <- parSizes ] ++  -}
         [ bench ("bag_random5050-" ++ show elems) $
           Benchmarkable $ rep (fork5050 newBag add remove elems splits randomVec)
         | elems <- parSizes ] ++
