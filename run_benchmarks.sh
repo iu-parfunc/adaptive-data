@@ -8,8 +8,7 @@
 #  * CI_BUILD_ID   = build identifier.
 
 echo "Begin benchmarks for Adaptive data repository."
-set -x
-set -e
+set -xe
 
 EXTRAARGS=$*
 

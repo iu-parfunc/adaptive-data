@@ -43,10 +43,7 @@ mkdir -p $FAILDIR
 CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.12
 CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.12
 # If we don't have the Criterion uploader, don't bother trying
-if ! [ -x `which $CRITUPLOAD` ]; then
-    echo "Error: no $CRITUPLOAD found"
-    exit 1
-fi
+which $CRITUPLOAD
 
 # CABAL=cabal-1.20
 # Cabal 1.20 has working parallel builds but it is too old to drive
@@ -68,8 +65,8 @@ function go() {
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
     # Grab the Chase-Lev deque packages from the submodule.
-    $CABAL install ../haskell-lockfree/chaselev-deque
-    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS 
+#    $CABAL install ../haskell-lockfree/chaselev-deque
+    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS . ../haskell-lockfree/chaselev-deque
     $CABAL configure $CONFOPTS -f-debug
     $CABAL build ${executable}
     
