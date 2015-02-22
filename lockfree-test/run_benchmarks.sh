@@ -16,6 +16,9 @@ cabal --version
 which ghc
 ghc --version
 
+# Run only certain benchmarks from the criterion suite:
+WHICHBENCH=" $BENCHVARIANT/bag_new-1 $BENCHVARIANT/bag_team-parfill-N "
+
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
 --regress=numGcs:iters --regress=mutatorWallSeconds:iters --regress=gcWallSeconds:iters \
@@ -80,8 +83,11 @@ function go() {
     for i in 1 2 4 8 16 24 32; do
 	CRITREPORT=${TAG}_${REPORT}-N$i.crit
 	CSVREPORT=${TAG}_${REPORT}-N$i.csv
-	
-	./dist/build/$executable/$executable $BENCHVARIANT \
+
+	echo "Listing supported benchmarks:"
+	./dist/build/$executable/$executable -l
+#	./dist/build/$executable/$executable $BENCHVARIANT \
+	./dist/build/$executable/$executable $WHICHBENCH \	
 	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i \
           +RTS $RTSOPTS -RTS
 
