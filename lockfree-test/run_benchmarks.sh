@@ -134,7 +134,7 @@ function go() {
 case $BENCHVARIANT in
     pure)
 	echo "Running pure-in-a-box benchmarks..."
-
+	go
 	;;
     oldpure)
 	echo "Running old-style pure-in-a-box benchmarks..."
