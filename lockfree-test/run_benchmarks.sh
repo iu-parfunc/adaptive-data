@@ -17,7 +17,8 @@ which ghc
 ghc --version
 
 # Run only certain benchmarks from the criterion suite:
-WHICHBENCH=" $BENCHVARIANT/bag_new-1 $BENCHVARIANT/bag_team-parfill-N "
+SEQBENCHES=" bag_new-1 "
+PARBENCHES=" bag_team-parfill-N "
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
@@ -61,6 +62,34 @@ CABAL=cabal-1.22
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
+function runcritbench () {
+    i=$1
+    shift
+    benches=$*
+
+    CRITREPORT=${TAG}_${REPORT}-N$i.crit
+    CSVREPORT=${TAG}_${REPORT}-N$i.csv
+
+    ./dist/build/$executable/$executable $BENCHVARIANT $benches \
+      --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
+       +RTS -T -s -N$i $RTSOPTS -RTS
+
+    # FIXME: does criterion uploader reorder for the server?
+    # If not, our archived file below will not match the server schema.
+    $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
+		--threads=$i $CRITREPORT --runflags="$RTSOPTS"
+    # --args=""
+
+    # NOTE: could aggregate these to ONE big CSV and then do the upload.
+    $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+    if [ "$FAILED" == 1 ]; then
+	cp $CSVREPORT $FAILDIR/
+    else
+	cp $CSVREPORT $WINDIR/
+    fi
+    
+}
+
 function go() {    
     VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
     
@@ -80,30 +109,15 @@ function go() {
     # 	rm -f $CRITREPORT.html
     # done
 
+    echo "Listing supported benchmarks:"
+    ./dist/build/$executable/$executable -l
+
+    REPORT=report_seq_${executable}
+    runcritbench 1 $SEQBENCHES
+
+    REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
-	CRITREPORT=${TAG}_${REPORT}-N$i.crit
-	CSVREPORT=${TAG}_${REPORT}-N$i.csv
-
-	echo "Listing supported benchmarks:"
-	./dist/build/$executable/$executable -l
-#	./dist/build/$executable/$executable $BENCHVARIANT \
-	./dist/build/$executable/$executable $WHICHBENCH \
-	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
-           +RTS -T -s -N$i $RTSOPTS -RTS
-
-	# FIXME: does criterion uploader reorder for the server?
-	# If not, our archived file below will not match the server schema.
-        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
-		    --threads=$i $CRITREPORT --runflags="$RTSOPTS"
-	# --args=""
-
-	# NOTE: could aggregate these to ONE big CSV and then do the upload.
-        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
-	if [ "$FAILED" == 1 ]; then
-	    cp $CSVREPORT $FAILDIR/
-	else
-	    cp $CSVREPORT $WINDIR/
-	fi
+	runcritbench $i $PARBENCHES
     done
 
     if [ $? = 0 ]; then
