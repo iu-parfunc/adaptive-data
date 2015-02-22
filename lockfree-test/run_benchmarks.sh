@@ -88,8 +88,8 @@ function go() {
 	./dist/build/$executable/$executable -l
 #	./dist/build/$executable/$executable $BENCHVARIANT \
 	./dist/build/$executable/$executable $WHICHBENCH \
-	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i \
-          +RTS $RTSOPTS -RTS
+	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
+           +RTS -T -s -N$i $RTSOPTS -RTS
 
 	# FIXME: does criterion uploader reorder for the server?
 	# If not, our archived file below will not match the server schema.
