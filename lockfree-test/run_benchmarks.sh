@@ -87,7 +87,7 @@ function go() {
 	echo "Listing supported benchmarks:"
 	./dist/build/$executable/$executable -l
 #	./dist/build/$executable/$executable $BENCHVARIANT \
-	./dist/build/$executable/$executable $WHICHBENCH \	
+	./dist/build/$executable/$executable $WHICHBENCH \
 	  --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i \
           +RTS $RTSOPTS -RTS
 
