@@ -111,7 +111,7 @@ hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
   let quota = (fromIntegral reps) `quot` splits
   forkJoin splits (\ _chunkID -> for_ 1 (fromIntegral quota) $ \i -> do
                       let ix :: Int -> Int
-                          ix vecLen = (fromIntegral i + (quota* splits) `mod` vecLen)
+                          ix vecLen = ((fromIntegral i + (quota* splits)) `mod` vecLen)
                           flp = randomFlips VS.! ix (VS.length randomFlips)
                           idx = round $ if flp == 0 then 0
                                         else (randomIndices VS.! (ix $ VS.length randomIndices))
