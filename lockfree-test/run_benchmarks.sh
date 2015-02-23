@@ -16,6 +16,10 @@ cabal --version
 which ghc
 ghc --version
 
+# Run only certain benchmarks from the criterion suite:
+SEQBENCHES=" bag_new-1 "
+PARBENCHES=" bag_team-parfill-N "
+
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
 --regress=numGcs:iters --regress=mutatorWallSeconds:iters --regress=gcWallSeconds:iters \
@@ -27,6 +31,9 @@ TAG=`date +'%s'`
 
 TABLENAME=AdaptivelyScalable
 
+# These are good settings for insert benchmarks on cutter:
+RTSOPTS=" -qa -qm -A1G -T -G1 "
+
 REPORT=report_${executable}
 BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
 WINDIR=$BAKDIR/uploaded
@@ -37,13 +44,10 @@ mkdir -p $FAILDIR
 
 
 
-CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.9
-CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.12
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.12
 # If we don't have the Criterion uploader, don't bother trying
-if ! [ -x `which $CRITUPLOAD` ]; then
-    echo "Error: no $CRITUPLOAD found"
-    exit 1
-fi
+which $CRITUPLOAD
 
 # CABAL=cabal-1.20
 # Cabal 1.20 has working parallel builds but it is too old to drive
@@ -58,13 +62,43 @@ CABAL=cabal-1.22
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
+function runcritbench () {
+    i=$1
+    shift
+    benches=$*
+
+    CRITREPORT=${TAG}_${REPORT}-N$i.crit
+    CSVREPORT=${TAG}_${REPORT}-N$i.csv
+
+    ./dist/build/$executable/$executable $BENCHVARIANT $benches \
+      --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
+       +RTS -T -s -N$i $RTSOPTS -RTS
+
+    # FIXME: does criterion uploader reorder for the server?
+    # If not, our archived file below will not match the server schema.
+    $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
+		--threads=$i $CRITREPORT --runflags="$RTSOPTS"
+    # --args=""
+
+    # NOTE: could aggregate these to ONE big CSV and then do the upload.
+    $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+    if [ "$FAILED" == 1 ]; then
+	cp $CSVREPORT $FAILDIR/
+    else
+	cp $CSVREPORT $WINDIR/
+    fi
+    
+}
+
 function go() {    
     VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
     
     echo "Installing benchmark program."
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
-    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS 
+    # Grab the Chase-Lev deque packages from the submodule.
+#    $CABAL install ../haskell-lockfree/chaselev-deque
+    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS . ../haskell-lockfree/chaselev-deque
     $CABAL configure $CONFOPTS -f-debug
     $CABAL build ${executable}
     
@@ -75,23 +109,15 @@ function go() {
     # 	rm -f $CRITREPORT.html
     # done
 
-    for i in 1 2 4 8 16 24 32; do
-	CRITREPORT=${TAG}_${REPORT}-N$i.crit
-	CSVREPORT=${TAG}_${REPORT}-N$i.csv
-	
-	./dist/build/$executable/$executable $BENCHVARIANT \
-	    --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES +RTS -T -s -N$i
+    echo "Listing supported benchmarks:"
+    ./dist/build/$executable/$executable -l
 
-        $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT --threads=$i $CRITREPORT
-	# --args=""
+    REPORT=report_seq_${executable}
+    runcritbench 1 $SEQBENCHES
 
-	# NOTE: could aggregate these to ONE big CSV and then do the upload.
-        $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
-	if [ "$FAILED" == 1 ]; then
-	    cp $CSVREPORT $FAILDIR/
-	else
-	    cp $CSVREPORT $WINDIR/
-	fi
+    REPORT=report_par_${executable}
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
+	runcritbench $i $PARBENCHES
     done
 
     if [ $? = 0 ]; then
@@ -104,16 +130,21 @@ function go() {
     fi
 }
 
+
 case $BENCHVARIANT in
     pure)
 	echo "Running pure-in-a-box benchmarks..."
-	go 
+	go
 	;;
     oldpure)
 	echo "Running old-style pure-in-a-box benchmarks..."
 	go 
 	;;
     scalable)
+	echo "Running regular scalable/lock-free benchmarks..."	
+	go 
+	;;
+    scalable-chaselev)
 	echo "Running regular scalable/lock-free benchmarks..."	
 	go 
 	;;

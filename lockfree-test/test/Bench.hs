@@ -26,7 +26,9 @@ import qualified Data.TLS.PThread as TLS
 import qualified Data.Concurrent.AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.OldBag as OB
-import qualified Data.Concurrent.ScalableBag as SB
+import qualified Data.Concurrent.ScalableBag as UB
+import qualified Data.Concurrent.ScalableBagBoxed  as SB
+import qualified Data.Concurrent.ScalableBagChaseLev as SBCL
 
 --------------------------------------------------------------------------------
 -- Queue benchmarks:
@@ -97,12 +99,23 @@ fork5050 newBag push pop elems splits vec = do
                         else push bag i)
 
 hotKeyOrRandom :: forall a .
-                  IO a -> (a -> Int64 -> IO ()) -> Int -> Int -> VM.IOVector (Maybe a) -> IO ()
-hotKeyOrRandom newBag push reps splits vec = do
+                  IO a
+                  -> (a -> Int64 -> IO ())
+                  -> Int
+                  -> Int
+                  -> VM.IOVector (Maybe a)
+                  -> VS.Vector Int
+                  -> VS.Vector Float
+                  -> IO ()
+hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
   let quota = (fromIntegral reps) `quot` splits
   forkJoin splits (\ _chunkID -> for_ 1 (fromIntegral quota) $ \i -> do
-                      flp <- randomRIO (0, 1) :: IO Float
-                      idx <- if flp < 0.5 then randomRIO (0, VM.length vec - 1) else return 0
+                      let ix :: Int -> Int
+                          ix vecLen = (fromIntegral i + (quota* splits) `mod` vecLen)
+                          flp = randomFlips VS.! ix (VS.length randomFlips)
+                          idx = round $ if flp == 0 then 0
+                                        else (randomIndices VS.! (ix $ VS.length randomIndices))
+                                             * (fromIntegral $ VM.length vec)
                       tick <- readVectorElem vec idx
                       b <- case peekTicket tick of
                         Nothing -> do
@@ -115,11 +128,17 @@ hotKeyOrRandom newBag push reps splits vec = do
                         Just b -> return b
                       push b i)
 
+numRandoms :: Int
+numRandoms = 100000
+
 main :: IO ()
 main = do
   splits <- getNumCapabilities
+  
   -- Initialize randomness for fork5050
-  randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
+  -- randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
+  randomInts <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Int)
+  randomFloats <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Float)
 
   -- Initialize vector of Nothing for hotKeyOrRandom.  This is the
   -- outer collection of a nested collection.
@@ -129,6 +148,11 @@ main = do
   let _adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
       
   putStrLn $ "[benchmark] using " ++ show splits ++ " capabilities"
+  putStr "[benchmark] OS thread ID of all current worker threads:\n  "
+  forkJoin splits (\ix -> do tid <- TLS.getTLS SB.osThreadID
+                             putStr $ show ix ++ ":" ++ show tid ++ "  ")
+  putStrLn ""
+  
   args <- getArgs
   -- when (null args) (error "Expected at least one command line arg: pure, scalable, hybrid")
 -- RRN: disabling queues for now.  We're off queues.
@@ -165,7 +189,7 @@ main = do
         ----------------------------------------
         -- This measures the marginal cost of one operation on ONE thread, under
         -- a varying amount of contention.        
-        [ bench "perthreadop-parfill-N" $ Benchmarkable $ \num -> do
+        [ bench "bag_perthreadop-parfill-N" $ Benchmarkable $ \num -> do
            -- putStrLn $ "Forking "++show splits++" threads to each insert "++show num++" elements"
            -- forkJoin splits (\_ -> fillN newBag add num)
            forkNFill newBag add (fromIntegral num * splits) splits
@@ -174,7 +198,7 @@ main = do
         -- This one measures something funny: the marginal cost of
         -- adding one work item to a pool which is completed by N
         -- separate workers.  This number should go down as N increases.
-        [ bench "team-parfill-N" $ Benchmarkable $ \num -> do
+        [ bench "bag_team-parfill-N" $ Benchmarkable $ \num -> do
            -- let quota = num `quot` fromIntegral splits
            -- putStrLn $ "Forking "++show splits++" threads to each insert "++show quota++" elements"
            -- forkJoin splits (\_ -> fillN newBag add quota)
@@ -182,19 +206,26 @@ main = do
         ] ++
         ----------------------------------------
   
-        [ bench ("bag_insert-" ++ show elems) $
+        {- [ bench ("bag_insert-" ++ show elems) $
           Benchmarkable $ rep (forkNFill newBag add elems splits)
-        | elems <- parSizes ] ++ 
+        | elems <- parSizes ] ++  -}
         [ bench ("bag_random5050-" ++ show elems) $
-          Benchmarkable $ rep (fork5050 newBag add remove elems splits randomVec)
+          Benchmarkable $ rep (fork5050 newBag add remove elems splits randomInts)
         | elems <- parSizes ] ++
-        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
-          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec) ]
 
+        [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
+          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomInts randomFloats) ] ++ 
+        [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
+          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomInts randomFloats) ] 
+
+  
   pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
   oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
   scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
   hybrid   <- mkBagBenchSet AB.newBag AB.add AB.remove
+
+  scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
+  scalableCL <- mkBagBenchSet SBCL.newBag SBCL.add SBCL.remove
 
   -- These are not specific to an implementation:
   let basicBenchmarks =
@@ -203,6 +234,11 @@ main = do
         , bench ("getOSTID") $ whnfIO $ TLS.getTLS SB.osThreadID
         , bench ("forkJoin-getOSTID-N") $ Benchmarkable $ \n ->
            forkJoin splits (\_ -> rep (TLS.getTLS SB.osThreadID) n)
+           -- Sanity check about scalability:
+        , bench ("team-separate-bags") $ Benchmarkable $ \ num ->
+          let quota = num `quot` fromIntegral splits in 
+          forkJoin splits (\_ -> do bg <- PB.newBag
+                                    for_ 1 quota (PB.add bg))
         ]
 
    -- Hack to make the names come out right in the upload:
@@ -211,10 +247,13 @@ main = do
        "pure":t     -> (t,pure ++ basicBenchmarks)
        "oldpure":t  -> (t,oldpure)
        "scalable":t -> (t,scalable)
+       "scalable-chaselev":t -> (t,scalableCL)
        "hybrid":t   -> (t,hybrid)
        t            -> (t,[ bgroup "pure"     pure,
                             bgroup "oldpure"  oldpure,
                             bgroup "scalable" scalable,
+                            bgroup "scalable-chaselev" scalableCL, 
+                            bgroup "scalable-unbox" scalableUB,
                             bgroup "hybrid"   hybrid,
                             bgroup "basic"    basicBenchmarks
                           ])
@@ -227,7 +266,7 @@ main = do
 
 -- Inclusive/Inclusive
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
-for_ start end _ | start > end = error "start greater than end"
+-- for_ start end _ | start > end = error "start greater than end"
 for_ start end fn = loop start
   where loop !i | i > end = return ()
                 | otherwise = fn i >> loop (i+1)
