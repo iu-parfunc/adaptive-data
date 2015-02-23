@@ -138,7 +138,6 @@ public class InsertionThread extends Thread {
 				hotColdKeyRangeMax);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
 
@@ -165,7 +164,7 @@ public class InsertionThread extends Thread {
 					randomInsertion_SKIP_LIST_WITH_INNER_CONC_SKIP_LIST_MAP();
 					break;
 				case Util.CONCURRENT_MAP:
-					randomInsertion_CONC_HASH_MAP_WITH_INNER_CONC_HASH_MAP();
+					randomInsertion_CONCURRENT_HASH_MAP_WITH_INNER_CONC_HASH_MAP();
 					break;
 				case Util.HYBRID_MAP:
 					randomInsertion_HYBRID_WITH_INNER_HYBRID_MAP();
@@ -300,7 +299,7 @@ public class InsertionThread extends Thread {
 		}
 	}
 
-	private void randomInsertion_CONC_HASH_MAP_WITH_INNER_CONC_HASH_MAP() {
+	private void randomInsertion_CONCURRENT_HASH_MAP_WITH_INNER_CONC_HASH_MAP() {
 
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 

@@ -8,6 +8,7 @@ CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
 SIMPLE_INSERTION_OUTPUT_FILE=simple_insertion.csv
 RANDOM_HOT_COLD_OUTPUT_FILE=random_hot_cold_key.csv
+mvn package 
 
 JAVA_EXEC=java
 JAVA_OPTS="-Xms4g -Xmx16g -d64"
