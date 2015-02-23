@@ -116,12 +116,12 @@ hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
                           idx = round $ if flp == 0 then 0
                                         else (randomIndices VS.! (ix $ VS.length randomIndices))
                                              * (fromIntegral $ VM.length vec)
-                      putStrLn $ "[debug] reading from index " ++ show idx ++ " in vector of length " ++ show (VM.length vec)
-                      tick <- readVectorElem vec idx
+                          idx' = if idx >= VM.length vec then VM.length vec - 1 else idx
+                      tick <- readVectorElem vec idx'
                       b <- case peekTicket tick of
                         Nothing -> do
                           b <- newBag
-                          (success, tick') <- casVectorElem vec idx tick $ Just b
+                          (success, tick') <- casVectorElem vec idx' tick $ Just b
                           if success
                             then return b else case peekTicket tick' of
                             Nothing -> error "shouldn't see this"
