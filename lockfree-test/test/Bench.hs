@@ -116,6 +116,7 @@ hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
                           idx = round $ if flp == 0 then 0
                                         else (randomIndices VS.! (ix $ VS.length randomIndices))
                                              * (fromIntegral $ VM.length vec)
+                      putStrLn $ "[debug] reading from index " ++ show idx ++ " in vector of length " ++ show V.length vec
                       tick <- readVectorElem vec idx
                       b <- case peekTicket tick of
                         Nothing -> do
@@ -138,7 +139,7 @@ main = do
   -- Initialize randomness for fork5050
   -- randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
   randomInts <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Int)
-  randomFloats <- VS.replicateM numRandoms (randomRIO (0, 0.99) :: IO Float)
+  randomFloats <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Float)
 
   -- Initialize vector of Nothing for hotKeyOrRandom.  This is the
   -- outer collection of a nested collection.
