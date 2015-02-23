@@ -17,8 +17,8 @@ which ghc
 ghc --version
 
 # Run only certain benchmarks from the criterion suite:
-SEQBENCHES=" bag_new-1 "
-PARBENCHES=" bag_team-parfill-N "
+# SEQBENCHES=""
+PARBENCHES=" bag_team-parfill-N bag_new-1 bag_random5050-1000000 array-bag_hotcold-insert-100000 "
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
@@ -112,8 +112,8 @@ function go() {
     echo "Listing supported benchmarks:"
     ./dist/build/$executable/$executable -l
 
-    REPORT=report_seq_${executable}
-    runcritbench 1 $SEQBENCHES
+    # REPORT=report_seq_${executable}
+    # runcritbench 1 $SEQBENCHES
 
     REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
