@@ -9,7 +9,6 @@ import org.pcollections.IntTreePMap;
 public class CopyThread<V> extends Thread {
 
 	private HybridIntMap<V> hybridDS;
-	private IntTreePMap<V> pureDS;
 	private Iterator<Integer> keySet;
 
 	public CopyThread(HybridIntMap<V> hybridDS, IntTreePMap<V> pureDS,
@@ -24,9 +23,9 @@ public class CopyThread<V> extends Thread {
 		Integer nextKey;
 		while (keySet.hasNext()) {
 			nextKey = keySet.next();
-			hybridDS.putIfAbsent(nextKey, hybridDS.get(nextKey));
+			hybridDS.putIfAbsentCopyThead(nextKey, hybridDS.get(nextKey));
 		}
-		hybridDS.copied();
-		System.out.println("COPY IS DONE");
+		hybridDS.copyIsDone();
+		// System.out.println("COPY IS DONE");
 	}
 }

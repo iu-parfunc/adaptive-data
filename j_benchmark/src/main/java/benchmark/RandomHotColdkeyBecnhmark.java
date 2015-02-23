@@ -1,13 +1,17 @@
 package benchmark;
 
 import hybrid_ds.HybridIntMap;
+import hybrid_ds.PureIntMap;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -18,29 +22,24 @@ import org.pcollections.IntTreePMap;
 
 public class RandomHotColdkeyBecnhmark {
 
+	@SuppressWarnings("rawtypes")
 	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
-	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> outerMutableIntTreeMap;
 	private HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap;
-	private HashMap<String, TreeMap<Integer, Integer>> performanceData = new HashMap<String, TreeMap<Integer, Integer>>();
-	private BufferedWriter writer;
-	private boolean append = true;
+	private PureIntMap<PureIntMap<Integer>> outerPureIntTreeMap;
+
+	private HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData = new HashMap<String, TreeMap<Integer, ArrayList<Long>>>();
+
+	private Thread[] threads = new Thread[64];
 
 	public RandomHotColdkeyBecnhmark(String dsTypeToBeBenchmarked,
 			int numofInsertions, double hotKeyPercentage, int runRepetitions,
 			int maxNumberOfThreads, double coldKeyProbability)
 			throws IOException, InterruptedException {
-		String outputFileName = "random_hot_cold_key.csv";
-		if (!new File(outputFileName).exists()) {
-			append = false;
-		}
-		writer = new BufferedWriter(new FileWriter(new File(outputFileName),
-				append));
 
 		String cuncorrencyType = null, valueType = null;
-
 		switch (dsTypeToBeBenchmarked) {
-		case "pure":
+		case "mutable":
 			cuncorrencyType = Util.MUTABLE_INT_TREE_MAP;
 			break;
 		case "scalable":
@@ -49,25 +48,23 @@ public class RandomHotColdkeyBecnhmark {
 		case "hybrid":
 			cuncorrencyType = Util.HYBRID_MAP;
 			break;
-		case "JavaConc":
-			cuncorrencyType = Util.CONCURRENT_MAP;
+		case "pure":
+			cuncorrencyType = Util.PURE_MAP;
 			break;
 		default:
-			System.out
-					.println("Please insert one of the following data structures be benchmarked\n"
-							+ "pure|scalable|hybrid|JavaConc");
+
+			Util.inputFormatError("random");
 			System.exit(0);
 			break;
 		}
 
-		warmUp(cuncorrencyType, valueType, numofInsertions, hotKeyPercentage,
+		warmUp(cuncorrencyType, numofInsertions, hotKeyPercentage,
 				runRepetitions, maxNumberOfThreads, coldKeyProbability);
 		runBenchmark(cuncorrencyType, valueType, numofInsertions,
 				hotKeyPercentage, runRepetitions, maxNumberOfThreads,
 				coldKeyProbability);
-		writePerfData(dsTypeToBeBenchmarked, numofInsertions, hotKeyPercentage,
-				coldKeyProbability);
-		writer.close();
+		Util.writePerfData(performanceData, "random", dsTypeToBeBenchmarked,
+				numofInsertions, hotKeyPercentage, coldKeyProbability);
 	}
 
 	private void runBenchmark(String cuncorrencyType, String valueType,
@@ -75,178 +72,114 @@ public class RandomHotColdkeyBecnhmark {
 			int maxNumberOfThreads, double coldKeyProbability)
 			throws InterruptedException, IOException {
 
-		benchmark(cuncorrencyType, runRepetitions, numofInsertions,
+		randomBenchmark(cuncorrencyType, runRepetitions, numofInsertions,
 				hotKeyPercentage, maxNumberOfThreads, coldKeyProbability, false);
 	}
 
-	private void benchmark(String concurrencyType, int runRepetitions,
-			int numofInsertions, double hotKeyPercentage,
+	private void randomBenchmark(String concurrencyType, int runRepetitions,
+			int insertionCount, double hotKeyPercentage,
 			int maxNumberOfThreads, double coldKeyProbability, boolean warmUp)
 			throws InterruptedException, IOException {
 
-		String mapConfig = concurrencyType;
-		if (!warmUp) {
-			performanceData.put(mapConfig, new TreeMap<Integer, Integer>());
-		}
-
 		CountDownLatch startSignal, doneSignal;
-
-		long startTime, endTime, elapsed = 0;
-		int randomInsertRepetitions;
-		Thread[] threads = new Thread[64];
+		long startTime, endTime, elapsed;
 
 		for (int numOfThreads = 1; numOfThreads <= maxNumberOfThreads; numOfThreads *= 2) {
 
-			System.out.println(" *** " + numOfThreads + " *** ");
+//			System.out.println(" *** " + numOfThreads + " *** ");
 
-			int numOfInsretionsPerThread = numofInsertions / numOfThreads;
-			startTime = System.currentTimeMillis();
+			int insretionsPerThread = insertionCount / numOfThreads;
+
+			ArrayList<Long> runTimeRecods = new ArrayList<Long>();
 
 			for (int i = 1; i <= runRepetitions; i++) {
 
 				outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 				outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
-				outerMutableIntTreeMap = new AtomicReference(
-						IntTreePMap.empty());
+				outerPureIntTreeMap = new PureIntMap<PureIntMap<Integer>>();
 				outerHybridIntMapInnrMap = new HybridIntMap<HybridIntMap<Integer>>();
 
+				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
 
 				for (int j = 0; j < numOfThreads; j++) {
 					switch (concurrencyType) {
 					case Util.SKIP_LIST_MAP:
-						threads[j] = new Inserter(outerConcSkipListMap, j
-								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, numofInsertions,
+						threads[j] = new InsertionThread(outerConcSkipListMap,
+								j * insretionsPerThread, (j + 1)
+										* insretionsPerThread, insertionCount,
 								hotKeyPercentage, coldKeyProbability,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
 					case Util.CONCURRENT_MAP:
-						threads[j] = new Inserter(outerConcHashMap, j
-								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, numofInsertions,
-								hotKeyPercentage, coldKeyProbability,
-								startSignal, doneSignal);
-						threads[j].start();
-						break;
-					case Util.MUTABLE_INT_TREE_MAP:
-						threads[j] = new Inserter(outerMutableIntTreeMap, j
-								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, numofInsertions,
+						threads[j] = new InsertionThread(outerConcHashMap, j
+								* insretionsPerThread, (j + 1)
+								* insretionsPerThread, insertionCount,
 								hotKeyPercentage, coldKeyProbability,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
 					case Util.HYBRID_MAP:
-						threads[j] = new Inserter(outerHybridIntMapInnrMap, j
-								* numOfInsretionsPerThread, (j + 1)
-								* numOfInsretionsPerThread, numofInsertions,
+						threads[j] = new InsertionThread(
+								outerHybridIntMapInnrMap, j
+										* insretionsPerThread, (j + 1)
+										* insretionsPerThread, insertionCount,
 								hotKeyPercentage, coldKeyProbability,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
-					default:
+
+					case Util.PURE_MAP:
+						threads[j] = new InsertionThread(outerPureIntTreeMap, j
+								* insretionsPerThread, (j + 1)
+								* insretionsPerThread, insertionCount,
+								hotKeyPercentage, coldKeyProbability,
+								startSignal, doneSignal);
+						threads[j].start();
 						break;
 					}
 				}
 				startSignal.countDown();
 				doneSignal.await();
-				// switch (concurrencyType) {
-				// case Util.SKIP_LIST_MAP:
-				// if (outerConcSkipListMap.get(new Integer(0)).size() !=
-				// numOfThreads) {
-				// System.out
-				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
-				// }
-				// break;
-				// case Util.CONCURRENT_MAP:
-				// break;
-				// case Util.MUTABLE_INT_TREE_MAP:
-				// if (outerMutableIntTreeMap.get().get(new Integer(0)).get()
-				// .size() != numOfThreads) {
-				// System.out
-				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
-				// }
-				// break;
-				// case Util.HYBRID_MAP:
-				// if (outerHybridIntMapInnrMap.get(new Integer(0)).size() !=
-				// numOfThreads) {
-				// System.out
-				// .println("***** &&&&&&&&&&&&&&&& ***** FATAL ERROR ***** &&&&&&&&&&&&&&&& *****");
-				// }
-				// break;
-				// default:
-				// break;
-				// }
-			}
+				endTime = System.currentTimeMillis();
+				elapsed = (endTime - startTime);
+				if (!warmUp) {
+					runTimeRecods.add(new Long(elapsed));
+				}
+			}// End of FOR loop over run repetitions
 
-			endTime = System.currentTimeMillis();
-			elapsed = (endTime - startTime);
+			// switch (concurrencyType) {
+			// case Util.HYBRID_MAP:
+			// System.out.println(outerHybridIntMapInnrMap);
+			// break;
+			//
+			// case Util.PURE_MAP:
+			// System.out.println(outerPureIntTreeMap);
+			// break;
+			//
+			// case Util.SKIP_LIST_MAP:
+			// System.out.println(outerConcSkipListMap);
+			// break;
+			// }
+
 			if (!warmUp) {
+				String mapConfig = concurrencyType;
+				performanceData.putIfAbsent(mapConfig,
+						new TreeMap<Integer, ArrayList<Long>>());
 				performanceData.get(mapConfig).put(new Integer(numOfThreads),
-						new Integer((int) (elapsed / runRepetitions)));
+						runTimeRecods);
 			}
-
-//			switch (concurrencyType) {
-//			case Util.SKIP_LIST_MAP:
-//				System.out.println(outerConcSkipListMap.size() + " >>> "
-//						+ outerConcSkipListMap);
-//				break;
-//			case Util.CONCURRENT_MAP:
-//				break;
-//			case Util.MUTABLE_INT_TREE_MAP:
-//				System.out.println(outerMutableIntTreeMap.get().size()
-//						+ " >>> " + outerMutableIntTreeMap);
-//				break;
-//			case Util.HYBRID_MAP:
-//				System.out.println(outerHybridIntMapInnrMap.size() + " >>> "
-//						+ outerHybridIntMapInnrMap);
-//				break;
-//			default:
-//				break;
-//			}
-		}
+		}// End of FOR loop over numberOfThreads
 	}
 
-	private void writePerfData(String dsTypeToBeBenchmarked,
-			int numofInsertions, double hotKeyPercentage,
-			double coldKeyProbability) throws IOException {
-
-		if (!append) {
-			Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
-		}
-
-		Integer numerOfThreads, timeTaken;
-		TreeMap<Integer, Integer> perfDataPerMapType;
-		Iterator<Integer> numberOfThreadsITR;
-		Iterator<String> mapTypeITR = performanceData.keySet().iterator();
-
-		String mapType = null;
-		while (mapTypeITR.hasNext()) {
-			mapType = mapTypeITR.next();
-			perfDataPerMapType = performanceData.get(mapType);
-			numberOfThreadsITR = perfDataPerMapType.keySet().iterator();
-			while (numberOfThreadsITR.hasNext()) {
-				numerOfThreads = numberOfThreadsITR.next();
-				timeTaken = perfDataPerMapType.get(numerOfThreads);
-				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-"
-						+ dsTypeToBeBenchmarked + " -#inserts "
-						+ numofInsertions + " -hotKeyPercentage "
-						+ hotKeyPercentage + " -coldKeyProbability "
-						+ coldKeyProbability + " -#threads " + numerOfThreads
-						+ " ," + timeTaken);
-			}
-		}
-	}
-
-	private void warmUp(String cuncorrencyType, String valueType,
-			int numofInsertions, double hotKeyPercentage, int runRepetitions,
+	private void warmUp(String cuncorrencyType, int numofInsertions,
+			double hotKeyPercentage, int runRepetitions,
 			int maxNumberOfThreads, double coldKeyProbability)
 			throws InterruptedException, IOException {
 
-		benchmark(cuncorrencyType,
+		randomBenchmark(cuncorrencyType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
 				numofInsertions, hotKeyPercentage, maxNumberOfThreads,
 				coldKeyProbability, true);
@@ -255,29 +188,21 @@ public class RandomHotColdkeyBecnhmark {
 	public static void main(String[] args) {
 
 		try {
-
-			String dsTypeToBeBenchmarked = args[0];
-			int numofInsertions = Integer.parseInt(args[1]);
-			double hotKeyPercentage = Double.parseDouble(args[2]);
-			int runRepetitions = Integer.parseInt(args[3]);
-			int maxNumberOfThreads = Integer.parseInt(args[4]);
-			double coldKeyProbability = Double.parseDouble(args[5]);
-			new RandomHotColdkeyBecnhmark(dsTypeToBeBenchmarked,
-					numofInsertions, hotKeyPercentage, runRepetitions,
-					maxNumberOfThreads, coldKeyProbability);
+			int i = 0;
+			String dsType = args[i++];
+			int numofInsertions = Integer.parseInt(args[i++]);
+			double hotKeyPercentage = Double.parseDouble(args[i++]);
+			int runRepetitions = Integer.parseInt(args[i++]);
+			int maxNumberOfThreads = Integer.parseInt(args[i++]);
+			double coldKeyProbability = Double.parseDouble(args[i++]);
+			new RandomHotColdkeyBecnhmark(dsType, numofInsertions,
+					hotKeyPercentage, runRepetitions, maxNumberOfThreads,
+					coldKeyProbability);
 
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-			System.out
-					.println("Please enter the folowing input data:\n"
-							+ " 1-Data structure to bebenchmarked (pure|scalable|hybrid|JavaConc)\n"
-							+ " 2-Number of insertions\n"
-							+ " 3-Hot key percentage over key range from 0 to the number of insertions (double in range [0-100])\n"
-							+ " 4-Number of run repetitions\n"
-							+ " 5-Maximum number of threads\n"
-							+ " 6-Probablity of cold key operation (double in range [0-1])\n"
-							+ "Output will be put in \"random_hot_cold_key_<DS Type>_<Probablity of cold keys>_<Number of run insertions>_<Hot key percentage>_<Maximum number of threads>.csv\"");
+			Util.inputFormatError("random");
 		}
 	}
 }

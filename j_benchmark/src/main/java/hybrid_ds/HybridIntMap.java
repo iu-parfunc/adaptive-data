@@ -1,12 +1,7 @@
 package hybrid_ds;
 
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.pcollections.IntTreePMap;
@@ -16,29 +11,29 @@ public class HybridIntMap<V> {
 	private enum State {
 		A, B, AB
 	};
-	
-	
+
+	AtomicInteger contentionCount = new AtomicInteger(0);
+
 	V tombstone = null;
 	private AtomicReference<State> state;
 
 	private ConcurrentSkipListMap<Integer, V> concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
-	private AtomicReference<IntTreePMap<V>> mutableIntTreeMap = new AtomicReference(
+	private AtomicReference<IntTreePMap<V>> mutableIntTreeMap = new AtomicReference<IntTreePMap<V>>(
 			IntTreePMap.empty());
 
 	public HybridIntMap() {
-
 		state = new AtomicReference<HybridIntMap.State>(State.A);
 	}
 
-	public void contentionDetected() {
+	private void contentionDetected() {
 		if (!state.compareAndSet(State.A, State.AB)) {
 			return;
 		}
-		switchMaps();
+		initiateTransition();
 	}
 
-	private void switchMaps() {
-		System.out.println("*** switchMaps ***");
+	private void initiateTransition() {
+		// System.out.println("*** Transition initiated ***");
 		concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
 		CopyThread copyThread = new CopyThread<V>(this,
 				mutableIntTreeMap.get(), mutableIntTreeMap.get().keySet()
@@ -46,22 +41,8 @@ public class HybridIntMap<V> {
 		copyThread.start();
 	}
 
-	protected void copied() {
+	protected void copyIsDone() {
 		state.set(State.B);
-	}
-
-	// @Override
-	public int size() {
-		switch (state.get()) {
-		case A:
-			return mutableIntTreeMap.get().size();
-		case B:
-			return concSkipListMap.size();
-		case AB:
-			// Remove has not been implemented yet
-			break;
-		}
-		return 0;
 	}
 
 	public V get(Object key) {
@@ -72,34 +53,41 @@ public class HybridIntMap<V> {
 			return concSkipListMap.get(key);
 		case AB:
 			if (concSkipListMap.containsKey(key)) {
-				return concSkipListMap.get(key);
+				return concSkipListMap.get(key);// A real value or
+												// tombstone=null which means
+												// there is no mapping
 			}
 			return mutableIntTreeMap.get().get(key);
 		}
 		return null;
 	}
 
-	public V tryPut(Integer key, V value) {
+	public V put(Integer key, V value) {
 
 		if (key == null || value == null) {
 			throw new NullPointerException();
 		}
+		int retry = 0;
+		int retryThreshold = 10;
 		switch (state.get()) {
 		case A:
 
 			IntTreePMap<V> lastSnapshot;
 			boolean CAS = false;
-			do {
-				lastSnapshot = mutableIntTreeMap.get();
-			} while ((state.get().equals(State.A))
+			lastSnapshot = mutableIntTreeMap.get();
+			while ((state.get().equals(State.A))
 					&& !(CAS = mutableIntTreeMap.compareAndSet(lastSnapshot,
-							lastSnapshot.plus(key, value))));
-
-			if (state.get().equals(State.A) && CAS) {
-				return lastSnapshot.get(key);
+							lastSnapshot.plus(key, value)))) {
+				if (++retry > retryThreshold) {
+					contentionDetected();
+				}
+				lastSnapshot = mutableIntTreeMap.get();
 			}
-			if (!CAS) {
-				return concSkipListMap.put(key, value);
+
+			if (CAS) {
+				return lastSnapshot.get(key);
+			} else {
+				return put(key, value);
 			}
 		case B:
 			return concSkipListMap.put(key, value);
@@ -110,31 +98,87 @@ public class HybridIntMap<V> {
 		return null;
 	}
 
-	protected V putIfAbsent(Integer key, V value) {
+	public V putIfAbsent(Integer key, V value) {
+		switch (state.get()) {
+		case A:
 
-		return concSkipListMap.putIfAbsent(key, value);
+			IntTreePMap<V> snapShot = mutableIntTreeMap.get();
+			if (snapShot.containsKey(key)) {
+				return snapShot.get(key);
+			}
+			return put(key, value);
+		case B:
+			if (concSkipListMap.containsKey(key)
+					&& concSkipListMap.get(key) == null) {
+				return concSkipListMap.put(key, value);
+			} else {
+				return concSkipListMap.putIfAbsent(key, value);
+			}
+		case AB:
+
+			snapShot = mutableIntTreeMap.get();
+			if (!concSkipListMap.containsKey(key) && snapShot.containsKey(key)) {
+				return snapShot.get(key);
+			}
+			if (concSkipListMap.containsKey(key)
+					&& concSkipListMap.get(key) == null) {
+				concSkipListMap.put(key, value);
+			} else {
+				return concSkipListMap.putIfAbsent(key, value);
+			}
+		}
+		return null;
+	}
+
+	protected void putIfAbsentCopyThead(Integer key, V value) {
+
+		if (concSkipListMap.containsKey(key)) {
+			return;
+		} else {
+			concSkipListMap.putIfAbsent(key, value);
+		}
+	}
+
+	public V remove(Integer key) {
+
+		int retry = 0;
+		int retryThreshold = 10;
+
+		switch (state.get()) {
+		case A:
+
+			IntTreePMap<V> lastSnapshot;
+			boolean CAS = false;
+			lastSnapshot = mutableIntTreeMap.get();
+			while ((state.get().equals(State.A))
+					&& !(CAS = mutableIntTreeMap.compareAndSet(lastSnapshot,
+							lastSnapshot.minus(key)))) {
+				if (++retry > retryThreshold) {
+					contentionDetected();
+				}
+				lastSnapshot = mutableIntTreeMap.get();
+			}
+
+			if (CAS) {
+				return lastSnapshot.get(key);
+			} else {
+				return remove(key);
+			}
+		case B:
+			return concSkipListMap.remove(key);
+		case AB:
+			V previous = concSkipListMap.get(key);
+			concSkipListMap.put(key, null);
+			return previous;
+		}
+		return null;
 	}
 
 	public void clear() {
-
-		mutableIntTreeMap = new AtomicReference(IntTreePMap.empty());
-		state.getAndSet(State.A);
+		mutableIntTreeMap = new AtomicReference<IntTreePMap<V>>(
+				IntTreePMap.empty());
+		state.set(State.A);
 		concSkipListMap.clear();
-
-	}
-
-	public boolean remove(Object key, Object value) {
-		switch (state.get()) {
-		case A:
-			break;
-		case B:
-			break;
-		case AB:
-			break;
-		default:
-			break;
-		}
-		return false;
 	}
 
 	@Override

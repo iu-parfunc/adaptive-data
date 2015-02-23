@@ -1,9 +1,13 @@
 package benchmark;
 
+import hybrid_ds.HybridIntMap;
+import hybrid_ds.PureIntMap;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -20,28 +24,21 @@ public class SimpleInsertionBenchmark {
 
 	@SuppressWarnings("rawtypes")
 	private Map threadSafeMap;
-	private BufferedWriter writer;
-	private HashMap<String, TreeMap<Integer, Integer>> performanceData = new HashMap<String, TreeMap<Integer, Integer>>();
-	private AtomicReference<IntTreePMap<Integer>> mutableIntTreeMapInt;
-	private AtomicReference<IntTreePMap<AtomicReference<IntTreePMap<Integer>>>> mutableIntTreeMapInnerMap;
-	private boolean append = true;
+	private PureIntMap<Integer> pureIntMapInt;
+	private PureIntMap<PureIntMap<Integer>> pureIntMapInnerMap;
+	private HybridIntMap<Integer> hybridIntMapInt;
+	private HybridIntMap<HybridIntMap<Integer>> hybridIntMapInnerMap;
+
+	private HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData = new HashMap<String, TreeMap<Integer, ArrayList<Long>>>();
 
 	public SimpleInsertionBenchmark(String dsTypeToBeBenchmarked,
 			int numofInsertions, int runRepetitions, int maxNumberOfThreads)
 			throws InterruptedException, IOException {
 
-		String outputFileName = "simple_insertion.csv";
-
-		if (!new File(outputFileName).exists()) {
-			append = false;
-		}
-		writer = new BufferedWriter(new FileWriter(new File(outputFileName),
-				true));
-
 		String cuncorrencyType = null, valueType = null;
 		switch (dsTypeToBeBenchmarked) {
 		case "pure":
-			cuncorrencyType = Util.MUTABLE_INT_TREE_MAP;
+			cuncorrencyType = Util.PURE_MAP;
 			break;
 		case "scalable":
 			cuncorrencyType = Util.SKIP_LIST_MAP;
@@ -56,32 +53,30 @@ public class SimpleInsertionBenchmark {
 			cuncorrencyType = Util.CONCURRENT_MAP;
 			break;
 		default:
-			System.out
-					.println("Please insert one of the following data structures be benchmarked\n"
-							+ "pure|scalable|hybrid|JavaSynch|JavaConc");
+			Util.inputFormatError("simple");
 			System.exit(0);
 			break;
 		}
 
-		valueType = Util.INT_TO_INT;
-		warmUp(cuncorrencyType, valueType, numofInsertions, runRepetitions,
+		warmUp(cuncorrencyType, numofInsertions, runRepetitions,
 				maxNumberOfThreads);
-		runBenchmark(cuncorrencyType, valueType, numofInsertions,
-				runRepetitions, maxNumberOfThreads);
-		valueType = Util.INT_TO_INNER_MAP;
-		warmUp(cuncorrencyType, valueType, numofInsertions, runRepetitions,
+		runBenchmark(cuncorrencyType, numofInsertions, runRepetitions,
 				maxNumberOfThreads);
-		runBenchmark(cuncorrencyType, valueType, numofInsertions,
-				runRepetitions, maxNumberOfThreads);
-		writePerfData(dsTypeToBeBenchmarked, numofInsertions, runRepetitions);
-		writer.close();
+		Util.writePerfData(performanceData, "simple", dsTypeToBeBenchmarked,
+				numofInsertions, 0, 0);
 	}
 
-	private void runBenchmark(String cuncorrencyType, String valueType,
-			int numofInsertions, int runRepetitions, int maxNumberOfThreads)
+	private void runBenchmark(String cuncorrencyType, int numofInsertions,
+			int runRepetitions, int maxNumberOfThreads)
 			throws InterruptedException, IOException {
+
+		String valueType = Util.INT_TO_INNER_MAP;
 		benchmark(cuncorrencyType, valueType, runRepetitions, numofInsertions,
 				maxNumberOfThreads, false);
+		// valueType = Util.INT_TO_INT;
+		// benchmark(cuncorrencyType, valueType, runRepetitions,
+		// numofInsertions,
+		// maxNumberOfThreads, false);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
@@ -89,9 +84,6 @@ public class SimpleInsertionBenchmark {
 			boolean warmUp) throws InterruptedException, IOException {
 
 		initiatlizeMap(concurrencyType, mapValueType);
-		if (!warmUp) {
-			performanceData.put(mapValueType, new TreeMap<Integer, Integer>());
-		}
 
 		CountDownLatch startSignal, doneSignal;
 
@@ -99,23 +91,26 @@ public class SimpleInsertionBenchmark {
 		Thread[] threads = new Thread[64];
 
 		for (int numOfThreads = 1; numOfThreads <= maxNumberOfThreads; numOfThreads *= 2) {
+
+			// System.out.println(" *** " + numOfThreads + " " + mapValueType
+			// + " *** ");
 			int numOfInsretionsPerThread = numofInsertions / numOfThreads;
 
-			startTime = System.currentTimeMillis();
+			ArrayList<Long> runTimeRecods = new ArrayList<Long>();
+
 			for (int i = 1; i <= runRepetitions; i++) {
 
+				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
 
 				switch (concurrencyType) {
-				case Util.MUTABLE_INT_TREE_MAP:
-					mutableIntTreeMapInt = new AtomicReference(
-							IntTreePMap.empty());
-					mutableIntTreeMapInnerMap = new AtomicReference(
-							IntTreePMap.empty());
+				case Util.PURE_MAP:
+					pureIntMapInt = new PureIntMap<Integer>();
+					pureIntMapInnerMap = new PureIntMap<PureIntMap<Integer>>();
 					for (int j = 0; j < numOfThreads; j++) {
-						threads[j] = new Inserter(mutableIntTreeMapInt,
-								mutableIntTreeMapInnerMap, j
+						threads[j] = new InsertionThread(pureIntMapInt,
+								pureIntMapInnerMap, j
 										* numOfInsretionsPerThread, (j + 1)
 										* numOfInsretionsPerThread,
 								mapValueType, startSignal, doneSignal);
@@ -123,12 +118,21 @@ public class SimpleInsertionBenchmark {
 					}
 					break;
 				case Util.HYBRID_MAP:
-
+					hybridIntMapInt = new HybridIntMap<Integer>();
+					hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>();
+					for (int j = 0; j < numOfThreads; j++) {
+						threads[j] = new InsertionThread(hybridIntMapInt,
+								hybridIntMapInnerMap, j
+										* numOfInsretionsPerThread, (j + 1)
+										* numOfInsretionsPerThread,
+								mapValueType, startSignal, doneSignal);
+						threads[j].start();
+					}
 					break;
 				default:
 					threadSafeMap.clear();
 					for (int j = 0; j < numOfThreads; j++) {
-						threads[j] = new Inserter(threadSafeMap, j
+						threads[j] = new InsertionThread(threadSafeMap, j
 								* numOfInsretionsPerThread, (j + 1)
 								* numOfInsretionsPerThread, concurrencyType,
 								mapValueType, startSignal, doneSignal);
@@ -138,26 +142,23 @@ public class SimpleInsertionBenchmark {
 				}
 				startSignal.countDown();
 				doneSignal.await();
-			}
-			// switch (mapValueType) {
-			// case Util.INT_TO_INT:
-			// System.out.println(numOfThreads + " *** >>> "
-			// + mutableIntTreeMapInt);
-			// break;
-			// case Util.INT_TO_INNER_MAP:
-			// System.out.println(numOfThreads + " *** >>> "
-			// + mutableIntTreeMapInnerMap);
-			// break;
-			// }
+				endTime = System.currentTimeMillis();
+				elapsed = (endTime - startTime);
+				if (!warmUp) {
+					runTimeRecods.add(new Long(elapsed));
+				}
 
-			endTime = System.currentTimeMillis();
-			elapsed = (endTime - startTime);
+			}// End of FOR loop over run repetitions
+
 			if (!warmUp) {
-				performanceData.get(mapValueType).put(
-						new Integer(numOfThreads),
-						new Integer((int) (elapsed / runRepetitions)));
+
+				String mapConfig = mapValueType;
+				performanceData.putIfAbsent(mapConfig,
+						new TreeMap<Integer, ArrayList<Long>>());
+				performanceData.get(mapConfig).put(new Integer(numOfThreads),
+						runTimeRecods);
 			}
-		}
+		}// End of FOR loop over numberOfThreads
 	}
 
 	private void initiatlizeMap(String ConcurrecyType, String mapValyeType) {
@@ -175,10 +176,6 @@ public class SimpleInsertionBenchmark {
 			case Util.SKIP_LIST_MAP:
 				threadSafeMap = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
-			case Util.MUTABLE_INT_TREE_MAP:
-				break;
-			default:
-				break;
 			}
 			break;
 		case Util.INT_TO_INNER_MAP:
@@ -193,48 +190,20 @@ public class SimpleInsertionBenchmark {
 			case Util.SKIP_LIST_MAP:
 				threadSafeMap = new ConcurrentSkipListMap<Integer, Map<Integer, Integer>>();
 				break;
-			case Util.MUTABLE_INT_TREE_MAP:
-				break;
-			default:
-				break;
 			}
-			break;
-		default:
 			break;
 		}
 	}
 
-	private void writePerfData(String dsTypeToBeBenchmarked,
-			int numofInsertions, int runRepetitions) throws IOException {
-
-		if (!append) {
-			Util.writeLine(writer, "PROGNAME,VARIANT,ARGS,AVERAGE_TIME");
-		}
-		Integer numerOfThreads, timeTaken;
-		TreeMap<Integer, Integer> perfDataPerMapType;
-		Iterator<Integer> numberOfThreadsITR;
-		Iterator<String> mapTypeITR = performanceData.keySet().iterator();
-
-		String mapType = null;
-		while (mapTypeITR.hasNext()) {
-			mapType = mapTypeITR.next();
-			perfDataPerMapType = performanceData.get(mapType);
-			numberOfThreadsITR = perfDataPerMapType.keySet().iterator();
-			while (numberOfThreadsITR.hasNext()) {
-				numerOfThreads = numberOfThreadsITR.next();
-				timeTaken = perfDataPerMapType.get(numerOfThreads);
-				Util.writeLine(writer, "RANDOM_INSERTION,JAVA,-"
-						+ dsTypeToBeBenchmarked + "_" + mapType + " -#inserts "
-						+ numofInsertions + " -#threads " + numerOfThreads
-						+ " ," + timeTaken);
-			}
-		}
-	}
-
-	private void warmUp(String cuncorrencyType, String valueType,
-			int numofInsertions, int runRepetitions, int maxNumberOfThreads)
+	private void warmUp(String cuncorrencyType, int numofInsertions,
+			int runRepetitions, int maxNumberOfThreads)
 			throws InterruptedException, IOException {
 
+		String valueType = Util.INT_TO_INT;
+		benchmark(cuncorrencyType, valueType,
+				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
+				numofInsertions, maxNumberOfThreads, true);
+		valueType = Util.INT_TO_INNER_MAP;
 		benchmark(cuncorrencyType, valueType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
 				numofInsertions, maxNumberOfThreads, true);
@@ -243,23 +212,16 @@ public class SimpleInsertionBenchmark {
 	public static void main(String[] args) {
 
 		try {
-			String dsTypeToBeBenchmarked = args[0];
+			String dsType = args[0];
 			int numofInsertions = Integer.parseInt(args[1]);
 			int runRepetitions = Integer.parseInt(args[2]);
 			int maxNumberOfThreads = Integer.parseInt(args[3]);
-			new SimpleInsertionBenchmark(dsTypeToBeBenchmarked,
-					numofInsertions, runRepetitions, maxNumberOfThreads);
+			new SimpleInsertionBenchmark(dsType, numofInsertions,
+					runRepetitions, maxNumberOfThreads);
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-			System.out
-					.println("Please enter the folowing input data:\n"
-							+ " 1-Data structure to bebenchmarked (pure|scalable|hybrid|JavaSynch|JavaConc)\n"
-							+ " 2-Number of insertions\n"
-							+ " 3-Number of run repetitions\n"
-							+ " 4-Maximum number of threads\n"
-							+ " Output will be put in "
-							+ "\"simple_insertion_<DS Type>_<Number of insertions>_<Maximum number of threads>.csv\"");
+			Util.inputFormatError("simple");
 		}
 	}
 }

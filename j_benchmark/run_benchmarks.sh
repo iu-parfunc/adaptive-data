@@ -2,6 +2,10 @@
 
 echo "FINISHME: invoke java benchmarks here and then upload"
 set -xe
+
+TABLENAME=AdaptivelyScalable
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
+
 SIMPLE_INSERTION_OUTPUT_FILE=simple_insertion.csv
 RANDOM_HOT_COLD_OUTPUT_FILE=random_hot_cold_key.csv
 
@@ -11,7 +15,7 @@ JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 
 BENCHMARK_ROUNDS=100
-MAX_NUMBER_OF_THREADS=64
+MAX_NUMBER_OF_THREADS=16
 NUMBER_OF_INSERTS=1000000
 
 COLD_KEY_OPERATION_CHANCE=0.5
@@ -44,6 +48,12 @@ case $BENCHVARIANT in
 	;;
     "hybrid")
 	echo "FINISHME: run hybrid benchmarks here"
+	for i in 1;
+        do
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
+	done
+
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $HOT_KEY_PERCENTAGE $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
 	;;
     *)
 echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
@@ -51,6 +61,9 @@ echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
 	;;
 esac
 
-which -a hsbencher-fusion-upload-csv 
+$CSVUPLOAD random_hot_cold_key.csv --fusion-upload --name=$TABLENAME
+$CSVUPLOAD simple_insertion.csv --fusion-upload --name=$TABLENAME
+
+#which -a hsbencher-fusion-upload-csv 
 # This can upload the CSV file:
-hsbencher-fusion-upload-csv -h
+#hsbencher-fusion-upload-csv -h 
