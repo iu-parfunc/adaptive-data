@@ -83,8 +83,6 @@ public class SimpleInsertionBenchmark {
 			int runRepetitions, int numofInsertions, int maxNumberOfThreads,
 			boolean warmUp) throws InterruptedException, IOException {
 
-		initiatlizeMap(concurrencyType, mapValueType);
-
 		CountDownLatch startSignal, doneSignal;
 
 		long startTime, endTime, elapsed = 0;
@@ -100,14 +98,14 @@ public class SimpleInsertionBenchmark {
 
 			for (int i = 1; i <= runRepetitions; i++) {
 
+				initiatlizeMap(concurrencyType, mapValueType);
+				
 				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numOfThreads);
 
 				switch (concurrencyType) {
 				case Util.PURE_MAP:
-					pureIntMapInt = new PureIntMap<Integer>();
-					pureIntMapInnerMap = new PureIntMap<PureIntMap<Integer>>();
 					for (int j = 0; j < numOfThreads; j++) {
 						threads[j] = new InsertionThread(pureIntMapInt,
 								pureIntMapInnerMap, j
@@ -118,8 +116,7 @@ public class SimpleInsertionBenchmark {
 					}
 					break;
 				case Util.HYBRID_MAP:
-					hybridIntMapInt = new HybridIntMap<Integer>();
-					hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>();
+
 					for (int j = 0; j < numOfThreads; j++) {
 						threads[j] = new InsertionThread(hybridIntMapInt,
 								hybridIntMapInnerMap, j
@@ -130,7 +127,6 @@ public class SimpleInsertionBenchmark {
 					}
 					break;
 				default:
-					threadSafeMap.clear();
 					for (int j = 0; j < numOfThreads; j++) {
 						threads[j] = new InsertionThread(threadSafeMap, j
 								* numOfInsretionsPerThread, (j + 1)
@@ -161,11 +157,11 @@ public class SimpleInsertionBenchmark {
 		}// End of FOR loop over numberOfThreads
 	}
 
-	private void initiatlizeMap(String ConcurrecyType, String mapValyeType) {
+	private void initiatlizeMap(String cuncorrencyType, String mapValueType) {
 
-		switch (mapValyeType) {
+		switch (mapValueType) {
 		case Util.INT_TO_INT:
-			switch (ConcurrecyType) {
+			switch (cuncorrencyType) {
 			case Util.SYNCHRONIZED_MAP:
 				threadSafeMap = Collections
 						.synchronizedMap(new HashMap<Integer, Integer>());
@@ -176,10 +172,16 @@ public class SimpleInsertionBenchmark {
 			case Util.SKIP_LIST_MAP:
 				threadSafeMap = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
+			case Util.HYBRID_MAP:
+				hybridIntMapInt = new HybridIntMap<Integer>();
+				break;
+			case Util.PURE_MAP:
+				pureIntMapInt = new PureIntMap<Integer>();
+				break;
 			}
 			break;
 		case Util.INT_TO_INNER_MAP:
-			switch (ConcurrecyType) {
+			switch (cuncorrencyType) {
 			case Util.SYNCHRONIZED_MAP:
 				threadSafeMap = Collections
 						.synchronizedMap(new HashMap<Integer, Map<Integer, Integer>>());
@@ -189,6 +191,12 @@ public class SimpleInsertionBenchmark {
 				break;
 			case Util.SKIP_LIST_MAP:
 				threadSafeMap = new ConcurrentSkipListMap<Integer, Map<Integer, Integer>>();
+				break;
+			case Util.HYBRID_MAP:
+				hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>();
+				break;
+			case Util.PURE_MAP:
+				pureIntMapInnerMap = new PureIntMap<PureIntMap<Integer>>();
 				break;
 			}
 			break;

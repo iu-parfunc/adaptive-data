@@ -271,15 +271,32 @@ public class InsertionThread extends Thread {
 
 			HybridIntMap<Integer> newMap = new HybridIntMap<Integer>();
 			HybridIntMap<Integer> innerMap = outerHybridIntMapInnrMap
-					.get(randomKey);
+					.putIfAbsent(randomKey, newMap);
 
 			if (innerMap == null) {
 				innerMap = newMap;
-				outerHybridIntMapInnrMap.put(randomKey, innerMap);
 			}
 			Integer innerKey = nextInnerMapKeyValue();
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
+		}
+	}
+	
+	private void randomInsertion_PURE_WITH_INNER_PURE_MAP() {
+
+		Integer randomKey;
+		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+			randomKey = nextHotOrColdKeyOuterMap(i);
+			PureIntMap<Integer> newMap = new PureIntMap<>();
+			PureIntMap<Integer> innerMap = outerPureIntMap.putIfAbsent(
+					randomKey, newMap);
+			if (innerMap == null) {
+				innerMap = newMap;
+			}
+			Integer innerKey = nextInnerMapKeyValue();
+			Integer innerValue = innerKey;
+			innerMap.put(innerKey, innerValue);
+
 		}
 	}
 
@@ -298,24 +315,6 @@ public class InsertionThread extends Thread {
 			Integer innerKey = nextInnerMapKeyValue();
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
-		}
-	}
-
-	private void randomInsertion_PURE_WITH_INNER_PURE_MAP() {
-
-		Integer randomKey;
-		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-			randomKey = nextHotOrColdKeyOuterMap(i);
-			PureIntMap<Integer> newMap = new PureIntMap<>();
-			PureIntMap<Integer> innerMap = outerPureIntMap.putIfAbsent(
-					randomKey, newMap);
-			if (innerMap == null) {
-				innerMap = newMap;
-			}
-			Integer innerKey = nextInnerMapKeyValue();
-			Integer innerValue = innerKey;
-			innerMap.put(innerKey, innerValue);
-
 		}
 	}
 
