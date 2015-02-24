@@ -7,7 +7,7 @@ CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
 MAVEN=mvn
 JAVA_EXEC=java
-JAVA_OPTS="-Xms4g -Xmx16g -d64"
+JAVA_OPTS="-Xms16g -Xmx24g -d64"
 JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 if [[ "$HOSTNAME" =~ cutter ]]; then
