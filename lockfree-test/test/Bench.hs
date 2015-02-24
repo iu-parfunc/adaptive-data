@@ -263,7 +263,7 @@ main = do
 
   where -- _sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
-        hotkeySize = 10^8
+        hotkeySize = 10^7
 
 -- Inclusive/Inclusive
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
