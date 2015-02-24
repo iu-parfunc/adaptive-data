@@ -8,7 +8,7 @@ CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
 MAVEN=mvn
 JAVA_EXEC=java
-#JAVA_OPTS="-Xms4g -Xmx16g -d64"
+JAVA_OPTS="-Xms4g -Xmx16g -d64"
 JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 if [[ "$HOSTNAME" =~ cutter ]]; then
@@ -18,12 +18,12 @@ fi
 $MAVEN clean
 $MAVEN package 
 
-BENCHMARK_ROUNDS=10
+BENCHMARK_ROUNDS=100
 MAX_NUMBER_OF_THREADS=16
-NUMBER_OF_INSERTS=80
+NUMBER_OF_INSERTS=1000000
 
 COLD_KEY_OPERATION_CHANCE=0.5
-HOT_KEY_PERCENTAGE=1
+NUM_HOTKEYS=1
 
 #rm -rf $SIMPLE_INSERTION_OUTPUT_FILE
 #rm -rf $RANDOM_HOT_COLD_OUTPUT_FILE
@@ -39,7 +39,7 @@ case $BENCHVARIANT in
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $HOT_KEY_PERCENTAGE $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
 	;;
     "scalable")
 	echo "Running scalable benchmarks"
@@ -48,7 +48,7 @@ case $BENCHVARIANT in
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $HOT_KEY_PERCENTAGE $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
 	;;
     "hybrid")
 	echo "FINISHME: run hybrid benchmarks here"
@@ -57,7 +57,7 @@ case $BENCHVARIANT in
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $HOT_KEY_PERCENTAGE $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
 	;;
     *)
 echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
