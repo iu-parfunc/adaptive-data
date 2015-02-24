@@ -7,7 +7,7 @@ CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
 MAVEN=mvn
 JAVA_EXEC=java
-#JAVA_OPTS="-Xms4g -Xmx16g -d64"
+JAVA_OPTS="-Xms4g -Xmx16g -d64"
 JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 if [[ "$HOSTNAME" =~ cutter ]]; then
@@ -17,9 +17,9 @@ fi
 $MAVEN clean
 $MAVEN package 
 
-BENCHMARK_ROUNDS=1
+BENCHMARK_ROUNDS=100
 MAX_NUM_THREADS=16
-NUM_INSERTS=100
+NUM_INSERTS=1000000
 
 HOT_RATIO=0.5
 NUM_HOTKEYS=1
