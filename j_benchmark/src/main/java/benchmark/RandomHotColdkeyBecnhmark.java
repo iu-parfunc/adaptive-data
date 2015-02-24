@@ -83,7 +83,7 @@ public class RandomHotColdkeyBecnhmark {
 		CountDownLatch startSignal, doneSignal;
 		long startTime, endTime, elapsed;
 
-		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads *= 2) {
+		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads++) {
 
 			int numInsretionsPerThread = insertionCount / numThreads;
 

@@ -97,7 +97,7 @@ public class SimpleInsertionBenchmark {
 		long startTime, endTime, elapsed = 0;
 		Thread[] threads = new Thread[64];
 
-		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads *= 2) {
+		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads++) {
 
 			int numInsretionsPerThread = numInsertions / numThreads;
 
