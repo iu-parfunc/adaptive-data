@@ -6,25 +6,24 @@ set -xe
 TABLENAME=AdaptivelyScalable
 CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
-SIMPLE_INSERTION_OUTPUT_FILE=simple_insertion.csv
-RANDOM_HOT_COLD_OUTPUT_FILE=random_hot_cold_key.csv
+MAVEN=mvn
+JAVA_EXEC=java
+#JAVA_OPTS="-Xms4g -Xmx16g -d64"
+JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 if [[ "$HOSTNAME" =~ cutter ]]; then
     module load jdk
 fi
-mvn package 
 
-JAVA_EXEC=java
-JAVA_OPTS="-Xms4g -Xmx16g -d64"
-JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
-
+$MAVEN clean
+$MAVEN package 
 
 BENCHMARK_ROUNDS=10
 MAX_NUMBER_OF_THREADS=16
-NUMBER_OF_INSERTS=1000000
+NUMBER_OF_INSERTS=80
 
 COLD_KEY_OPERATION_CHANCE=0.5
-HOT_KEY_PERCENTAGE=0.0001
+HOT_KEY_PERCENTAGE=1
 
 #rm -rf $SIMPLE_INSERTION_OUTPUT_FILE
 #rm -rf $RANDOM_HOT_COLD_OUTPUT_FILE

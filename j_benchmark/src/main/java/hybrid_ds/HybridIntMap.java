@@ -1,12 +1,15 @@
 package hybrid_ds;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.pcollections.IntTreePMap;
 
-public class HybridIntMap<V> {
+public class HybridIntMap<V> implements Map<Integer, V> {
 
 	private enum State {
 		A, B, AB
@@ -35,7 +38,7 @@ public class HybridIntMap<V> {
 	private void initiateTransition() {
 		// System.out.println("*** Transition initiated ***");
 		concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
-		CopyThread copyThread = new CopyThread<V>(this,
+		CopyThread<V> copyThread = new CopyThread<V>(this,
 				mutableIntTreeMap.get(), mutableIntTreeMap.get().keySet()
 						.iterator());
 		copyThread.start();
@@ -45,6 +48,7 @@ public class HybridIntMap<V> {
 		state.set(State.B);
 	}
 
+	@Override
 	public V get(Object key) {
 		switch (state.get()) {
 		case A:
@@ -62,6 +66,7 @@ public class HybridIntMap<V> {
 		return null;
 	}
 
+	@Override
 	public V put(Integer key, V value) {
 
 		if (key == null || value == null) {
@@ -98,6 +103,7 @@ public class HybridIntMap<V> {
 		return null;
 	}
 
+	@Override
 	public V putIfAbsent(Integer key, V value) {
 		switch (state.get()) {
 		case A:
@@ -139,7 +145,8 @@ public class HybridIntMap<V> {
 		}
 	}
 
-	public V remove(Integer key) {
+	@Override
+	public V remove(Object key) {
 
 		int retry = 0;
 		int retryThreshold = 10;
@@ -168,12 +175,13 @@ public class HybridIntMap<V> {
 			return concSkipListMap.remove(key);
 		case AB:
 			V previous = concSkipListMap.get(key);
-			concSkipListMap.put(key, null);
+			concSkipListMap.put((Integer) key, null);
 			return previous;
 		}
 		return null;
 	}
 
+	@Override
 	public void clear() {
 		mutableIntTreeMap = new AtomicReference<IntTreePMap<V>>(
 				IntTreePMap.empty());
@@ -191,5 +199,53 @@ public class HybridIntMap<V> {
 		default:
 			return "IN TRANSITION STATE!";
 		}
+	}
+
+	@Override
+	public int size() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public boolean isEmpty() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean containsKey(Object key) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean containsValue(Object value) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public void putAll(Map<? extends Integer, ? extends V> m) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public Set<Integer> keySet() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Collection<V> values() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Set<java.util.Map.Entry<Integer, V>> entrySet() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

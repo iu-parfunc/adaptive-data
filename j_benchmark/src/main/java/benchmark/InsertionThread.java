@@ -5,26 +5,22 @@ import hybrid_ds.PureIntMap;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.pcollections.IntTreePMap;
 
 public class InsertionThread extends Thread {
 
-	@SuppressWarnings("rawtypes")
 	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
 	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
 	private PureIntMap<PureIntMap<Integer>> outerPureIntMap;
 
 	private HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap;
 
-	private Map map;
+	private Map<Integer, Integer> mapInt;
+	private Map<Integer, Map<Integer, Integer>> mapInnerMap;
 	private PureIntMap<Integer> pureIntMapInt;
 	private PureIntMap<PureIntMap<Integer>> pureIntMapInnerMap;
 	private HybridIntMap<Integer> hybridIntMapInt;
@@ -33,12 +29,13 @@ public class InsertionThread extends Thread {
 	private CountDownLatch startSignal, doneSignal;
 
 	private String mapValueType, concurrentMapType, benchmarkType;
-	private double coldKeyProbability, hotKeyPercentage;
-	private int insertionStratIndex, insertionEndIndex, hotColdKeyRangeMax;
+	private double hotRatio;
+	private int insertionStratIndex, insertionEndIndex, coldKeyRangeMax,
+			numHotKey;
 
 	private static Random randomGen = new Random();
 
-	private boolean offline = true;
+	private boolean oflineColdKeys = true;
 
 	public InsertionThread(HybridIntMap<Integer> hybridIntMapInt,
 			HybridIntMap<HybridIntMap<Integer>> hybridIntMapInnerMp,
@@ -68,13 +65,15 @@ public class InsertionThread extends Thread {
 				insertionEndIndex, mapValuetype, 0, 0, 0);
 	}
 
-	public InsertionThread(@SuppressWarnings("rawtypes") Map map,
+	public InsertionThread(Map<Integer, Integer> mapInt,
+			Map<Integer, Map<Integer, Integer>> mapInnerMap,
 			int insertionStartIndex, int insertionEndIndex,
 			String concurrentMapType, String mapValuetype,
 			CountDownLatch startSignal, CountDownLatch doneSignal) {
 		benchmarkType = Util.SIMPLE_INSERTION;
 		this.concurrentMapType = concurrentMapType;
-		this.map = map;
+		this.mapInt = mapInt;
+		this.mapInnerMap = mapInnerMap;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
 				insertionEndIndex, mapValuetype, 0, 0, 0);
 	}
@@ -82,59 +81,55 @@ public class InsertionThread extends Thread {
 	public InsertionThread(
 			ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap,
 			int insertionStartIndex, int insertionEndIndex,
-			int hotColdKeyRangeMax, double hotKeyPercentage,
-			double coldKeyProbability, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			int hotColdKeyRangeMax, int numHotKey, double hotRatio,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
 		benchmarkType = Util.RANDOM_HOT_COLD;
 		concurrentMapType = Util.SKIP_LIST_MAP;
 		this.outerConcSkipListMap = outerConcSkipListMap;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
-				insertionEndIndex, null, coldKeyProbability, hotKeyPercentage,
+				insertionEndIndex, null, hotRatio, numHotKey,
 				hotColdKeyRangeMax);
 	}
 
 	public InsertionThread(
 			ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap,
 			int insertionStartIndex, int insertionEndIndex,
-			int hotColdKeyRangeMax, double hotKeyPercentage,
-			double coldKeyProbability, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			int hotColdKeyRangeMax, int numHotKey, double hotRatio,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
 		benchmarkType = Util.RANDOM_HOT_COLD;
 		concurrentMapType = Util.CONCURRENT_MAP;
 		this.outerConcHashMap = outerConcHashMap;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
-				insertionEndIndex, null, coldKeyProbability, hotKeyPercentage,
+				insertionEndIndex, null, hotRatio, numHotKey,
 				hotColdKeyRangeMax);
 	}
 
 	public InsertionThread(PureIntMap<PureIntMap<Integer>> outerPureIntMap,
 			int insertionStartIndex, int insertionEndIndex,
-			int hotColdKeyRangeMax, double hotKeyPercentage,
-			double coldKeyProbability, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			int hotColdKeyRangeMax, int numHotKey, double hotRatio,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
 		benchmarkType = Util.RANDOM_HOT_COLD;
 		concurrentMapType = Util.PURE_MAP;
 		this.outerPureIntMap = outerPureIntMap;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
-				insertionEndIndex, null, coldKeyProbability, hotKeyPercentage,
+				insertionEndIndex, null, hotRatio, numHotKey,
 				hotColdKeyRangeMax);
 	}
 
 	public InsertionThread(
 			HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap,
 			int insertionStartIndex, int insertionEndIndex,
-			int hotColdKeyRangeMax, double hotKeyPercentage,
-			double coldKeyProbability, CountDownLatch startSignal,
-			CountDownLatch doneSignal) {
+			int hotColdKeyRangeMax, int numHotKey, double hotRatio,
+			CountDownLatch startSignal, CountDownLatch doneSignal) {
 
 		benchmarkType = Util.RANDOM_HOT_COLD;
 		concurrentMapType = Util.HYBRID_MAP;
 		this.outerHybridIntMapInnrMap = outerHybridIntMapInnrMap;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
-				insertionEndIndex, null, coldKeyProbability, hotKeyPercentage,
+				insertionEndIndex, null, hotRatio, numHotKey,
 				hotColdKeyRangeMax);
 	}
 
@@ -150,10 +145,10 @@ public class InsertionThread extends Thread {
 			case Util.SIMPLE_INSERTION:
 				switch (mapValueType) {
 				case Util.INT_TO_INT:
-					simpleInsertToMapOfInt();
+					simpleInsertToMapInt();
 					break;
 				case Util.INT_TO_INNER_MAP:
-					simpleInsertToMapOfInnerMap();
+					simpleInsertToMapInnerMap();
 				}
 				break;
 
@@ -183,7 +178,7 @@ public class InsertionThread extends Thread {
 		}
 	}
 
-	private void simpleInsertToMapOfInt() {
+	private void simpleInsertToMapInt() {
 
 		switch (concurrentMapType) {
 		case Util.PURE_MAP:
@@ -196,37 +191,19 @@ public class InsertionThread extends Thread {
 				hybridIntMapInt.put(new Integer(i), new Integer(i));
 			}
 			break;
-		default:
+		default:// SkipListMap, ConcurrentMap, SynchronisedMap
 			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-				map.put(new Integer(i), new Integer(i));
+				mapInt.put(new Integer(i), new Integer(i));
 			}
 			break;
 		}
 
 	}
 
-	private void simpleInsertToMapOfInnerMap() {
+	private void simpleInsertToMapInnerMap() {
 
 		switch (concurrentMapType) {
 
-		case Util.SKIP_LIST_MAP:
-			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-				map.put(new Integer(i),
-						new ConcurrentSkipListMap<Integer, Integer>());
-			}
-			break;
-		case Util.CONCURRENT_MAP:
-			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-				map.put(new Integer(i),
-						new ConcurrentHashMap<Integer, Integer>());
-			}
-			break;
-		case Util.SYNCHRONIZED_MAP:
-			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
-				map.put(new Integer(i), Collections
-						.synchronizedMap(new HashMap<Integer, Integer>()));
-			}
-			break;
 		case Util.HYBRID_MAP:
 			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
@@ -242,6 +219,26 @@ public class InsertionThread extends Thread {
 						new PureIntMap<Integer>());
 			}
 			break;
+		case Util.SKIP_LIST_MAP:
+			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+
+				mapInnerMap.put(new Integer(i),
+						new ConcurrentSkipListMap<Integer, Integer>());
+			}
+			break;
+		case Util.SYNCHRONIZED_MAP:
+			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+
+				mapInnerMap.put(new Integer(i), Collections
+						.synchronizedMap(new HashMap<Integer, Integer>()));
+			}
+			break;
+		case Util.CONCURRENT_MAP:
+			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
+				mapInnerMap.put(new Integer(i),
+						new ConcurrentSkipListMap<Integer, Integer>());
+			}
+			break;
 		}
 	}
 
@@ -252,7 +249,7 @@ public class InsertionThread extends Thread {
 			Integer randomKey = nextHotOrColdKeyOuterMap(i);
 
 			ConcurrentSkipListMap<Integer, Integer> newMap = new ConcurrentSkipListMap<Integer, Integer>();
-			ConcurrentSkipListMap<Integer, Integer> innerMap = (ConcurrentSkipListMap<Integer, Integer>) outerConcSkipListMap
+			ConcurrentSkipListMap<Integer, Integer> innerMap = outerConcSkipListMap
 					.putIfAbsent(randomKey, newMap);
 			if (innerMap == null) {
 				innerMap = newMap;
@@ -280,7 +277,7 @@ public class InsertionThread extends Thread {
 			innerMap.put(innerKey, innerValue);
 		}
 	}
-	
+
 	private void randomInsertion_PURE_WITH_INNER_PURE_MAP() {
 
 		Integer randomKey;
@@ -306,7 +303,7 @@ public class InsertionThread extends Thread {
 			Integer randomKey = nextHotOrColdKeyOuterMap(i);
 
 			ConcurrentHashMap<Integer, Integer> newMap = new ConcurrentHashMap<Integer, Integer>();
-			ConcurrentHashMap<Integer, Integer> innerMap = (ConcurrentHashMap<Integer, Integer>) outerConcHashMap
+			ConcurrentHashMap<Integer, Integer> innerMap = outerConcHashMap
 					.putIfAbsent(randomKey, newMap);
 			if (innerMap == null) {
 				innerMap = newMap;
@@ -317,8 +314,9 @@ public class InsertionThread extends Thread {
 		}
 	}
 
-	private Integer nextInnerMapKeyValue(int offlineKey) {
-		return new Integer(offlineKey);
+	@SuppressWarnings("unused")
+	private Integer nextInnerMapKeyValue(int oflineKey) {
+		return new Integer(oflineKey);
 	}
 
 	private Integer nextInnerMapKeyValue() {
@@ -330,15 +328,14 @@ public class InsertionThread extends Thread {
 
 		Integer randomKey;
 		double hotOrRandomKey = randomGen.nextDouble();
-		if (hotOrRandomKey < coldKeyProbability) {
-			if (offline) {
+		if (hotOrRandomKey < hotRatio) {
+			randomKey = Util.nextHotKey(randomGen, coldKeyRangeMax, numHotKey);
+		} else {
+			if (oflineColdKeys) {
 				randomKey = new Integer(coldkey);
 			} else {
-				randomKey = new Integer(randomGen.nextInt(hotColdKeyRangeMax));
+				randomKey = new Integer(randomGen.nextInt(coldKeyRangeMax));
 			}
-		} else {
-			randomKey = Util.getNextHotKey(randomGen, 0, hotColdKeyRangeMax,
-					hotKeyPercentage);
 		}
 
 		return randomKey;
@@ -346,17 +343,15 @@ public class InsertionThread extends Thread {
 
 	private void initializeFields(CountDownLatch startSignal,
 			CountDownLatch doneSignal, int insertionStartIndex,
-			int insertionEndIndex, String mapValuetype,
-			double coldKeyProbability, double hotKeyPercentage,
-			int hotColdKeyRangeMax) {
+			int insertionEndIndex, String mapValuetype, double hotRatio,
+			int numHotKey, int hotColdKeyRangeMax) {
 		this.startSignal = startSignal;
 		this.doneSignal = doneSignal;
 		this.insertionStratIndex = insertionStartIndex;
 		this.insertionEndIndex = insertionEndIndex;
 		this.mapValueType = mapValuetype;
-		this.coldKeyProbability = coldKeyProbability;
-		this.hotKeyPercentage = hotKeyPercentage;
-		this.hotColdKeyRangeMax = hotColdKeyRangeMax;
+		this.hotRatio = hotRatio;
+		this.numHotKey = numHotKey;
+		this.coldKeyRangeMax = hotColdKeyRangeMax;
 	}
-
 }
