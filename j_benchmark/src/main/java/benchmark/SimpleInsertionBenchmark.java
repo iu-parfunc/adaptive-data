@@ -147,7 +147,7 @@ public class SimpleInsertionBenchmark {
 				endTime = System.currentTimeMillis();
 				elapsed = (endTime - startTime);
 				if (!warmUp) {
-					timeTakenForRounds.add(new Long(elapsed / 1000));
+					timeTakenForRounds.add(new Long(elapsed));
 				}
 
 			}// End of FOR loop over run repetitions
@@ -216,7 +216,7 @@ public class SimpleInsertionBenchmark {
 			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[i++]);
 			long runStartTimestamp = Long.parseLong(args[i++]);
 			new SimpleInsertionBenchmark(dsType, numInsertions, runRepetitions,
-					maxNumThreadsmaxNumThreadss,runStartTimestamp);
+					maxNumThreadsmaxNumThreadss, runStartTimestamp);
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 			System.exit(1);

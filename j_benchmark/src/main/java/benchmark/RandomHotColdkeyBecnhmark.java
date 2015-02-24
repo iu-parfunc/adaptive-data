@@ -136,7 +136,7 @@ public class RandomHotColdkeyBecnhmark {
 				endTime = System.currentTimeMillis();
 				elapsed = (endTime - startTime);
 				if (!warmUp) {
-					timeTakenForRounds.add(new Long(elapsed / 1000));
+					timeTakenForRounds.add(new Long(elapsed));
 				}
 			}// End of FOR loop over run repetitions
 
