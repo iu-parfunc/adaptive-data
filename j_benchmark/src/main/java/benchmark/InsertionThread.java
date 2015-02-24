@@ -283,7 +283,7 @@ public class InsertionThread extends Thread {
 		Integer randomKey;
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 			randomKey = nextHotOrColdKeyOuterMap(i);
-			PureIntMap<Integer> newMap = new PureIntMap<>();
+			PureIntMap<Integer> newMap = new PureIntMap<Integer>();
 			PureIntMap<Integer> innerMap = outerPureIntMap.putIfAbsent(
 					randomKey, newMap);
 			if (innerMap == null) {
@@ -327,7 +327,7 @@ public class InsertionThread extends Thread {
 	private Integer nextHotOrColdKeyOuterMap(int coldkey) {
 
 		Integer randomKey;
-		double hotOrRandomKey = randomGen.nextDouble();
+		double hotOrRandomKey = randomGen.nextDouble();//uniformly distributed double value between 0.0 and 1.0
 		if (hotOrRandomKey < hotRatio) {
 			randomKey = Util.nextHotKey(randomGen, coldKeyRangeMax, numHotKey);
 		} else {

@@ -21,7 +21,6 @@ BENCHMARK_ROUNDS=100
 MAX_NUM_THREADS=16
 NUM_INSERTS=1000000
 
-HOT_RATIO=0.5
 NUM_HOTKEYS=1
 TIME_MILLI_SECONDS="$(date +%s)"
 
@@ -31,29 +30,38 @@ case $BENCHVARIANT in
 	;;    
     "pure")
 	echo "Running pure-in-a-box benchmark"
-	for i in 1;
-    do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
-	done
+	#for i in 1;
+    #do
+		#	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
+	#done
 
+	HOT_RATIO=0.0
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
+	HOT_RATIO=1.0
 	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     "scalable")
 	echo "Running scalable benchmarks"
-	for i in 1;
-        do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS
-	done
+	#for i in 1;
+        #    do
+		#	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS
+	#done
 
+	HOT_RATIO=0.0
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
+	HOT_RATIO=1.0
 	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     "hybrid")
-	echo "FINISHME: run hybrid benchmarks here"
-	for i in 1;
-        do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
-	done
+	echo "Running hybrid benchmarks here"
+	#for i in 1;
+        #    do
+		#$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
+	#done
 
+	HOT_RATIO=0.0
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
+	HOT_RATIO=1.0
 	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     *)
