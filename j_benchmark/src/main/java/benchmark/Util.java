@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Random;
 import java.util.TreeMap;
 
@@ -43,26 +42,20 @@ public class Util {
 	public static void writePerfData(
 			HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData,
 			String benchMarkType, String dsType, int numInsertions,
-			double numHotKey, double hotRatio, long runStartTimestamp)
-			throws IOException {
+			double numHotKey, double hotRatio, long runStartTimestamp,
+			int casTries) throws IOException {
 
 		BufferedWriter writer = initiaLizeOutputFile(benchMarkType,
 				runStartTimestamp);
 
-		Integer numerThreads;
 		ArrayList<Long> timeTaken;
 		long medianTime, maxTime, minTime;
 		TreeMap<Integer, ArrayList<Long>> perfDataPerMapType;
-		Iterator<Integer> numberOfThreadsITR;
-		Iterator<String> mapTypeITR = performanceData.keySet().iterator();
 
-		String mapType = null;
-		while (mapTypeITR.hasNext()) {
-			mapType = mapTypeITR.next();
+		for (String mapType : performanceData.keySet()) {
+
 			perfDataPerMapType = performanceData.get(mapType);
-			numberOfThreadsITR = perfDataPerMapType.keySet().iterator();
-			while (numberOfThreadsITR.hasNext()) {
-				numerThreads = numberOfThreadsITR.next();
+			for (Integer numerThreads : perfDataPerMapType.keySet()) {
 				timeTaken = perfDataPerMapType.get(numerThreads);
 				Collections.sort(timeTaken);
 				minTime = timeTaken.get(0);
@@ -76,15 +69,19 @@ public class Util {
 				case "simple":
 					outDataLine = "simple_insertion_int_to_int," + dsType
 							+ "-java," + /* ARGS is empty */"," + numerThreads
-							+ "," + numInsertions + "," + 0 + "," + 0 + ","
-							+ minTime + "," + medianTime + "," + maxTime;
+							+ "," + numInsertions + "," + casTries + ","
+							+ (double) minTime / 1000 + ","
+							+ (double) medianTime / 1000 + ","
+							+ (double) maxTime / 1000;
 					break;
 				case "random":
 					outDataLine = "hotcold_int_to_inner_map," + dsType
 							+ "-java," + /* ARGS is empty */"," + numerThreads
 							+ "," + numInsertions + "," + numHotKey + ","
-							+ hotRatio + "," + minTime + "," + medianTime + ","
-							+ maxTime;
+							+ hotRatio + "," + casTries + ","
+							+ (double) minTime / 1000 + ","
+							+ (double) medianTime / 1000 + ","
+							+ (double) maxTime / 1000;
 					break;
 				}
 				Util.writeLine(writer, outDataLine);
@@ -117,26 +114,33 @@ public class Util {
 			break;
 		}
 
+		boolean append = false;
+		if (new File(outputFileName).exists()) {
+			append = true;
+		}
+
 		try {
-			writer = new BufferedWriter(
-					new FileWriter(new File(outputFileName)));
+			writer = new BufferedWriter(new FileWriter(
+					new File(outputFileName), append));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
 		try {
 
-			switch (benchMarkType) {
-			case "random":
-				Util.writeLine(
-						writer,
-						"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,NUM_HOTKEYS,HOT_RATIO,MINTIME,MEDIANTIME,MAXTIME");
-				break;
-			case "simple":
-				Util.writeLine(
-						writer,
-						"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,NUM_HOTKEYS,HOT_RATIO,MINTIME,MEDIANTIME,MAXTIME");
-				break;
+			if (!append) {
+				switch (benchMarkType) {
+				case "random":
+					Util.writeLine(
+							writer,
+							"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,NUM_HOTKEYS,HOT_RATIO,CAS_TRIES,MINTIME,MEDIANTIME,MAXTIME");
+					break;
+				case "simple":
+					Util.writeLine(
+							writer,
+							"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,CAS_TRIES,MINTIME,MEDIANTIME,MAXTIME");
+					break;
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -165,6 +169,8 @@ public class Util {
 							+ "-Maximum number of threads\n"
 							+ i++
 							+ "-Probablity of hot key operation (double in range [0-1])\n"
+							+ i++
+							+ "-Cas tries\n"
 							+ i++
 							+ "-Current time in milliseconds\n"
 							+ " Output will be put in "

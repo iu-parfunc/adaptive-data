@@ -26,8 +26,8 @@ public class SimpleInsertionBenchmark {
 
 	public SimpleInsertionBenchmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int runRepetitions,
-			int maxNumThreadsmaxNumThreadss, long runStartTimestamp)
-			throws InterruptedException, IOException {
+			int maxNumThreadsmaxNumThreadss, long runStartTimestamp,
+			int casTries) throws InterruptedException, IOException {
 
 		String cuncorrencyType = null;
 		switch (dsTypeToBeBenchmarked) {
@@ -53,20 +53,20 @@ public class SimpleInsertionBenchmark {
 		}
 
 		warmUp(cuncorrencyType, numInsertions, runRepetitions,
-				maxNumThreadsmaxNumThreadss);
+				maxNumThreadsmaxNumThreadss, casTries);
 		runBenchmark(cuncorrencyType, numInsertions, runRepetitions,
-				maxNumThreadsmaxNumThreadss);
+				maxNumThreadsmaxNumThreadss, casTries);
 		Util.writePerfData(performanceData, "simple", dsTypeToBeBenchmarked,
-				numInsertions, 0, 0, runStartTimestamp);
+				numInsertions, 0, 0, runStartTimestamp, casTries);
 	}
 
 	private void runBenchmark(String cuncorrencyType, int numInsertions,
-			int runRepetitions, int maxNumThreadsmaxNumThreadss)
+			int runRepetitions, int maxNumThreadsmaxNumThreadss, int casTries)
 			throws InterruptedException, IOException {
 
 		String valueType = Util.INT_TO_INT;
 		benchmark(cuncorrencyType, valueType, runRepetitions, numInsertions,
-				maxNumThreadsmaxNumThreadss, false);
+				maxNumThreadsmaxNumThreadss, false, casTries);
 		// valueType = Util.INT_TO_INNER_MAP;
 		// benchmark(cuncorrencyType, valueType, runRepetitions,
 		// numInsertions,
@@ -74,22 +74,22 @@ public class SimpleInsertionBenchmark {
 	}
 
 	private void warmUp(String cuncorrencyType, int numInsertions,
-			int runRepetitions, int maxNumThreadsmaxNumThreadss)
+			int runRepetitions, int maxNumThreadsmaxNumThreadss, int casTries)
 			throws InterruptedException, IOException {
 
 		String valueType = Util.INT_TO_INT;
 		benchmark(cuncorrencyType, valueType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
-				numInsertions, maxNumThreadsmaxNumThreadss, true);
+				numInsertions, maxNumThreadsmaxNumThreadss, true, casTries);
 		valueType = Util.INT_TO_INNER_MAP;
 		benchmark(cuncorrencyType, valueType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
-				numInsertions, maxNumThreadsmaxNumThreadss, true);
+				numInsertions, maxNumThreadsmaxNumThreadss, true, casTries);
 	}
 
 	private void benchmark(String concurrencyType, String mapValueType,
 			int runRepetitions, int numInsertions,
-			int maxNumThreadsmaxNumThreadss, boolean warmUp)
+			int maxNumThreadsmaxNumThreadss, boolean warmUp, int casTries)
 			throws InterruptedException, IOException {
 
 		CountDownLatch startSignal, doneSignal;
@@ -105,7 +105,7 @@ public class SimpleInsertionBenchmark {
 
 			for (int i = 1; i <= runRepetitions; i++) {
 
-				initiatlizeMap(concurrencyType, mapValueType);
+				initiatlizeMap(concurrencyType, mapValueType, casTries);
 
 				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
@@ -128,7 +128,7 @@ public class SimpleInsertionBenchmark {
 								hybridIntMapInnerMap, j
 										* numInsretionsPerThread, (j + 1)
 										* numInsretionsPerThread, mapValueType,
-								startSignal, doneSignal);
+								casTries, startSignal, doneSignal);
 						threads[j].start();
 					}
 					break;
@@ -160,7 +160,8 @@ public class SimpleInsertionBenchmark {
 		}// End of FOR loop over numberOfThreads
 	}
 
-	private void initiatlizeMap(String cuncorrencyType, String mapValueType) {
+	private void initiatlizeMap(String cuncorrencyType, String mapValueType,
+			int casTries) {
 
 		switch (mapValueType) {
 		case Util.INT_TO_INT:
@@ -176,7 +177,7 @@ public class SimpleInsertionBenchmark {
 				mapInt = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
 			case Util.HYBRID_MAP:
-				hybridIntMapInt = new HybridIntMap<Integer>();
+				hybridIntMapInt = new HybridIntMap<Integer>(casTries);
 				break;
 			case Util.PURE_MAP:
 				pureIntMapInt = new PureIntMap<Integer>();
@@ -196,7 +197,8 @@ public class SimpleInsertionBenchmark {
 				mapInnerMap = new ConcurrentSkipListMap<Integer, Map<Integer, Integer>>();
 				break;
 			case Util.HYBRID_MAP:
-				hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>();
+				hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>(
+						casTries);
 				break;
 			case Util.PURE_MAP:
 				pureIntMapInnerMap = new PureIntMap<PureIntMap<Integer>>();
@@ -214,9 +216,10 @@ public class SimpleInsertionBenchmark {
 			int numInsertions = Integer.parseInt(args[i++]);
 			int runRepetitions = Integer.parseInt(args[i++]);
 			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[i++]);
+			int casTries = Integer.parseInt(args[i++]);
 			long runStartTimestamp = Long.parseLong(args[i++]);
 			new SimpleInsertionBenchmark(dsType, numInsertions, runRepetitions,
-					maxNumThreadsmaxNumThreadss, runStartTimestamp);
+					maxNumThreadsmaxNumThreadss, runStartTimestamp, casTries);
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 			System.exit(1);

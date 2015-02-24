@@ -20,12 +20,15 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	V tombstone = null;
 	private AtomicReference<State> state;
 
+	private int casTries;
+
 	private ConcurrentSkipListMap<Integer, V> concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
 	private AtomicReference<IntTreePMap<V>> mutableIntTreeMap = new AtomicReference<IntTreePMap<V>>(
 			IntTreePMap.empty());
 
-	public HybridIntMap() {
+	public HybridIntMap(int casTries) {
 		state = new AtomicReference<HybridIntMap.State>(State.A);
+		this.casTries = casTries;
 	}
 
 	private void contentionDetected() {
@@ -72,8 +75,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		if (key == null || value == null) {
 			throw new NullPointerException();
 		}
-		int retry = 0;
-		int retryThreshold = 10;
+		int tries = 0;
 		switch (state.get()) {
 		case A:
 
@@ -83,7 +85,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			while ((state.get().equals(State.A))
 					&& !(CAS = mutableIntTreeMap.compareAndSet(lastSnapshot,
 							lastSnapshot.plus(key, value)))) {
-				if (++retry > retryThreshold) {
+				if (++tries > casTries) {
 					contentionDetected();
 				}
 				lastSnapshot = mutableIntTreeMap.get();
@@ -148,8 +150,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	@Override
 	public V remove(Object key) {
 
-		int retry = 0;
-		int retryThreshold = 10;
+		int tries = 0;
 
 		switch (state.get()) {
 		case A:
@@ -160,7 +161,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			while ((state.get().equals(State.A))
 					&& !(CAS = mutableIntTreeMap.compareAndSet(lastSnapshot,
 							lastSnapshot.minus(key)))) {
-				if (++retry > retryThreshold) {
+				if (++tries > casTries) {
 					contentionDetected();
 				}
 				lastSnapshot = mutableIntTreeMap.get();

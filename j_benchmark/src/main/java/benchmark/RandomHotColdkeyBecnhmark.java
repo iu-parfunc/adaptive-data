@@ -24,8 +24,8 @@ public class RandomHotColdkeyBecnhmark {
 
 	public RandomHotColdkeyBecnhmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int numHotKey, int runRepetitions,
-			int maxNumThreads, double hotRatio, long runStartTimestamp)
-			throws IOException, InterruptedException {
+			int maxNumThreads, double hotRatio, long runStartTimestamp,
+			int casTries) throws IOException, InterruptedException {
 
 		String cuncorrencyType = null, valueType = null;
 		switch (dsTypeToBeBenchmarked) {
@@ -49,36 +49,38 @@ public class RandomHotColdkeyBecnhmark {
 		}
 
 		warmUp(cuncorrencyType, numInsertions, numHotKey, runRepetitions,
-				maxNumThreads, hotRatio);
+				maxNumThreads, hotRatio, casTries);
 		runBenchmark(cuncorrencyType, valueType, numInsertions, numHotKey,
-				runRepetitions, maxNumThreads, hotRatio);
+				runRepetitions, maxNumThreads, hotRatio, casTries);
 		Util.writePerfData(performanceData, "random", dsTypeToBeBenchmarked,
-				numInsertions, numHotKey, hotRatio, runStartTimestamp);
+				numInsertions, numHotKey, hotRatio, runStartTimestamp, casTries);
 	}
 
 	private void runBenchmark(String cuncorrencyType, String valueType,
 			int numInsertions, int numHotKey, int runRepetitions,
-			int maxNumThreadsmaxNumThreadss, double hotRatio)
+			int maxNumThreadsmaxNumThreadss, double hotRatio, int casTries)
 			throws InterruptedException, IOException {
 
 		randomBenchmark(cuncorrencyType, runRepetitions, numInsertions,
-				numHotKey, maxNumThreadsmaxNumThreadss, hotRatio, false);
+				numHotKey, maxNumThreadsmaxNumThreadss, hotRatio, false,
+				casTries);
 	}
 
 	private void warmUp(String cuncorrencyType, int numInsertions,
 			int numHotKey, int runRepetitions, int maxNumThreadsmaxNumThreadss,
-			double hotRatio) throws InterruptedException, IOException {
+			double hotRatio, int casTries) throws InterruptedException,
+			IOException {
 
 		randomBenchmark(cuncorrencyType,
 				((runRepetitions >= 10) ? runRepetitions / 10 : 1),
 				numInsertions, numHotKey, maxNumThreadsmaxNumThreadss,
-				hotRatio, true);
+				hotRatio, true, casTries);
 	}
 
 	private void randomBenchmark(String concurrencyType, int runRepetitions,
 			int insertionCount, int numHotKey, int maxNumThreadsmaxNumThreadss,
-			double hotRatio, boolean warmUp) throws InterruptedException,
-			IOException {
+			double hotRatio, boolean warmUp, int casTries)
+			throws InterruptedException, IOException {
 
 		CountDownLatch startSignal, doneSignal;
 		long startTime, endTime, elapsed;
@@ -91,7 +93,7 @@ public class RandomHotColdkeyBecnhmark {
 
 			for (int i = 1; i <= runRepetitions; i++) {
 
-				initiatlizeMap(concurrencyType);
+				initiatlizeMap(concurrencyType, casTries);
 				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numThreads);
@@ -117,7 +119,7 @@ public class RandomHotColdkeyBecnhmark {
 								outerHybridIntMapInnrMap, j
 										* numInsretionsPerThread, (j + 1)
 										* numInsretionsPerThread,
-								insertionCount, numHotKey, hotRatio,
+								insertionCount, numHotKey, hotRatio, casTries,
 								startSignal, doneSignal);
 						threads[j].start();
 						break;
@@ -148,7 +150,7 @@ public class RandomHotColdkeyBecnhmark {
 		}// End of FOR loop over numberOfThreads
 	}
 
-	private void initiatlizeMap(String ConcurrecyType) {
+	private void initiatlizeMap(String ConcurrecyType, int casTries) {
 
 		switch (ConcurrecyType) {
 		case Util.SYNCHRONIZED_MAP:
@@ -160,7 +162,8 @@ public class RandomHotColdkeyBecnhmark {
 			outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 			break;
 		case Util.HYBRID_MAP:
-			outerHybridIntMapInnrMap = new HybridIntMap<HybridIntMap<Integer>>();
+			outerHybridIntMapInnrMap = new HybridIntMap<HybridIntMap<Integer>>(
+					casTries);
 			break;
 		case Util.PURE_MAP:
 			outerPureIntTreeMap = new PureIntMap<PureIntMap<Integer>>();
@@ -178,10 +181,11 @@ public class RandomHotColdkeyBecnhmark {
 			int runRepetitions = Integer.parseInt(args[i++]);
 			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[i++]);
 			double hotRatio = Double.parseDouble(args[i++]);
+			int casTries = Integer.parseInt(args[i++]);
 			long runStartTimestamp = Long.parseLong(args[i++]);
 			new RandomHotColdkeyBecnhmark(dsType, numInsertions, numHotKey,
 					runRepetitions, maxNumThreadsmaxNumThreadss, hotRatio,
-					runStartTimestamp);
+					runStartTimestamp, casTries);
 
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();

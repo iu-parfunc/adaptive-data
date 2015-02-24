@@ -34,35 +34,30 @@ case $BENCHVARIANT in
     #do
 		#	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
 	#done
+	CAS_TRIES=0
+	for HOT_RATIO in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0;
+	do
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $CAS_TRIES $TIME_MILLI_SECONDS
+	done  
 
-	HOT_RATIO=0.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
-	HOT_RATIO=1.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     "scalable")
 	echo "Running scalable benchmarks"
-	#for i in 1;
-        #    do
-		#	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS
-	#done
-
-	HOT_RATIO=0.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
-	HOT_RATIO=1.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
+	CAS_TRIES=0
+	for HOT_RATIO in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0;
+	do
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $CAS_TRIES $TIME_MILLI_SECONDS
+	done 
 	;;
     "hybrid")
 	echo "Running hybrid benchmarks here"
-	#for i in 1;
-        #    do
-		#$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
-	#done
-
-	HOT_RATIO=0.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
-	HOT_RATIO=1.0
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
+	for CAS_TRIES in 2 5 10;
+	do
+		for HOT_RATIO in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0;
+		do
+			$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $CAS_TRIES $TIME_MILLI_SECONDS
+		done 
+	done
 	;;
     *)
 echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
