@@ -1,6 +1,5 @@
 #!/bin/bash
 
-echo "FINISHME: invoke java benchmarks here and then upload"
 set -xe
 
 TABLENAME=AdaptivelyScalable
@@ -8,7 +7,7 @@ CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
 
 MAVEN=mvn
 JAVA_EXEC=java
-JAVA_OPTS="-Xms4g -Xmx16g -d64"
+#JAVA_OPTS="-Xms4g -Xmx16g -d64"
 JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
 
 if [[ "$HOSTNAME" =~ cutter ]]; then
@@ -18,15 +17,13 @@ fi
 $MAVEN clean
 $MAVEN package 
 
-BENCHMARK_ROUNDS=100
-MAX_NUMBER_OF_THREADS=16
-NUMBER_OF_INSERTS=1000000
+BENCHMARK_ROUNDS=1
+MAX_NUM_THREADS=16
+NUM_INSERTS=100
 
-COLD_KEY_OPERATION_CHANCE=0.5
+HOT_RATIO=0.5
 NUM_HOTKEYS=1
-
-#rm -rf $SIMPLE_INSERTION_OUTPUT_FILE
-#rm -rf $RANDOM_HOT_COLD_OUTPUT_FILE
+TIME_MILLI_SECONDS="$(date +%s)"
 
 case $BENCHVARIANT in
     "oldpure")
@@ -36,28 +33,28 @@ case $BENCHVARIANT in
 	echo "Running pure-in-a-box benchmark"
 	for i in 1;
     do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     "scalable")
 	echo "Running scalable benchmarks"
 	for i in 1;
         do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     "hybrid")
 	echo "FINISHME: run hybrid benchmarks here"
 	for i in 1;
         do
-		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUMBER_OF_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS 
+		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT  $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
 	done
 
-	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUMBER_OF_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUMBER_OF_THREADS $COLD_KEY_OPERATION_CHANCE
+	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $TIME_MILLI_SECONDS
 	;;
     *)
 echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
@@ -65,8 +62,9 @@ echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
 	;;
 esac
 
-$CSVUPLOAD random_hot_cold_key.csv --fusion-upload --name=$TABLENAME
-$CSVUPLOAD simple_insertion.csv --fusion-upload --name=$TABLENAME
+
+$CSVUPLOAD "$TIME_MILLI_SECONDS"_random_hot_cold_key.csv --fusion-upload --name=$TABLENAME
+$CSVUPLOAD "$TIME_MILLI_SECONDS"_simple_insertion.csv --fusion-upload --name=$TABLENAME
 
 #which -a hsbencher-fusion-upload-csv 
 # This can upload the CSV file:

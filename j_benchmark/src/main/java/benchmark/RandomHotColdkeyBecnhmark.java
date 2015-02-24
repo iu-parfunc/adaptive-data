@@ -24,8 +24,8 @@ public class RandomHotColdkeyBecnhmark {
 
 	public RandomHotColdkeyBecnhmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int numHotKey, int runRepetitions,
-			int maxNumThreads, double hotRatio) throws IOException,
-			InterruptedException {
+			int maxNumThreads, double hotRatio, long runStartTimestamp)
+			throws IOException, InterruptedException {
 
 		String cuncorrencyType = null, valueType = null;
 		switch (dsTypeToBeBenchmarked) {
@@ -53,7 +53,7 @@ public class RandomHotColdkeyBecnhmark {
 		runBenchmark(cuncorrencyType, valueType, numInsertions, numHotKey,
 				runRepetitions, maxNumThreads, hotRatio);
 		Util.writePerfData(performanceData, "random", dsTypeToBeBenchmarked,
-				numInsertions, numHotKey, hotRatio);
+				numInsertions, numHotKey, hotRatio, runStartTimestamp);
 	}
 
 	private void runBenchmark(String cuncorrencyType, String valueType,
@@ -178,8 +178,10 @@ public class RandomHotColdkeyBecnhmark {
 			int runRepetitions = Integer.parseInt(args[i++]);
 			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[i++]);
 			double hotRatio = Double.parseDouble(args[i++]);
+			long runStartTimestamp = Long.parseLong(args[i++]);
 			new RandomHotColdkeyBecnhmark(dsType, numInsertions, numHotKey,
-					runRepetitions, maxNumThreadsmaxNumThreadss, hotRatio);
+					runRepetitions, maxNumThreadsmaxNumThreadss, hotRatio,
+					runStartTimestamp);
 
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();

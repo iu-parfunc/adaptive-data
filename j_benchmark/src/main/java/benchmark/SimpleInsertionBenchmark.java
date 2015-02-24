@@ -26,8 +26,8 @@ public class SimpleInsertionBenchmark {
 
 	public SimpleInsertionBenchmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int runRepetitions,
-			int maxNumThreadsmaxNumThreadss) throws InterruptedException,
-			IOException {
+			int maxNumThreadsmaxNumThreadss, long runStartTimestamp)
+			throws InterruptedException, IOException {
 
 		String cuncorrencyType = null;
 		switch (dsTypeToBeBenchmarked) {
@@ -57,7 +57,7 @@ public class SimpleInsertionBenchmark {
 		runBenchmark(cuncorrencyType, numInsertions, runRepetitions,
 				maxNumThreadsmaxNumThreadss);
 		Util.writePerfData(performanceData, "simple", dsTypeToBeBenchmarked,
-				numInsertions, 0, 0);
+				numInsertions, 0, 0, runStartTimestamp);
 	}
 
 	private void runBenchmark(String cuncorrencyType, int numInsertions,
@@ -209,12 +209,14 @@ public class SimpleInsertionBenchmark {
 	public static void main(String[] args) {
 
 		try {
-			String dsType = args[0];
-			int numInsertions = Integer.parseInt(args[1]);
-			int runRepetitions = Integer.parseInt(args[2]);
-			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[3]);
+			int i = 0;
+			String dsType = args[i++];
+			int numInsertions = Integer.parseInt(args[i++]);
+			int runRepetitions = Integer.parseInt(args[i++]);
+			int maxNumThreadsmaxNumThreadss = Integer.parseInt(args[i++]);
+			long runStartTimestamp = Long.parseLong(args[i++]);
 			new SimpleInsertionBenchmark(dsType, numInsertions, runRepetitions,
-					maxNumThreadsmaxNumThreadss);
+					maxNumThreadsmaxNumThreadss,runStartTimestamp);
 		} catch (InterruptedException | IOException e) {
 			e.printStackTrace();
 			System.exit(1);

@@ -43,9 +43,11 @@ public class Util {
 	public static void writePerfData(
 			HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData,
 			String benchMarkType, String dsType, int numInsertions,
-			double numHotKey, double hotRatio) throws IOException {
+			double numHotKey, double hotRatio, long runStartTimestamp)
+			throws IOException {
 
-		BufferedWriter writer = initiaLizeOutputFile(benchMarkType);
+		BufferedWriter writer = initiaLizeOutputFile(benchMarkType,
+				runStartTimestamp);
 
 		Integer numerThreads;
 		ArrayList<Long> timeTaken;
@@ -101,18 +103,17 @@ public class Util {
 				timeTakenForRounds);
 	}
 
-	private static BufferedWriter initiaLizeOutputFile(String benchMarkType) {
+	private static BufferedWriter initiaLizeOutputFile(String benchMarkType,
+			long runStartTimestamp) {
 
 		BufferedWriter writer = null;
 		String outputFileName = "";
 		switch (benchMarkType) {
 		case "simple":
-			outputFileName = System.currentTimeMillis()
-					+ "_simple_insertion.csv";
+			outputFileName = runStartTimestamp + "_simple_insertion.csv";
 			break;
 		case "random":
-			outputFileName = System.currentTimeMillis()
-					+ "_random_hot_cold_key.csv";
+			outputFileName = runStartTimestamp + "_random_hot_cold_key.csv";
 			break;
 		}
 
@@ -163,7 +164,10 @@ public class Util {
 							+ "-Maximum number of threads\n"
 							+ i++
 							+ "-Probablity of hot key operation (double in range [0-1])\n"
-							+ "Output will be put in \"random_hot_cold_key_<DS Type>_<Probablity of cold keys>_<Number of run insertions>_<Hot key percentage>_<Maximum number of threads>.csv\"");
+							+ i++
+							+ "-Current time in milliseconds\n"
+							+ " Output will be put in "
+							+ "\"<Current time in milliseconds>_random_hot_cold_key.csv\"");
 			break;
 
 		case "simple":
@@ -177,8 +181,10 @@ public class Util {
 							+ "-Number of run repetitions\n"
 							+ i++
 							+ "-Maximum number of threads\n"
+							+ i++
+							+ "-Current time in milliseconds\n"
 							+ " Output will be put in "
-							+ "\"simple_insertion_<DS Type>_<Number of insertions>_<Maximum number of threads>.csv\"");
+							+ "\"<Current time in milliseconds>_simple_insertion.csv\"");
 			break;
 		}
 	}
