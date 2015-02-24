@@ -74,13 +74,13 @@ public class Util {
 				String outDataLine = null;
 				switch (benchMarkType) {
 				case "simple":
-					outDataLine = "simple_insertion_map_int_int," + dsType
+					outDataLine = "simple_insertion_int_to_int," + dsType
 							+ "-java," + /* ARGS is empty */"," + numerThreads
-							+ "," + numInsertions + "," + minTime + ","
-							+ medianTime + "," + maxTime;
+							+ "," + numInsertions + "," + 0 + "," + 0 + ","
+							+ minTime + "," + medianTime + "," + maxTime;
 					break;
 				case "random":
-					outDataLine = "hotcold_map_int_inner_map," + dsType
+					outDataLine = "hotcold_int_to_inner_map," + dsType
 							+ "-java," + /* ARGS is empty */"," + numerThreads
 							+ "," + numInsertions + "," + numHotKey + ","
 							+ hotRatio + "," + minTime + "," + medianTime + ","
@@ -133,8 +133,9 @@ public class Util {
 						"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,NUM_HOTKEYS,HOT_RATIO,MINTIME,MEDIANTIME,MAXTIME");
 				break;
 			case "simple":
-				Util.writeLine(writer,
-						"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,MINTIME,MEDIANTIME,MAXTIME,THREADS");
+				Util.writeLine(
+						writer,
+						"PROGNAME,VARIANT,ARGS,THREADS,NUM_INSERTS,NUM_HOTKEYS,HOT_RATIO,MINTIME,MEDIANTIME,MAXTIME");
 				break;
 			}
 		} catch (IOException e) {
