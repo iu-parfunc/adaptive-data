@@ -142,9 +142,7 @@ case $BENCHVARIANT in
 	;;
     scalable)
 	echo "Running regular scalable/lock-free benchmarks..."
-        for cas_tries in 1 2 3 5 10; do
-            CAS_TRIES=$cas_tries go
-        done
+        go
 	;;
     scalable-chaselev)
 	echo "Running regular scalable/lock-free benchmarks..."	
