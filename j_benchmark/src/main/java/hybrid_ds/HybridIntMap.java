@@ -12,7 +12,7 @@ import org.pcollections.IntTreePMap;
 public class HybridIntMap<V> implements Map<Integer, V> {
 
 	private enum State {
-		A, B, AB
+		A, B, AB, ABinit
 	};
 
 	AtomicInteger contentionCount = new AtomicInteger(0);
@@ -22,7 +22,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 
 	private int casTries;
 
-	private ConcurrentSkipListMap<Integer, V> concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
+	private ConcurrentSkipListMap<Integer, V> concSkipListMap;// = new
+																// ConcurrentSkipListMap<Integer,
+																// V>();
 	private AtomicReference<IntTreePMap<V>> mutableIntTreeMap = new AtomicReference<IntTreePMap<V>>(
 			IntTreePMap.empty());
 
@@ -32,15 +34,15 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	}
 
 	private void contentionDetected() {
-		if (!state.compareAndSet(State.A, State.AB)) {
-			return;
+		if (state.compareAndSet(State.A, State.ABinit)) {
+			concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
+			state.set(State.AB);
+			initiateTransition();
 		}
-		initiateTransition();
 	}
 
 	private void initiateTransition() {
 		// System.out.println("*** Transition initiated ***");
-		concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
 		CopyThread<V> copyThread = new CopyThread<V>(this,
 				mutableIntTreeMap.get(), mutableIntTreeMap.get().keySet()
 						.iterator());
@@ -65,6 +67,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 												// there is no mapping
 			}
 			return mutableIntTreeMap.get().get(key);
+		case ABinit:
+			while(state.get().equals(State.ABinit));
+			return get(key);
 		}
 		return null;
 	}
@@ -101,6 +106,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 
 		case AB:
 			return concSkipListMap.put(key, value);
+		case ABinit:
+			while(state.get().equals(State.ABinit));
+			return put(key, value);
 		}
 		return null;
 	}
@@ -134,6 +142,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			} else {
 				return concSkipListMap.putIfAbsent(key, value);
 			}
+		case ABinit:
+			while(state.get().equals(State.ABinit));
+			return putIfAbsent(key, value);
 		}
 		return null;
 	}
@@ -178,6 +189,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			V previous = concSkipListMap.get(key);
 			concSkipListMap.put((Integer) key, null);
 			return previous;
+		case ABinit:
+			while(state.get().equals(State.ABinit));
+			return remove(key);
 		}
 		return null;
 	}

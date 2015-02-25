@@ -34,7 +34,7 @@ case $BENCHVARIANT in
     #do
 		#	$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.SimpleInsertionBenchmark $BENCHVARIANT $(($NUM_INSERTS * $i)) $BENCHMARK_ROUNDS $MAX_NUM_THREADS $TIME_MILLI_SECONDS 
 	#done
-	for HOT_RATIO in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0;
+	for HOT_RATIO in 0.0 0.1 0.2 0.3 0.4 0.5;
 	do
 		$JAVA_RUN -cp  target/j_benchmark-0.0.1.jar benchmark.RandomHotColdkeyBecnhmark $BENCHVARIANT $NUM_INSERTS $NUM_HOTKEYS $BENCHMARK_ROUNDS $MAX_NUM_THREADS $HOT_RATIO $CAS_TRIES $TIME_MILLI_SECONDS
 	done  
