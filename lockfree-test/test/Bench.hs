@@ -217,13 +217,10 @@ main = do
         | elems <- parSizes ] ++
 
         [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
-          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomFlips randomFloats hotRatio)
-        | hotRatio <- hotKeyRatios] ++
+           (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomFlips randomFloats (getNumEnvVar 0.5 "HOT_RATIO")) ] ++
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
-          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomFloats randomFloats (getNumEnvVar 0.5 "HOT_RATIO"))
-        | hotRatio <- hotKeyRatios ]
+          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomFloats randomFloats (getNumEnvVar 0.5 "HOT_RATIO")) ]
 
-  print $ getNumEnvVar 5 "CAS_TRIES"
   pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
   oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
   scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
@@ -268,7 +265,6 @@ main = do
   where -- _sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
         hotkeySize = 10^7
-        hotKeyRatios = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 -- Inclusive/Inclusive
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()

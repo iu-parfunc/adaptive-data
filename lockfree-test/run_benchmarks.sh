@@ -150,7 +150,9 @@ case $BENCHVARIANT in
 	;;
     hybrid)
 	echo "Running hybrid benchmarks..."
-	go 
+        for hot_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0; do
+	    HOT_RATIO=$hot_ratio go
+        done
 	;;
     *)
 	echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
