@@ -3,7 +3,9 @@
 echo "Begin benchmarks for lockfree-test."
 set -xe
 
-pwd
+# Make sure we go to the right directory
+cd $1
+shift
 
 EXTRAARGS=$*
 
