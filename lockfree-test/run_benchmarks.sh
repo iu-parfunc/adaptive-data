@@ -77,7 +77,8 @@ function runcritbench () {
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
     $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
-		--threads=$i $CRITREPORT --runflags="$RTSOPTS"
+		--threads=$i $CRITREPORT --runflags="$RTSOPTS" \
+                --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES
     # --args=""
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
