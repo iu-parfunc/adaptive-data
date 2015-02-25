@@ -71,8 +71,8 @@ function runcritbench () {
     shift
     benches=$*
 
-    CRITREPORT=${TAG}_${REPORT}-N$i.crit
-    CSVREPORT=${TAG}_${REPORT}-N$i.csv
+    CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.crit
+    CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     ./dist/build/$executable/$executable $BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
