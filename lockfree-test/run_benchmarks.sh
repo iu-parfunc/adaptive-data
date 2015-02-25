@@ -44,7 +44,7 @@ mkdir -p $FAILDIR
 
 
 
-CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.12
+CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.15
 CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.12
 # If we don't have the Criterion uploader, don't bother trying
 which $CRITUPLOAD
