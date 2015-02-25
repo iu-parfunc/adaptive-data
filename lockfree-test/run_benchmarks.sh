@@ -3,6 +3,8 @@
 echo "Begin benchmarks for lockfree-test."
 set -xe
 
+pwd
+
 EXTRAARGS=$*
 
 if [ "$BENCHCOMPILER" == "" ]; then
