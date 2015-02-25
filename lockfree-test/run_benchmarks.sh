@@ -92,7 +92,7 @@ function runcritbench () {
 
 function go() {    
     VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
-    
+
     echo "Installing benchmark program."
     # Put the sandbox here in the lockfree-test/ subdir.
     $CABAL sandbox init
@@ -141,8 +141,10 @@ case $BENCHVARIANT in
 	go 
 	;;
     scalable)
-	echo "Running regular scalable/lock-free benchmarks..."	
-	go 
+	echo "Running regular scalable/lock-free benchmarks..."
+        for cas_tries in 1 2 3 5 10; do
+            CAS_TRIES=$cas_tries go
+        done
 	;;
     scalable-chaselev)
 	echo "Running regular scalable/lock-free benchmarks..."	
