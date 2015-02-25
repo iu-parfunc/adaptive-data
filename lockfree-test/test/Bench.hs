@@ -104,16 +104,17 @@ hotKeyOrRandom :: forall a .
                   -> Int
                   -> Int
                   -> VM.IOVector (Maybe a)
-                  -> VS.Vector Int
                   -> VS.Vector Float
+                  -> VS.Vector Float
+                  -> Float
                   -> IO ()
-hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices = do
+hotKeyOrRandom newBag push reps splits vec randomFlips randomIndices hotRatio = do
   let quota = (fromIntegral reps) `quot` splits
   forkJoin splits (\ _chunkID -> for_ 1 (fromIntegral quota) $ \i -> do
                       let ix :: Int -> Int
                           ix vecLen = ((fromIntegral i + (quota* splits)) `mod` vecLen)
                           flp = randomFlips VS.! ix (VS.length randomFlips)
-                          idx = round $ if flp == 0 then 0
+                          idx = round $ if flp < hotRatio then 0
                                         else (randomIndices VS.! (ix $ VS.length randomIndices))
                                              * (fromIntegral $ VM.length vec)
                           idx' = if idx >= VM.length vec then VM.length vec - 1 else idx
@@ -140,6 +141,7 @@ main = do
   -- randomVec <- VS.replicateM splits (randomRIO (0, 1) :: IO Int)
   randomInts <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Int)
   randomFloats <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Float)
+  randomFlips <- VS.replicateM numRandoms (randomRIO (0, 1) :: IO Float)
 
   -- Initialize vector of Nothing for hotKeyOrRandom.  This is the
   -- outer collection of a nested collection.
@@ -215,15 +217,17 @@ main = do
         | elems <- parSizes ] ++
 
         [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
-          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomInts randomFloats) ] ++ 
+          (hotKeyOrRandom newBag add (fromIntegral num) splits nothingVec randomFlips randomFloats hotRatio)
+        | hotRatio <- hotKeyRatios] ++
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
-          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomInts randomFloats) ] 
+          Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomFloats randomFloats (getNumEnvVar 0.5 "HOT_RATIO"))
+        | hotRatio <- hotKeyRatios ]
 
-  
+  print $ getNumEnvVar 5 "CAS_TRIES"
   pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
   oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
   scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
-  hybrid   <- mkBagBenchSet AB.newBag AB.add AB.remove
+  hybrid   <- mkBagBenchSet (AB.newBagThreshold $ getNumEnvVar 5 "CAS_TRIES") AB.add AB.remove
 
   scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
   scalableCL <- mkBagBenchSet SBCL.newBag SBCL.add SBCL.remove
@@ -264,6 +268,7 @@ main = do
   where -- _sizes = [10^e | e <- [0..4]]
         parSizes = [ 10000, 100000, 500000 ]
         hotkeySize = 10^7
+        hotKeyRatios = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 -- Inclusive/Inclusive
 for_ :: Monad m => Int64 -> Int64 -> (Int64 -> m a) -> m ()
@@ -273,7 +278,7 @@ for_ start end fn = loop start
                 | otherwise = fn i >> loop (i+1)
 {-# INLINE for_ #-}
 
-getNumEnvVar :: Int -> String -> Int
+getNumEnvVar :: (Num a, Read a) => a -> String -> a
 getNumEnvVar deflt name =
   case lookup name theEnv of
     Nothing -> deflt
