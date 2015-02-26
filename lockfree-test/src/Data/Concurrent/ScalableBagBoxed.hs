@@ -75,23 +75,26 @@ remove bag = do
   let -- Start with our own
       start = tid `mod` V.length bag      
       -- Sweep through all bags and try to "steal":
-      retryLoop vec ix 
-        | ix >= V.length vec = retryLoop vec 0 
+      retryLoop ix 
+        | ix >= V.length bag = retryLoop 0 
         | otherwise =
           do peek <- V.unsafeRead bag ix
              case peek of
                -- Nothing here:
                Nothing ->
                  let ix' = ix + 1 in
-                 if ix' == start || (ix' >= V.length vec && start == 0)
+                 if ix' == start || (ix' >= V.length bag && start == 0)
                  then return Nothing -- looped around once, nothing to pop
-                 else retryLoop vec ix'  -- keep going
+                 else retryLoop ix'  -- keep going
                Just b -> do
                  res <- PB.remove b
                  case res of
-                   Nothing -> retryLoop vec ix
+                   Nothing -> let ix' = ix + 1 in
+                     if ix' == start || (ix' >= V.length bag && start == 0)
+                     then return Nothing -- looped around once, nothing to pop
+                     else retryLoop ix'  -- keep going
                    jx      -> return jx
-  retryLoop bag start
+  retryLoop start
 
 -- FIXME: Vector.Mutable should really have generateM:
 generateM :: Int -> (Int -> a) -> IO (IOVector a)
