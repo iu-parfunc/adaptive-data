@@ -24,20 +24,20 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		}
 	}
 
-	HyState<V> plus(State state, HybridIntMap<V>.HyState<V> lastSnapshot,
+	private HyState<V> hyStatePlus(State state, HybridIntMap<V>.HyState<V> lastSnapshot,
 			Integer key, V value) {
 		HyState<V> tmp = new HyState<V>(state, lastSnapshot.pureMap.plus(key,
 				value));
 		return tmp;
 	}
 
-	HyState<V> minus(State state, HybridIntMap<V>.HyState<V> lastSnapshot,
+	private HyState<V> hyStateMinus(State state, HybridIntMap<V>.HyState<V> lastSnapshot,
 			Object key) {
 		HyState<V> tmp = new HyState<V>(state, lastSnapshot.pureMap.minus(key));
 		return tmp;
 	}
 
-	HyState<V> copy(HybridIntMap<V>.HyState<V> lastSnapshot, State state) {
+	private HyState<V> hyStateModifiedStateCopy(HybridIntMap<V>.HyState<V> lastSnapshot, State state) {
 		HyState<V> tmp = new HyState<V>(state, lastSnapshot.pureMap);
 		return tmp;
 	}
@@ -56,10 +56,10 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		HyState<V> lastSnapshot;
 		while ((lastSnapshot = hyState.get()).state.equals(State.A)) {
 			if (hyState.compareAndSet(lastSnapshot,
-					copy(lastSnapshot, State.ABinit))) {
+					hyStateModifiedStateCopy(lastSnapshot, State.ABinit))) {
 				concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
 				hyState.compareAndSet(lastSnapshot = hyState.get(),
-						copy(lastSnapshot, State.AB));
+						hyStateModifiedStateCopy(lastSnapshot, State.AB));
 				initiateTransition();
 			}
 		}
@@ -76,7 +76,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	protected void copyIsDone() {
 		HyState<V> lastSnapshot;
 		while ((lastSnapshot = hyState.get()).state.equals(State.AB)) {
-			hyState.compareAndSet(lastSnapshot, copy(lastSnapshot, State.B));
+			hyState.compareAndSet(lastSnapshot, hyStateModifiedStateCopy(lastSnapshot, State.B));
 		}
 	}
 
@@ -115,7 +115,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		case A:
 			while ((lastSnapshot = hyState.get()).state.equals(State.A)
 					&& !hyState.compareAndSet(lastSnapshot,
-							plus(lastSnapshot.state, lastSnapshot, key, value))) {
+							hyStatePlus(lastSnapshot.state, lastSnapshot, key, value))) {
 				if (++tries > casTries) {
 					contentionDetected();
 					return put(key, value);
@@ -192,7 +192,7 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		case A:
 			while ((lastSnapshot = hyState.get()).state.equals(State.A)
 					&& !hyState.compareAndSet(lastSnapshot,
-							minus(lastSnapshot.state, lastSnapshot, key))) {
+							hyStateMinus(lastSnapshot.state, lastSnapshot, key))) {
 				if (++tries > casTries) {
 					contentionDetected();
 					return remove(key);
