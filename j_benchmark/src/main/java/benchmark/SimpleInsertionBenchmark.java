@@ -111,36 +111,13 @@ public class SimpleInsertionBenchmark {
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numThreads);
 
-				switch (concurrencyType) {
-				case Util.PURE_MAP:
-					for (int j = 0; j < numThreads; j++) {
-						threads[j] = new InsertionThread(pureIntMapInt,
-								pureIntMapInnerMap, j * numInsretionsPerThread,
-								(j + 1) * numInsretionsPerThread, mapValueType,
-								startSignal, doneSignal);
-						threads[j].start();
-					}
-					break;
-				case Util.HYBRID_MAP:
-
-					for (int j = 0; j < numThreads; j++) {
-						threads[j] = new InsertionThread(hybridIntMapInt,
-								hybridIntMapInnerMap, j
-										* numInsretionsPerThread, (j + 1)
-										* numInsretionsPerThread, mapValueType,
-								casTries, startSignal, doneSignal);
-						threads[j].start();
-					}
-					break;
-				default:
-					for (int j = 0; j < numThreads; j++) {
-						threads[j] = new InsertionThread(mapInt, mapInnerMap, j
-								* numInsretionsPerThread, (j + 1)
-								* numInsretionsPerThread, concurrencyType,
-								mapValueType, startSignal, doneSignal);
-						threads[j].start();
-					}
-					break;
+				for (int j = 0; j < numThreads; j++) {
+					threads[j] = new InsertionThread(mapInt, mapInnerMap,
+							pureIntMapInt, pureIntMapInnerMap, hybridIntMapInt,
+							hybridIntMapInnerMap, j * numInsretionsPerThread,
+							(j + 1) * numInsretionsPerThread, concurrencyType,
+							mapValueType, startSignal, doneSignal);
+					threads[j].start();
 				}
 				startSignal.countDown();
 				doneSignal.await();

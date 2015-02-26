@@ -21,7 +21,7 @@ public class RandomHotColdkeyBecnhmark {
 	private HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData = new HashMap<String, TreeMap<Integer, ArrayList<Long>>>();
 
 	private Thread[] threads = new Thread[64];
-
+	
 	public RandomHotColdkeyBecnhmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int numHotKey, int runRepetitions,
 			int maxNumThreads, double hotRatio, long runStartTimestamp,
@@ -29,9 +29,6 @@ public class RandomHotColdkeyBecnhmark {
 
 		String cuncorrencyType = null, valueType = null;
 		switch (dsTypeToBeBenchmarked) {
-		case "mutable":
-			cuncorrencyType = Util.MUTABLE_INT_TREE_MAP;
-			break;
 		case "scalable":
 			cuncorrencyType = Util.SKIP_LIST_MAP;
 			break;
@@ -98,40 +95,14 @@ public class RandomHotColdkeyBecnhmark {
 				startSignal = new CountDownLatch(1);
 				doneSignal = new CountDownLatch(numThreads);
 				for (int j = 0; j < numThreads; j++) {
-					switch (concurrencyType) {
-					case Util.SKIP_LIST_MAP:
-						threads[j] = new InsertionThread(outerConcSkipListMap,
-								j * numInsretionsPerThread, (j + 1)
-										* numInsretionsPerThread,
-								insertionCount, numHotKey, hotRatio,
-								startSignal, doneSignal);
-						threads[j].start();
-						break;
-					case Util.CONCURRENT_MAP:
-						threads[j] = new InsertionThread(outerConcHashMap, j
-								* numInsretionsPerThread, (j + 1)
-								* numInsretionsPerThread, insertionCount,
-								numHotKey, hotRatio, startSignal, doneSignal);
-						threads[j].start();
-						break;
-					case Util.HYBRID_MAP:
-						threads[j] = new InsertionThread(
-								outerHybridIntMapInnrMap, j
-										* numInsretionsPerThread, (j + 1)
-										* numInsretionsPerThread,
-								insertionCount, numHotKey, hotRatio, casTries,
-								startSignal, doneSignal);
-						threads[j].start();
-						break;
-
-					case Util.PURE_MAP:
-						threads[j] = new InsertionThread(outerPureIntTreeMap, j
-								* numInsretionsPerThread, (j + 1)
-								* numInsretionsPerThread, insertionCount,
-								numHotKey, hotRatio, startSignal, doneSignal);
-						threads[j].start();
-						break;
-					}
+					threads[j] = new InsertionThread(outerConcSkipListMap,
+							outerConcHashMap, outerPureIntTreeMap,
+							outerHybridIntMapInnrMap, concurrencyType, j
+									* numInsretionsPerThread, (j + 1)
+									* numInsretionsPerThread, insertionCount,
+							numHotKey, hotRatio, casTries, startSignal,
+							doneSignal);
+					threads[j].start();
 				}
 				startSignal.countDown();
 				doneSignal.await();
@@ -147,7 +118,20 @@ public class RandomHotColdkeyBecnhmark {
 				Util.recordTimeTaken(performanceData, timeTakenForRounds,
 						concurrencyType, numThreads);
 			}
-		}// End of FOR loop over numberOfThreads
+			// System.out.println("numThreads is " + numThreads);
+			// switch (concurrencyType) {
+			// case Util.SKIP_LIST_MAP:
+			// System.out.println(outerConcSkipListMap);
+			// break;
+			// case Util.HYBRID_MAP:
+			// System.out.println(outerHybridIntMapInnrMap);
+			// break;
+			// case Util.PURE_MAP:
+			// System.out.println(outerPureIntTreeMap);
+			// break;
+			// }
+			// System.out.println();
+		}// End of FOR loop over numThreads
 	}
 
 	private void initiatlizeMap(String ConcurrecyType, int casTries) {
