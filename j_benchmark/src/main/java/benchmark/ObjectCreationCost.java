@@ -38,7 +38,7 @@ public class ObjectCreationCost {
 			benchHybrid();
 			for (int i = 1; i < numNewObjects; i *= 10) {
 				hybridArray.get(i).put(new Integer(i),
-						new HybridIntMap<Integer>(1));
+						new HybridIntMap<Integer>());
 			}
 			break;
 		case "scalable":
@@ -71,7 +71,7 @@ public class ObjectCreationCost {
 
 		long startTime = System.currentTimeMillis();
 		for (int i = 0; i < numNewObjects; i++) {
-			hybridArray.add(new HybridIntMap<HybridIntMap<Integer>>(1));
+			hybridArray.add(new HybridIntMap<HybridIntMap<Integer>>());
 		}
 		long endTime = System.currentTimeMillis();
 		if (!warmUp) {

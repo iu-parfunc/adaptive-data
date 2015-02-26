@@ -1,5 +1,7 @@
 package benchmark;
 
+import hybrid_ds.HybridIntMap;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -24,6 +26,16 @@ public class Util {
 
 	public static final String RANDOM_HOT_COLD = "RANDOM";
 	public static final String SIMPLE_INSERTION = "SIMPLE";
+
+	private static int casTries;
+
+	public static int getCasTries() {
+		return casTries;
+	}
+
+	public static void setCasTries(int casTries) {
+		Util.casTries = casTries;
+	}
 
 	public static void writeLine(BufferedWriter writer, String line)
 			throws IOException {
@@ -195,5 +207,4 @@ public class Util {
 			break;
 		}
 	}
-
 }

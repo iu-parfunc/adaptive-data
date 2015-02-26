@@ -13,21 +13,22 @@ import java.util.concurrent.CountDownLatch;
 
 public class RandomHotColdkeyBecnhmark {
 
-	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
-	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
-	private HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap;
-	private PureIntMap<PureIntMap<Integer>> outerPureIntTreeMap;
+	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
+	private ConcurrentSkipListMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
+	private ConcurrentSkipListMap<Integer, HybridIntMap<Integer>> outerHybridIntMapInnrMap;
+	private ConcurrentSkipListMap<Integer, PureIntMap<Integer>> outerPureIntTreeMap;
 
 	private HashMap<String, TreeMap<Integer, ArrayList<Long>>> performanceData = new HashMap<String, TreeMap<Integer, ArrayList<Long>>>();
 
 	private Thread[] threads = new Thread[64];
-	
+
 	public RandomHotColdkeyBecnhmark(String dsTypeToBeBenchmarked,
 			int numInsertions, int numHotKey, int runRepetitions,
 			int maxNumThreads, double hotRatio, long runStartTimestamp,
 			int casTries) throws IOException, InterruptedException {
 
 		String cuncorrencyType = null, valueType = null;
+		Util.setCasTries(casTries);
 		switch (dsTypeToBeBenchmarked) {
 		case "scalable":
 			cuncorrencyType = Util.SKIP_LIST_MAP;
@@ -37,6 +38,9 @@ public class RandomHotColdkeyBecnhmark {
 			break;
 		case "pure":
 			cuncorrencyType = Util.PURE_MAP;
+			break;
+		case "concurrent":
+			cuncorrencyType = Util.CONCURRENT_MAP;
 			break;
 		default:
 
@@ -84,6 +88,7 @@ public class RandomHotColdkeyBecnhmark {
 
 		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads++) {
 
+			// System.out.println("numThreads is " + numThreads);
 			int numInsretionsPerThread = insertionCount / numThreads;
 
 			ArrayList<Long> timeTakenForRounds = new ArrayList<Long>();
@@ -118,7 +123,6 @@ public class RandomHotColdkeyBecnhmark {
 				Util.recordTimeTaken(performanceData, timeTakenForRounds,
 						concurrencyType, numThreads);
 			}
-			// System.out.println("numThreads is " + numThreads);
 			// switch (concurrencyType) {
 			// case Util.SKIP_LIST_MAP:
 			// System.out.println(outerConcSkipListMap);
@@ -129,6 +133,8 @@ public class RandomHotColdkeyBecnhmark {
 			// case Util.PURE_MAP:
 			// System.out.println(outerPureIntTreeMap);
 			// break;
+			// case Util.CONCURRENT_MAP:
+			// System.out.println(outerConcHashMap);
 			// }
 			// System.out.println();
 		}// End of FOR loop over numThreads
@@ -140,17 +146,16 @@ public class RandomHotColdkeyBecnhmark {
 		case Util.SYNCHRONIZED_MAP:
 			break;
 		case Util.CONCURRENT_MAP:
-			outerConcHashMap = new ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>>();
+			outerConcHashMap = new ConcurrentSkipListMap<Integer, ConcurrentHashMap<Integer, Integer>>();
 			break;
 		case Util.SKIP_LIST_MAP:
 			outerConcSkipListMap = new ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>();
 			break;
 		case Util.HYBRID_MAP:
-			outerHybridIntMapInnrMap = new HybridIntMap<HybridIntMap<Integer>>(
-					casTries);
+			outerHybridIntMapInnrMap = new ConcurrentSkipListMap<Integer, HybridIntMap<Integer>>();
 			break;
 		case Util.PURE_MAP:
-			outerPureIntTreeMap = new PureIntMap<PureIntMap<Integer>>();
+			outerPureIntTreeMap = new ConcurrentSkipListMap<Integer, PureIntMap<Integer>>();
 			break;
 		}
 	}

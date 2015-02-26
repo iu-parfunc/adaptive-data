@@ -14,10 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InsertionThread extends Thread {
 
 	private ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap;
-	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
-	private PureIntMap<PureIntMap<Integer>> outerPureIntMap;
-
-	private HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap;
+	private ConcurrentSkipListMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap;
+	private ConcurrentSkipListMap<Integer, PureIntMap<Integer>> outerPureIntMap;
+	private ConcurrentSkipListMap<Integer, HybridIntMap<Integer>> outerHybridIntMapInnrMap;
 
 	private Map<Integer, Integer> mapInt;
 	private Map<Integer, Map<Integer, Integer>> mapInnerMap;
@@ -37,7 +36,8 @@ public class InsertionThread extends Thread {
 
 	private static Random randomGen = new Random();
 
-	private boolean offlineColdKeys = false;
+	private boolean offlineOuterColdKeys = false;
+	private boolean offlineInnerKeys = false;
 
 	public InsertionThread(Map<Integer, Integer> mapInt,
 			Map<Integer, Map<Integer, Integer>> mapInnerMap,
@@ -62,9 +62,9 @@ public class InsertionThread extends Thread {
 
 	public InsertionThread(
 			ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>> outerConcSkipListMap,
-			ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap,
-			PureIntMap<PureIntMap<Integer>> outerPureIntMap,
-			HybridIntMap<HybridIntMap<Integer>> outerHybridIntMapInnrMap,
+			ConcurrentSkipListMap<Integer, ConcurrentHashMap<Integer, Integer>> outerConcHashMap,
+			ConcurrentSkipListMap<Integer, PureIntMap<Integer>> outerPureIntMap,
+			ConcurrentSkipListMap<Integer, HybridIntMap<Integer>> outerHybridIntMapInnrMap,
 			String concurrentMapType, int insertionStartIndex,
 			int insertionEndIndex, int coldKeyRangeMax, int numHotKey,
 			double hotRatio, int casTries, CountDownLatch startSignal,
@@ -156,7 +156,7 @@ public class InsertionThread extends Thread {
 			for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 
 				hybridIntMapInnerMap.put(new Integer(i),
-						new HybridIntMap<Integer>(casTries));
+						new HybridIntMap<Integer>());
 			}
 			break;
 
@@ -202,7 +202,7 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue();
+			Integer innerKey = nextInnerMapKeyValue(i);
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
@@ -213,16 +213,22 @@ public class InsertionThread extends Thread {
 		for (int i = insertionStratIndex; i < insertionEndIndex; i++) {
 			Integer randomKey = nextHotOrColdKeyOuterMap(i);
 
-			HybridIntMap<Integer> newMap = new HybridIntMap<Integer>(casTries);
+			HybridIntMap<Integer> newMap = new HybridIntMap<Integer>();
 			HybridIntMap<Integer> innerMap = outerHybridIntMapInnrMap
 					.putIfAbsent(randomKey, newMap);
 
+			Integer innerKey = nextInnerMapKeyValue(i);
 			if (innerMap == null) {
+				// System.out.println(innerKey + " >>> NULL");
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue();
+
 			Integer innerValue = innerKey;
+			// System.out.println("bef " + innerKey + " >>> " + innerMap +
+			// "\n");
 			innerMap.put(innerKey, innerValue);
+			// System.out.println("aft " + innerKey + " >>> " + innerMap +
+			// "\n");
 		}
 	}
 
@@ -237,7 +243,7 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue();
+			Integer innerKey = nextInnerMapKeyValue(i);
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
@@ -255,33 +261,30 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue();
+			Integer innerKey = nextInnerMapKeyValue(i);
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
 	}
 
-	@SuppressWarnings("unused")
-	private Integer nextInnerMapKeyValue(int oflineKey) {
-		return new Integer(oflineKey);
+	private Integer nextInnerMapKeyValue(int offlineKey) {
+		if (offlineInnerKeys) {
+			return new Integer(offlineKey);
+		}
+		return new Integer(randomGen.nextInt());
 	}
 
-	private Integer nextInnerMapKeyValue() {
-
-		return new Integer(randomGen.nextInt(20));
-	}
-
-	private Integer nextHotOrColdKeyOuterMap(int coldkey) {
+	private Integer nextHotOrColdKeyOuterMap(int offlineKey) {
 
 		Integer randomKey;
 		double hotOrRandomKey = randomGen.nextDouble();// uniformly distributed
 														// double value between
 														// 0.0 and 1.0
-		if (hotOrRandomKey < hotRatio) {
+		if (hotOrRandomKey <= hotRatio) {
 			randomKey = Util.nextHotKey(randomGen, coldKeyRangeMax, numHotKey);
 		} else {
-			if (offlineColdKeys) {
-				randomKey = new Integer(coldkey);
+			if (offlineOuterColdKeys) {
+				randomKey = new Integer(offlineKey);
 			} else {
 				randomKey = new Integer(randomGen.nextInt(coldKeyRangeMax));
 			}

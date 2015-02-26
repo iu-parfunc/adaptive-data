@@ -23,7 +23,7 @@ public class CopyThread<V> extends Thread {
 		Integer nextKey;
 		while (keySet.hasNext()) {
 			nextKey = keySet.next();
-			hybridDS.putIfAbsentCopyThead(nextKey, hybridDS.get(nextKey));
+			hybridDS.copyFromPureIfAbsent(nextKey, hybridDS.get(nextKey));
 		}
 		hybridDS.copyIsDone();
 		// System.out.println("COPY IS DONE");

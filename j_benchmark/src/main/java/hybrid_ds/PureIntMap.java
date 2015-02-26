@@ -20,10 +20,9 @@ public class PureIntMap<V> implements Map<Integer, V> {
 	public V put(Integer key, V value) {
 
 		IntTreePMap<V> snapShot = mutableIntTreeMap.get();
-		while (!mutableIntTreeMap.compareAndSet(snapShot,
-				snapShot.plus(key, value))) {
-			snapShot = mutableIntTreeMap.get();
-		}
+		while (!mutableIntTreeMap.compareAndSet(
+				snapShot = mutableIntTreeMap.get(), snapShot.plus(key, value)))
+			;
 		return snapShot.get(key);
 	}
 
@@ -46,14 +45,15 @@ public class PureIntMap<V> implements Map<Integer, V> {
 			}
 		}
 		return snapShot.get(key);
+//		return put(key, value);
 	}
 
 	@Override
 	public V remove(Object key) {
 		IntTreePMap<V> snapShot = mutableIntTreeMap.get();
-		while (!mutableIntTreeMap.compareAndSet(snapShot, snapShot.minus(key))) {
-			snapShot = mutableIntTreeMap.get();
-		}
+		while (!mutableIntTreeMap.compareAndSet(
+				snapShot = mutableIntTreeMap.get(), snapShot.minus(key)))
+			;
 		return snapShot.get(key);
 	}
 

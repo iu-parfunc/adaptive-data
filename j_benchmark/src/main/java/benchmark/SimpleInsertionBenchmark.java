@@ -29,6 +29,7 @@ public class SimpleInsertionBenchmark {
 			int maxNumThreadsmaxNumThreadss, long runStartTimestamp,
 			int casTries) throws InterruptedException, IOException {
 
+		Util.setCasTries(casTries);
 		String cuncorrencyType = null;
 		switch (dsTypeToBeBenchmarked) {
 		case "pure":
@@ -154,7 +155,7 @@ public class SimpleInsertionBenchmark {
 				mapInt = new ConcurrentSkipListMap<Integer, Integer>();
 				break;
 			case Util.HYBRID_MAP:
-				hybridIntMapInt = new HybridIntMap<Integer>(casTries);
+				hybridIntMapInt = new HybridIntMap<Integer>();
 				break;
 			case Util.PURE_MAP:
 				pureIntMapInt = new PureIntMap<Integer>();
@@ -174,8 +175,7 @@ public class SimpleInsertionBenchmark {
 				mapInnerMap = new ConcurrentSkipListMap<Integer, Map<Integer, Integer>>();
 				break;
 			case Util.HYBRID_MAP:
-				hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>(
-						casTries);
+				hybridIntMapInnerMap = new HybridIntMap<HybridIntMap<Integer>>();
 				break;
 			case Util.PURE_MAP:
 				pureIntMapInnerMap = new PureIntMap<PureIntMap<Integer>>();
