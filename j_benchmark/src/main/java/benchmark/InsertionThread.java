@@ -202,7 +202,7 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue(i);
+			Integer innerKey = nextInnerMapKeyValue();
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
@@ -220,7 +220,7 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue(i);
+			Integer innerKey = nextInnerMapKeyValue();
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
@@ -237,7 +237,7 @@ public class InsertionThread extends Thread {
 			if (innerMap == null) {
 				innerMap = newMap;
 			}
-			Integer innerKey = nextInnerMapKeyValue(i);
+			Integer innerKey = nextInnerMapKeyValue();
 			Integer innerValue = innerKey;
 			innerMap.put(innerKey, innerValue);
 		}
