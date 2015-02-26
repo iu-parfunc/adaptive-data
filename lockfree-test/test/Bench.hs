@@ -92,9 +92,9 @@ fork5050 newBag push pop elems splits vec = do
   bag <- newBag
   let quota = fromIntegral $ elems `quot` splits
   forkJoin splits (\chunk -> do
-                      let shouldPop = vec VS.! chunk == 0
-                          offset = fromIntegral $ chunk * fromIntegral quota
-                      for_ offset (offset + quota) $ \i ->
+                      let offset = fromIntegral $ chunk * fromIntegral quota
+                          shouldPop = ((vec VS.! (fromIntegral offset)) `mod` VS.length vec) == 0
+                      for_ offset (offset + quota) $ \i -> do
                         if shouldPop then void $ pop bag
                         else push bag i)
 
