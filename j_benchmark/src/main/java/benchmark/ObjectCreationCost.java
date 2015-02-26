@@ -8,33 +8,50 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class ObjectCreationCost {
 
-	int numNewObjects;
-	boolean warmUp;
-	private ArrayList<ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>> scalableArray = new ArrayList<ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>>();
-	private ArrayList<HybridIntMap<HybridIntMap<Integer>>> hybridArray = new ArrayList<HybridIntMap<HybridIntMap<Integer>>>();
-	private ArrayList<PureIntMap<PureIntMap<Integer>>> pureArray = new ArrayList<PureIntMap<PureIntMap<Integer>>>();
+	private int numNewObjects;
+	private boolean warmUp;
+	private String mapType;
+	private ArrayList<ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>> scalableArray;
+	private ArrayList<HybridIntMap<HybridIntMap<Integer>>> hybridArray;
+	private ArrayList<PureIntMap<PureIntMap<Integer>>> pureArray;
 
-	public ObjectCreationCost() {
+	public ObjectCreationCost(String mapType, int numNewObjects) {
+
+		this.mapType = mapType;
 
 		System.out.println("ObjectCreationCost");
-		System.out.println("Warming UP");
-		numNewObjects = 1000;
-		warmUp = true;
-		benchPure();
-		benchScalable();
-		benchHybrid();
-		warmUp = false;
-		System.out.println("Benchmarking");
-		numNewObjects = 10000;
-		System.out.println(String.format("creating %d new objects",
-				numNewObjects));
-		benchPure();
-		benchScalable();
-		benchHybrid();
 
-		scalableArray = new ArrayList<ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>>();
-		hybridArray = new ArrayList<HybridIntMap<HybridIntMap<Integer>>>();
-		pureArray = new ArrayList<PureIntMap<PureIntMap<Integer>>>();
+		switch (mapType) {
+		case "pure":
+			init(10000, true);
+			benchPure();
+			init(numNewObjects, false);
+			benchPure();
+			for (int i = 1; i < numNewObjects; i *= 10) {
+				pureArray.get(i).put(new Integer(i), new PureIntMap<Integer>());
+			}
+			break;
+		case "hybrid":
+			init(10000, true);
+			benchHybrid();
+			init(numNewObjects, false);
+			benchHybrid();
+			for (int i = 1; i < numNewObjects; i *= 10) {
+				hybridArray.get(i).put(new Integer(i),
+						new HybridIntMap<Integer>(1));
+			}
+			break;
+		case "scalable":
+			init(10000, true);
+			benchScalable();
+			init(numNewObjects, false);
+			benchScalable();
+			for (int i = 1; i < numNewObjects; i *= 10) {
+				scalableArray.get(i).put(new Integer(i),
+						new ConcurrentSkipListMap<Integer, Integer>());
+			}
+			break;
+		}
 	}
 
 	private void benchScalable() {
@@ -74,7 +91,28 @@ public class ObjectCreationCost {
 		}
 	}
 
+	private void init(int numNewObjects, boolean warmUp) {
+		switch (mapType) {
+		case "pure":
+			pureArray = new ArrayList<PureIntMap<PureIntMap<Integer>>>();
+			break;
+		case "hybrid":
+			hybridArray = new ArrayList<HybridIntMap<HybridIntMap<Integer>>>();
+			break;
+		case "scalable":
+			scalableArray = new ArrayList<ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<Integer, Integer>>>();
+			break;
+		}
+		this.numNewObjects = numNewObjects;
+		this.warmUp = warmUp;
+		if (!warmUp) {
+			System.out.println(String.format("creating %d new %s objects",
+					numNewObjects, mapType));
+		}
+	}
+
 	public static void main(String[] args) {
-		new ObjectCreationCost();
+
+		new ObjectCreationCost(args[0], Integer.parseInt(args[1]));
 	}
 }

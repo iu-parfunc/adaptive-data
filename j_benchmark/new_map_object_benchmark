@@ -1,0 +1,18 @@
+#!/bin/bash
+
+MAVEN=mvn
+JAVA_EXEC=java
+JAVA_OPTS="-Xms4g -Xmx16g -d64"
+JAVA_RUN="$JAVA_EXEC $JAVA_OPTS"
+
+if [[ "$HOSTNAME" =~ cutter ]]; then
+    module load jdk
+fi
+
+$MAVEN clean
+$MAVEN package 
+
+NUM_NEW_OBJECTS=10000000
+$JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost pure $NUM_NEW_OBJECTS
+$JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost scalable $NUM_NEW_OBJECTS
+$JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost hybrid $NUM_NEW_OBJECTS

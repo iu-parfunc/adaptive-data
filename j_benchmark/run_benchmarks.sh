@@ -3,7 +3,7 @@
 set -xe
 
 TABLENAME=AdaptivelyScalable
-CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.9
+CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.15
 
 MAVEN=mvn
 JAVA_EXEC=java
