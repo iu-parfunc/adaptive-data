@@ -25,7 +25,7 @@ ghc --version
 
 # Run only certain benchmarks from the criterion suite:
 # SEQBENCHES=""
-PARBENCHES=" array-bag_hotcold-team-fill-N "
+PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 "
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
