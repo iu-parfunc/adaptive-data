@@ -212,8 +212,8 @@ main = do
         {- [ bench ("bag_insert-" ++ show elems) $
           Benchmarkable $ rep (forkNFill newBag add elems splits)
         | elems <- parSizes ] ++  -}
-        [ bench ("bag_random5050-" ++ show elems) $
-          Benchmarkable $ rep (fork5050 newBag add remove elems splits randomInts)
+        [ bench "bag_random5050-N" $ Benchmarkable $ \num ->
+           (fork5050 newBag add remove (fromIntegral num) splits randomInts)
         | elems <- parSizes ] ++
 
         [ bench ("array-bag_hotcold-team-fill-N") $ Benchmarkable $ \num -> 
