@@ -3,9 +3,8 @@
 echo "Begin benchmarks for lockfree-test."
 set -xe
 
-# Use LVish uploader for now. These env vars are picked up by hsbencher-fusion:
-export HSBENCHER_GOOGLE_CLIENTID=820162629229-kp29aklebt6ucos5a71u8tu3hu8unres.apps.googleusercontent.com
-export HSBENCHER_GOOGLE_CLIENTSECRET=pSsMxVAJCFKyWsazuxZVRZwX
+export HSBENCHER_GOOGLE_CLIENTID=759282369766-ijonhc4662ot2qos4lgud0e0sltjshlj.apps.googleusercontent.com
+export HSBENCHER_GOOGLE_CLIENTSECRET=yI8GfZXsHPrW44udqklCHeDH
 
 # Make sure we go to the right directory
 cd $1
