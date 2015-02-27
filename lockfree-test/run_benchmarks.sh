@@ -40,7 +40,7 @@ TAG=`date +'%s'`
 TABLENAME=AdaptivelyScalable
 
 # These are good settings for insert benchmarks on cutter:
-RTSOPTS=" -qa -qm -A1G -T -G1 "
+RTSOPTS=" -qa -qm -T -G1 "
 
 REPORT=report_${executable}
 BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
@@ -75,12 +75,15 @@ function runcritbench () {
     shift
     benches=$*
 
+    NURSERY_SIZE=$((30000/$i))
+    echo "Using nursery of size $NURSERY_SIZE"
+
     CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.crit
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     ./dist/build/$executable/$executable $BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
-       +RTS -T -s -N$i $RTSOPTS -RTS
+       +RTS -T -s -N$i $RTSOPTS -A$NURSERY_SIZE
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
