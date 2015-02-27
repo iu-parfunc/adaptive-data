@@ -145,7 +145,8 @@ main = do
 
   -- Initialize vector of Nothing for hotKeyOrRandom.  This is the
   -- outer collection of a nested collection.
-  let vecSize = getNumEnvVar 100 "NUM_KEYS"
+  -- let vecSize = getNumEnvVar 100 "NUM_KEYS"
+  let vecSize = 10^6
 
   -- FINISHME, use this!
   let _adaptThresh = getNumEnvVar 10 "ADAPT_THRESH"
