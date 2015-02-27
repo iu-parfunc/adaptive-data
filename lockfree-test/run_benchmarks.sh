@@ -83,7 +83,7 @@ function runcritbench () {
 
     ./dist/build/$executable/$executable $BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
-       +RTS -T -s -N$i $RTSOPTS -A${$NURSERY_SIZE}M
+       +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
