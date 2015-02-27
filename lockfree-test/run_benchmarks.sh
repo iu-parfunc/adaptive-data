@@ -148,22 +148,22 @@ case $BENCHVARIANT in
 	echo "Running pure-in-a-box benchmarks..."
 	go
 	;;
-    oldpure)
-	echo "Running old-style pure-in-a-box benchmarks..."
-	go 
-	;;
+    # oldpure)
+    #     echo "Running old-style pure-in-a-box benchmarks..."
+    #     go 
+    #     ;;
     scalable)
 	echo "Running regular scalable/lock-free benchmarks..."
         go
 	;;
-    scalable-chaselev)
-	echo "Running regular scalable/lock-free benchmarks..."	
-	go 
-	;;
+    # scalable-chaselev)
+    #     echo "Running regular scalable/lock-free benchmarks..."	
+    #     go 
+    #     ;;
     hybrid)
 	echo "Running hybrid benchmarks..."
-        for hot_ratio in 0.0 0.2 0.4 0.6 0.8 1.0; do
-	    HOT_RATIO=$hot_ratio go
+        for cas_tries in 1 2 5 10; do
+	    CAS_TRIES=$cas_tries go
         done
 	;;
     *)
