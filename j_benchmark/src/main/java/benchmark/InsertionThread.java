@@ -32,8 +32,6 @@ public class InsertionThread extends Thread {
 	private int insertionStratIndex, insertionEndIndex, coldKeyRangeMax,
 			numHotKey;
 
-	private int casTries;
-
 	private static Random randomGen = new Random();
 
 	private boolean offlineOuterColdKeys = false;
@@ -76,7 +74,6 @@ public class InsertionThread extends Thread {
 		this.outerConcHashMap = outerConcHashMap;
 		this.outerPureIntMap = outerPureIntMap;
 		this.outerHybridIntMapInnrMap = outerHybridIntMapInnrMap;
-		this.casTries = casTries;
 		initializeFields(startSignal, doneSignal, insertionStartIndex,
 				insertionEndIndex, null, hotRatio, numHotKey, coldKeyRangeMax);
 	}
@@ -217,18 +214,13 @@ public class InsertionThread extends Thread {
 			HybridIntMap<Integer> innerMap = outerHybridIntMapInnrMap
 					.putIfAbsent(randomKey, newMap);
 
-			Integer innerKey = nextInnerMapKeyValue(i);
 			if (innerMap == null) {
-				// System.out.println(innerKey + " >>> NULL");
 				innerMap = newMap;
 			}
 
+			Integer innerKey = nextInnerMapKeyValue(i);
 			Integer innerValue = innerKey;
-			// System.out.println("bef " + innerKey + " >>> " + innerMap +
-			// "\n");
 			innerMap.put(innerKey, innerValue);
-			// System.out.println("aft " + innerKey + " >>> " + innerMap +
-			// "\n");
 		}
 	}
 
@@ -289,7 +281,6 @@ public class InsertionThread extends Thread {
 				randomKey = new Integer(randomGen.nextInt(coldKeyRangeMax));
 			}
 		}
-
 		return randomKey;
 	}
 

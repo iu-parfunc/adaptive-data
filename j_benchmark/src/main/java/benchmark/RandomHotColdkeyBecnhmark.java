@@ -88,13 +88,13 @@ public class RandomHotColdkeyBecnhmark {
 
 		for (int numThreads = 1; numThreads <= maxNumThreadsmaxNumThreadss; numThreads++) {
 
-			// System.out.println("numThreads is " + numThreads);
 			int numInsretionsPerThread = insertionCount / numThreads;
 
 			ArrayList<Long> timeTakenForRounds = new ArrayList<Long>();
 
 			for (int i = 1; i <= runRepetitions; i++) {
 
+				// System.out.println("\nnumThreads is " + numThreads);
 				initiatlizeMap(concurrencyType, casTries);
 				startTime = System.currentTimeMillis();
 				startSignal = new CountDownLatch(1);
@@ -116,6 +116,7 @@ public class RandomHotColdkeyBecnhmark {
 				if (!warmUp) {
 					timeTakenForRounds.add(new Long(elapsed));
 				}
+				// logLastMapping(concurrencyType);
 			}// End of FOR loop over run repetitions
 
 			if (!warmUp) {
@@ -123,21 +124,27 @@ public class RandomHotColdkeyBecnhmark {
 				Util.recordTimeTaken(performanceData, timeTakenForRounds,
 						concurrencyType, numThreads);
 			}
-			// switch (concurrencyType) {
-			// case Util.SKIP_LIST_MAP:
-			// System.out.println(outerConcSkipListMap);
-			// break;
-			// case Util.HYBRID_MAP:
-			// System.out.println(outerHybridIntMapInnrMap);
-			// break;
-			// case Util.PURE_MAP:
-			// System.out.println(outerPureIntTreeMap);
-			// break;
-			// case Util.CONCURRENT_MAP:
-			// System.out.println(outerConcHashMap);
-			// }
-			// System.out.println();
 		}// End of FOR loop over numThreads
+	}
+
+	private void logLastMapping(String concurrencyType) {
+		switch (concurrencyType) {
+		case Util.SKIP_LIST_MAP:
+			System.out.println(outerConcSkipListMap);
+			break;
+		case Util.HYBRID_MAP:
+			System.out
+					.println(outerHybridIntMapInnrMap
+							.get(outerHybridIntMapInnrMap.keySet().iterator()
+									.next()).size());
+			break;
+		case Util.PURE_MAP:
+			System.out.println(outerPureIntTreeMap);
+			break;
+		case Util.CONCURRENT_MAP:
+			System.out.println(outerConcHashMap);
+		}
+		System.out.println();
 	}
 
 	private void initiatlizeMap(String ConcurrecyType, int casTries) {

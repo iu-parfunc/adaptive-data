@@ -1,7 +1,5 @@
 package benchmark;
 
-import hybrid_ds.HybridIntMap;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;

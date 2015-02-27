@@ -1,11 +1,10 @@
 package hybrid_ds;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.pcollections.IntTreePMap;
@@ -15,16 +14,24 @@ import benchmark.Util;
 public class HybridIntMap<V> implements Map<Integer, V> {
 
 	private enum State {
-		A, B, AB, ABinit
+		A, B, AB
 	};
 
 	private class HyState<V> {
 		private State state;
+		private ConcurrentSkipListMap<Integer, V> concSkipListMap;
 		private IntTreePMap<V> pureMap;
 
 		public HyState(State state, IntTreePMap<V> pureMap) {
 			this.state = state;
 			this.pureMap = pureMap;
+		}
+
+		public HyState(State state, IntTreePMap<V> pureMap,
+				ConcurrentSkipListMap<Integer, V> concSkipListMap) {
+			this.state = state;
+			this.pureMap = pureMap;
+			this.concSkipListMap = concSkipListMap;
 		}
 	}
 
@@ -38,14 +45,13 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		return new HyState<V>(state, lastSnapshot.pureMap.minus(key));
 	}
 
-	private HyState<V> hyStateModifiedStateCopy(
-			HybridIntMap<V>.HyState<V> lastSnapshot, State state) {
-		return new HyState<V>(state, lastSnapshot.pureMap);
+	private HyState<V> hyStateModifiedStateCopy(State state,
+			IntTreePMap<V> pureMap,
+			ConcurrentSkipListMap<Integer, V> concSkipListMap) {
+		return new HyState<V>(state, pureMap, concSkipListMap);
 	}
 
-	private ConcurrentSkipListMap<Integer, V> concSkipListMap;
 	private AtomicReference<HyState<V>> hyState;
-	private AtomicBoolean transmitted = new AtomicBoolean(false);
 
 	public HybridIntMap() {
 		hyState = new AtomicReference<HyState<V>>(new HyState<V>(State.A,
@@ -54,17 +60,17 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 
 	private void contentionDetected(Integer key) {
 		HyState<V> lastSnapshot;
-		if (transmitted.compareAndSet(false, true)) {
-			while (!hyState.compareAndSet(lastSnapshot = hyState.get(),
-					hyStateModifiedStateCopy(lastSnapshot, State.ABinit)))
-				;
-			concSkipListMap = new ConcurrentSkipListMap<Integer, V>();
 
-			while (!hyState.compareAndSet(lastSnapshot = hyState.get(),
-					hyStateModifiedStateCopy(lastSnapshot, State.AB)))
-				;
-			// System.out.println("*** Transition initiated *** " + key);
-			initiateTransition();
+		while ((lastSnapshot = hyState.get()).state.equals(State.A)) {
+
+			if (hyState.compareAndSet(lastSnapshot, new HyState<V>(State.AB,
+					lastSnapshot.pureMap,
+					new ConcurrentSkipListMap<Integer, V>()))) {
+
+				// System.out.print("*****");
+				initiateTransition();
+				break;
+			}
 		}
 	}
 
@@ -77,9 +83,12 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 
 	protected void copyIsDone() {
 		HyState<V> lastSnapshot;
-		while (!hyState.compareAndSet(lastSnapshot = hyState.get(),
-				hyStateModifiedStateCopy(lastSnapshot, State.B)))
+		while (!hyState.compareAndSet(
+				lastSnapshot = hyState.get(),
+				hyStateModifiedStateCopy(State.B, lastSnapshot.pureMap,
+						lastSnapshot.concSkipListMap)))
 			;
+		;
 		hyState.get().pureMap = null;
 	}
 
@@ -90,18 +99,14 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		case A:
 			return lastSnapshot.pureMap.get(key);
 		case B:
-			return concSkipListMap.get(key);
+			return lastSnapshot.concSkipListMap.get(key);
 		case AB:
-			if (concSkipListMap.containsKey(key)) {
-				return concSkipListMap.get(key);// A real value or
-												// tombstone=null which means
-												// there is no mapping
+			if (lastSnapshot.concSkipListMap.containsKey(key)) {
+				return lastSnapshot.concSkipListMap.get(key);// A real value or
+				// tombstone=null which means
+				// there is no mapping
 			}
 			return lastSnapshot.pureMap.get(key);
-		case ABinit:
-			while (hyState.get().state.equals(State.ABinit))
-				;
-			return get(key);
 		}
 		return null;
 	}
@@ -131,13 +136,9 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			}
 			return tryPut(key, value, ++tries);
 		case B:
-			return concSkipListMap.put(key, value);
+			return lastSnapshot.concSkipListMap.put(key, value);
 		case AB:
-			return concSkipListMap.put(key, value);
-		case ABinit:
-			while (hyState.get().state.equals(State.ABinit))
-				;
-			return tryPut(key, value, 0);
+			return lastSnapshot.concSkipListMap.put(key, value);
 		}
 		return null;
 	}
@@ -146,44 +147,45 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	public V putIfAbsent(Integer key, V value) {
 		HyState<V> lastSnapshot = hyState.get();
 		switch (lastSnapshot.state) {
-		case A:
+		case A: {
 			IntTreePMap<V> snapShot = lastSnapshot.pureMap;
 			if (snapShot.containsKey(key)) {
 				return snapShot.get(key);
 			}
 			return put(key, value);
-		case B:
-			if (concSkipListMap.containsKey(key)
-					&& concSkipListMap.get(key) == null) {
-				return concSkipListMap.put(key, value);
+		}
+		case B: {
+			if (lastSnapshot.concSkipListMap.containsKey(key)
+					&& lastSnapshot.concSkipListMap.get(key) == null) {
+				return lastSnapshot.concSkipListMap.put(key, value);
 			} else {
-				return concSkipListMap.putIfAbsent(key, value);
+				return lastSnapshot.concSkipListMap.putIfAbsent(key, value);
 			}
-		case AB:
-			snapShot = lastSnapshot.pureMap;
-			if (!concSkipListMap.containsKey(key) && snapShot.containsKey(key)) {
+		}
+		case AB: {
+			IntTreePMap<V> snapShot = lastSnapshot.pureMap;
+			if (!lastSnapshot.concSkipListMap.containsKey(key)
+					&& snapShot.containsKey(key)) {
 				return snapShot.get(key);
 			}
-			if (concSkipListMap.containsKey(key)
-					&& concSkipListMap.get(key) == null) {
-				concSkipListMap.put(key, value);
+			if (lastSnapshot.concSkipListMap.containsKey(key)
+					&& lastSnapshot.concSkipListMap.get(key) == null) {
+				lastSnapshot.concSkipListMap.put(key, value);
 			} else {
-				return concSkipListMap.putIfAbsent(key, value);
+				return lastSnapshot.concSkipListMap.putIfAbsent(key, value);
 			}
-		case ABinit:
-			while (hyState.get().state.equals(State.ABinit))
-				;
-			return putIfAbsent(key, value);
+		}
 		}
 		return null;
 	}
 
 	protected void copyFromPureIfAbsent(Integer key, V value) {
 
-		if (concSkipListMap.containsKey(key)) {
+		HyState<V> lastSnapshot = hyState.get();
+		if (lastSnapshot.concSkipListMap.containsKey(key)) {
 			return;
 		} else {
-			concSkipListMap.putIfAbsent(key, value);
+			lastSnapshot.concSkipListMap.putIfAbsent(key, value);
 		}
 	}
 
@@ -210,15 +212,11 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 			}
 			return tryRemove(key, ++tries);
 		case B:
-			return concSkipListMap.remove(key);
+			return lastSnapshot.concSkipListMap.remove(key);
 		case AB:
-			V previous = concSkipListMap.get(key);
-			concSkipListMap.put((Integer) key, null);
+			V previous = lastSnapshot.concSkipListMap.get(key);
+			lastSnapshot.concSkipListMap.put((Integer) key, null);
 			return previous;
-		case ABinit:
-			while (hyState.get().state.equals(State.ABinit))
-				;
-			return tryRemove(key, 0);
 		}
 		return null;
 	}
@@ -227,7 +225,6 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 	public void clear() {
 		hyState = new AtomicReference<HyState<V>>(new HyState<V>(State.A,
 				IntTreePMap.empty()));
-		concSkipListMap.clear();
 	}
 
 	@Override
@@ -235,18 +232,30 @@ public class HybridIntMap<V> implements Map<Integer, V> {
 		HyState<V> lastSnapshot = hyState.get();
 		switch (lastSnapshot.state) {
 		case A:
-			return lastSnapshot.pureMap.toString();
+			return "A >>> " + lastSnapshot.pureMap.toString();
 		case B:
-			return concSkipListMap.toString();
-		default:// ABinit and AB
-			return lastSnapshot.pureMap.toString() + "\n"
-					+ concSkipListMap.toString();
+			return "B >>> " + lastSnapshot.concSkipListMap.toString();
+		case AB:
+			return "AB >>> " + lastSnapshot.pureMap.toString() + "\n"
+					+ lastSnapshot.concSkipListMap.toString();
 		}
+		return null;
 	}
 
 	@Override
 	public int size() {
-		// TODO Auto-generated method stub
+		HyState<V> lastSnapshot = hyState.get();
+		switch (lastSnapshot.state) {
+		case A:
+			return lastSnapshot.pureMap.size();
+		case B:
+			return lastSnapshot.concSkipListMap.size();
+		case AB:
+			HashSet<Integer> union = new HashSet<Integer>();
+			union.addAll(hyState.get().pureMap.keySet());
+			union.addAll(lastSnapshot.concSkipListMap.keySet());
+			return union.size();
+		}
 		return 0;
 	}
 
