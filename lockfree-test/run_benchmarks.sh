@@ -30,7 +30,7 @@ PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 "
 
 # PARBENCHES=" array-bag_hotcold-team-fill-N "
 
-PARBENCHES=" bag_random5050-N array-bag_hotcold-team-fill-N "
+PARBENCHES=" array-bag_hotcold-team-fill-N "
 
 
 # Criterion regressions
@@ -173,7 +173,7 @@ case $BENCHVARIANT in
     #     ;;
     hybrid)
 	echo "Running hybrid benchmarks..."
-        for cas_tries in 1 2 5 10; do
+        for cas_tries in 1 2; do
 	    CAS_TRIES=$cas_tries go
         done
 	;;
