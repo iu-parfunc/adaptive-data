@@ -128,15 +128,15 @@ function go() {
     # REPORT=report_seq_${executable}
     # runcritbench 1 $SEQBENCHES
 
-    REPORT=report_par_${executable}
-    for i in 13 14 15 16; do
-	runcritbench $i $PARBENCHES
-    done
-
     # REPORT=report_par_${executable}
-    # for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
+    # for i in 13 14 15 16; do
     #     runcritbench $i $PARBENCHES
     # done
+
+    REPORT=report_par_${executable}
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+        runcritbench $i $PARBENCHES
+    done
 
     if [ $? = 0 ]; then
 	mkdir -p reports
