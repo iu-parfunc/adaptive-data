@@ -25,7 +25,13 @@ ghc --version
 
 # Run only certain benchmarks from the criterion suite:
 # SEQBENCHES=""
+
 PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 "
+
+# PARBENCHES=" array-bag_hotcold-team-fill-N "
+
+PARBENCHES=" bag_random5050-N array-bag_hotcold-team-fill-N "
+
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
@@ -65,7 +71,8 @@ which $CRITUPLOAD
 #    database with the correct format.
 #
 # E.g. in build #7.
-CABAL=cabal-1.22
+# CABAL=cabal-1.22
+CABAL=cabal
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
@@ -109,7 +116,7 @@ function go() {
     $CABAL sandbox init
     # Grab the Chase-Lev deque packages from the submodule.
 #    $CABAL install ../haskell-lockfree/chaselev-deque
-    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS . ../haskell-lockfree/chaselev-deque
+#    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS . ../haskell-lockfree/chaselev-deque
     $CABAL configure $CONFOPTS -f-debug
     $CABAL build ${executable}
     
@@ -127,9 +134,14 @@ function go() {
     # runcritbench 1 $SEQBENCHES
 
     REPORT=report_par_${executable}
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
+    for i in 13 14 15 16; do
 	runcritbench $i $PARBENCHES
     done
+
+    # REPORT=report_par_${executable}
+    # for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 24 32; do
+    #     runcritbench $i $PARBENCHES
+    # done
 
     if [ $? = 0 ]; then
 	mkdir -p reports
