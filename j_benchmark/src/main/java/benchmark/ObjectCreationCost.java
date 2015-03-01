@@ -11,13 +11,9 @@ public class ObjectCreationCost {
 	private int numNewObjects;
 	private boolean warmUp;
 	private String mapType;
-	private ConcurrentSkipListMap[] scalableArray = new ConcurrentSkipListMap[10];
-	private HybridIntMap[] hybridArray = new HybridIntMap[10];
-	private PureIntMap[] pureArray = new PureIntMap[10];
-
-	// private ArrayList<ConcurrentSkipListMap<Integer, Integer>> scalableArray;
-	// private ArrayList<HybridIntMap<Integer>> hybridArray;
-	// private ArrayList<PureIntMap<Integer>> pureArray;
+	private ArrayList<ConcurrentSkipListMap<Integer, Integer>> scalableArray;
+	private ArrayList<HybridIntMap<Integer>> hybridArray;
+	private ArrayList<PureIntMap<Integer>> pureArray;
 
 	public ObjectCreationCost(String mapType, int numNewObjects) {
 
@@ -33,7 +29,7 @@ public class ObjectCreationCost {
 			init(numNewObjects, false);
 			timeTaken = benchPure();
 			for (int i = 1; i < numNewObjects; i *= 10) {
-				pureArray[i % 10].put(new Integer(i), new Integer(i));
+				pureArray.get(i % 10).put(new Integer(i), new Integer(i));
 			}
 			break;
 		case "hybrid":
@@ -42,7 +38,7 @@ public class ObjectCreationCost {
 			init(numNewObjects, false);
 			timeTaken = benchHybrid();
 			for (int i = 1; i < numNewObjects; i *= 10) {
-				hybridArray[i % 10].put(new Integer(i), new Integer(i));
+				hybridArray.get(i % 10).put(new Integer(i), new Integer(i));
 			}
 			break;
 		case "scalable":
@@ -51,7 +47,7 @@ public class ObjectCreationCost {
 			init(numNewObjects, false);
 			timeTaken = benchScalable();
 			for (int i = 1; i < numNewObjects; i *= 10) {
-				scalableArray[i % 10].put(new Integer(i), new Integer(i));
+				scalableArray.get(i % 10).put(new Integer(i), new Integer(i));
 			}
 			break;
 		}
@@ -64,13 +60,12 @@ public class ObjectCreationCost {
 	private long benchScalable() {
 
 		long startTime = System.currentTimeMillis();
-		// for (int i = 0; i < 10; i++) {
-		// scalableArray.add(new ConcurrentSkipListMap<Integer, Integer>());
-		// }
+		for (int i = 0; i < 10; i++) {
+			scalableArray.add(new ConcurrentSkipListMap<Integer, Integer>());
+		}
 		for (int i = 0; i < numNewObjects; i++) {
-			// scalableArray.add(i % 10,
-			// new ConcurrentSkipListMap<Integer, Integer>());
-			scalableArray[i % 10] = new ConcurrentSkipListMap<Integer, Integer>();
+			scalableArray.set(i % 10,
+					new ConcurrentSkipListMap<Integer, Integer>());
 		}
 		long endTime = System.currentTimeMillis();
 		return (endTime - startTime);
@@ -79,12 +74,11 @@ public class ObjectCreationCost {
 	private long benchHybrid() {
 
 		long startTime = System.currentTimeMillis();
-		// for (int i = 0; i < 10; i++) {
-		// hybridArray.add(new HybridIntMap<Integer>());
-		// }
+		for (int i = 0; i < 10; i++) {
+			hybridArray.add(new HybridIntMap<Integer>());
+		}
 		for (int i = 0; i < numNewObjects; i++) {
-			// hybridArray.add(i % 10, new HybridIntMap<Integer>());
-			hybridArray[i % 10] = new HybridIntMap<Integer>();
+			hybridArray.set(i % 10, new HybridIntMap<Integer>());
 		}
 		long endTime = System.currentTimeMillis();
 		return (endTime - startTime);
@@ -93,30 +87,28 @@ public class ObjectCreationCost {
 	private long benchPure() {
 
 		long startTime = System.currentTimeMillis();
-		// for (int i = 0; i < 10; i++) {
-		// pureArray.add(new PureIntMap<Integer>());
-		// }
+		for (int i = 0; i < 10; i++) {
+			pureArray.add(new PureIntMap<Integer>());
+		}
 		for (int i = 0; i < numNewObjects; i++) {
-			// pureArray.add(i % 10, new PureIntMap<Integer>());
-			pureArray[i % 10] = new PureIntMap<Integer>();
+			pureArray.set(i % 10, new PureIntMap<Integer>());
 		}
 		long endTime = System.currentTimeMillis();
 		return (endTime - startTime);
 	}
 
 	private void init(int numNewObjects, boolean warmUp) {
-		// switch (mapType) {
-		// case "pure":
-		// pureArray = new ArrayList<PureIntMap<Integer>>();
-		// break;
-		// case "hybrid":
-		// hybridArray = new ArrayList<HybridIntMap<Integer>>();
-		// break;
-		// case "scalable":
-		// scalableArray = new ArrayList<ConcurrentSkipListMap<Integer,
-		// Integer>>();
-		// break;
-		// }
+		switch (mapType) {
+		case "pure":
+			pureArray = new ArrayList<PureIntMap<Integer>>();
+			break;
+		case "hybrid":
+			hybridArray = new ArrayList<HybridIntMap<Integer>>();
+			break;
+		case "scalable":
+			scalableArray = new ArrayList<ConcurrentSkipListMap<Integer, Integer>>();
+			break;
+		}
 		this.numNewObjects = numNewObjects;
 		this.warmUp = warmUp;
 		if (!warmUp) {
