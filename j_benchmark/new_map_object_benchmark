@@ -12,7 +12,7 @@ fi
 $MAVEN clean
 $MAVEN package 
 
-NUM_NEW_OBJECTS=10000000
+NUM_NEW_OBJECTS=1000000
 $JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost pure $NUM_NEW_OBJECTS
 $JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost scalable $NUM_NEW_OBJECTS
 $JAVA_EXEC -cp target/j_benchmark-0.0.1.jar benchmark.ObjectCreationCost hybrid $NUM_NEW_OBJECTS
