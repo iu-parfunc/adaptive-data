@@ -8,7 +8,6 @@ import Control.Concurrent
 newtype EntryRef t = EntryRef (IORef (EntryVal t))
 data EntryVal t = Val t | Copied t
 
-
 -- need more details about atomic operations
 atomicModifyEntryRef' :: EntryRef a -> (a -> a) -> IO (a, Maybe a)
 atomicModifyEntryRef' = undefined
