@@ -5,12 +5,12 @@ import Data.IORef
 import Data.Atomics
 import Control.Concurrent
 
-newtype EntryRef t = MkEntryRef (IORef (EntryVal t))
+newtype EntryRef t = EntryRef (IORef (EntryVal t))
 data EntryVal t = Val t | Copied t
 
 
 -- need more details about atomic operations
-atomicModifyEntryRef' :: EntryRef a -> (a -> a) -> IO (a)
+atomicModifyEntryRef' :: EntryRef a -> (a -> a) -> IO (a, Maybe a)
 atomicModifyEntryRef' = undefined
 -- RRN: See atomicModifyIORefCAS for reference
 
