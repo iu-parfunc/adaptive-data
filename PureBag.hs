@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Data.Concurrent.PureBag
+module PureBag
        (
          PureBag
        , newBag
@@ -10,12 +10,13 @@ module Data.Concurrent.PureBag
 
 import Data.Atomics
 import Data.IORef
+import EntryRef
 
-type PureBag a = IORef [a]
+type PureBag a = EntryRef [a]
 
 {-# INLINABLE newBag #-}
 newBag :: IO (PureBag a)
-newBag = newIORef []
+newBag = newEntryRef []
 
 {-# INLINABLE add #-}
 add :: PureBag a -> a -> IO (Maybe a)
@@ -23,10 +24,13 @@ add bag !x =   loop =<< readForCAS bag
  where
  loop tik = do
    let !rst = peekTicket tik
-   (success, t2) <- casIORef bag tik (x:rst)
-   if success
-     then return (Just x)
-     else return Nothing
+     in case rst of
+     Val rst -> 
+       do (success, t2) <- casIORef bag tik $ Val (x:rst) ;
+              if success
+              then return (Just x)
+              else return Nothing
+     Copied _ -> return Nothing
 
 {-# INLINABLE remove #-}
 remove :: PureBag a -> IO (Maybe a)
@@ -34,13 +38,12 @@ remove bag = loop =<< readForCAS bag
  where
  loop tik = 
   case peekTicket tik of
-   [] -> return Nothing
-   (x:xs) -> do
-     (success, t2) <- casIORef bag tik xs
-     if success
-       then return (Just x)
-       else return Nothing
-
--- remove bag = atomicModifyIORefCAS bag pop
---   where pop [] = ([], Nothing)
---         pop (x:xs) = (xs, Just x)
+  Val rst ->
+    case rst of
+    [] -> return Nothing
+    (x:xs) -> do
+      (success, t2) <- casIORef bag tik $ Val xs
+      if success
+        then return (Just x)
+        else return Nothing
+  Copied _ -> return Nothing
