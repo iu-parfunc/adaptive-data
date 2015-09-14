@@ -20,30 +20,27 @@ newBag = newEntryRef []
 
 {-# INLINABLE add #-}
 add :: PureBag a -> a -> IO (Maybe a)
-add bag !x =   loop =<< readForCAS bag 
- where
- loop tik = do
-   let !rst = peekTicket tik
-     in case rst of
-     Val rst -> 
-       do (success, t2) <- casIORef bag tik $ Val (x:rst) ;
-              if success
-              then return (Just x)
-              else return Nothing
-     Copied _ -> return Nothing
+add bag !x = do
+  tik <- readForCAS bag
+  case peekTicket tik of
+    Val rst -> 
+      do (success, t2) <- casIORef bag tik $ Val (x:rst) ;
+         if success
+           then return (Just x)
+           else return Nothing
+    Copied _ -> return Nothing
 
 {-# INLINABLE remove #-}
 remove :: PureBag a -> IO (Maybe a)
-remove bag = loop =<< readForCAS bag
- where
- loop tik = 
+remove bag = do
+  tik <- readForCAS bag
   case peekTicket tik of
-  Val rst ->
-    case rst of
-    [] -> return Nothing
-    (x:xs) -> do
-      (success, t2) <- casIORef bag tik $ Val xs
-      if success
-        then return (Just x)
-        else return Nothing
-  Copied _ -> return Nothing
+    Val rst ->
+      case rst of
+      [] -> return Nothing
+      (x:xs) -> do
+        (success, t2) <- casIORef bag tik $ Val xs
+        if success
+          then return (Just x)
+          else return Nothing
+    Copied _ -> return Nothing
