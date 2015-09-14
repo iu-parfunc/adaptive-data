@@ -18,12 +18,12 @@ import Data.Bits
 import Data.Atomics.Vector
 import qualified Data.Atomics.Counter as C
 import Data.TLS.PThread
-import Data.Vector.Mutable as V
+import qualified Data.Vector as V
 import System.IO.Unsafe (unsafePerformIO)
 import EntryRef
 
 dbgPrint :: String -> IO ()
-#if 0
+#if 1
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
@@ -32,7 +32,7 @@ dbgPrint _ = return ()
 
 --------------------------------------------------------------------------------
 
-type ScalableBag a = IOVector (EntryVal [a])
+type ScalableBag a = V.Vector (EntryRef [a])
 
 {-# NOINLINE osThreadID #-}
 osThreadID :: TLS Int
@@ -54,7 +54,7 @@ padDiv x = shiftR x 3
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  V.replicate (padFactor * caps) (Val [])
+  V.replicateM (padFactor * caps) $ newEntryRef []
 
 add :: ScalableBag a -> a -> IO (Maybe a)
 add bag x = do
@@ -73,7 +73,7 @@ remove bag = do
   let idx = tid `mod` V.length bag
       retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
       retryLoop vec ix start = do
-        tick <- unsafeReadVectorElem bag ix;
+        tick <- readForCAS $ bag V.! ix;
         case peekTicket tick of
           Val v -> case v of
             [] -> let ix' = ix + 1 in
@@ -95,31 +95,31 @@ remove bag = do
 {-# INLINE insVector #-}
 insVector :: ScalableBag a -> a -> Int -> IO (Maybe a)
 insVector vec x ix = 
-  do !tick <- readVectorElem vec ix;
+  do !tick <- readForCAS $ vec V.! ix;
      case peekTicket tick of
        Val v ->
          let !newVal = Val $ x:v
          in do
-           (success, tick') <- casVectorElem vec ix tick newVal;
-           dbgPrint$ show success
+           (success, tick') <- casIORef (vec V.! ix) tick newVal;
+           dbgPrint$ "ins: CAS["++show ix++"]="++show success
            if success
              then return (Just x)
-             else return Nothing
+             else insVector vec x ix
        Copied _ ->
          return Nothing
 
 {-# INLINE popVector #-}
 popVector :: ScalableBag a -> Int -> IO (Maybe a)
 popVector vec ix =
-  do !tick <- readVectorElem vec ix
+  do !tick <- readForCAS $ vec V.! ix
      case peekTicket tick of
           Val v ->
             case v of
             x:xs -> do
-              (success, tick') <- casVectorElem vec ix tick $ Val xs
+              (success, tick') <- casIORef (vec V.! ix) tick $ Val xs
+              dbgPrint$ "rem: CAS["++show ix++"]="++show success
               if success
                 then return (Just x)
                 else return Nothing
             [] -> return Nothing
           Copied _ -> return Nothing
-
