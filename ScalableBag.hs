@@ -23,7 +23,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import EntryRef
 
 dbgPrint :: String -> IO ()
-#if 1
+#if 0
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
@@ -104,7 +104,7 @@ insVector vec x ix =
            dbgPrint$ "ins: CAS["++show ix++"]="++show success
            if success
              then return (Just x)
-             else insVector vec x ix
+             else return Nothing
        Copied _ ->
          return Nothing
 
