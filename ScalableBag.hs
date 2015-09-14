@@ -23,7 +23,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import EntryRef
 
 dbgPrint :: String -> IO ()
-#if 1
+#if 0
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
@@ -100,7 +100,6 @@ insVector vec x ix =
        Val v ->
          let !newVal = Val $ x:v
          in do
-           dbgPrint$ "ix "++show ix
            (success, tick') <- casVectorElem vec ix tick newVal;
            dbgPrint$ show success
            if success
