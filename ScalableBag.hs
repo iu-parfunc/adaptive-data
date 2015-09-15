@@ -15,15 +15,15 @@ module ScalableBag
 import Control.Concurrent
 import Data.Atomics
 import Data.Bits
-import Data.Atomics.Vector
 import qualified Data.Atomics.Counter as C
 import Data.TLS.PThread
-import qualified Data.Vector as V
+import Data.Primitive.Array
 import System.IO.Unsafe (unsafePerformIO)
 import EntryRef
+import Control.Monad.ST
 
 dbgPrint :: String -> IO ()
-#if 0
+#if 1
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
@@ -32,7 +32,8 @@ dbgPrint _ = return ()
 
 --------------------------------------------------------------------------------
 
-type ScalableBag a = V.Vector (EntryRef [a])
+type SBag a = MutableArray RealWorld (EntryVal [a])
+type ScalableBag a = (SBag a, Int)
 
 {-# NOINLINE osThreadID #-}
 osThreadID :: TLS Int
@@ -54,70 +55,73 @@ padDiv x = shiftR x 3
 newBag :: IO (ScalableBag a)
 newBag = do
   caps <- getNumCapabilities
-  V.replicateM (padFactor * caps) $ newEntryRef []
+  let length = padFactor * caps
+  array <- newArray (padFactor * caps) (Val [])
+  let bag = (array, length)
+  return bag
 
 add :: ScalableBag a -> a -> IO (Maybe a)
-add bag x = do
+add (bag, length) x = do
   tid <- getTLS osThreadID
-  let len = padDiv (V.length bag)
+  let len = padDiv length
   dbgPrint$ "tid "++show tid++"Length of bag: "++show len
   -- We try to keep this collision-free:
   let idx = tid `mod` len
       idx' = padFactor * idx
   dbgPrint$ "tid "++show tid++" going into CAS loop on index "++show idx'
-  insVector bag x idx'
+  pushArray bag idx' x
 
 remove :: ScalableBag a -> IO (Maybe a)
-remove bag = do
+remove (bag, length) = do
   tid <- getTLS osThreadID
-  let idx = tid `mod` V.length bag
-      retryLoop vec ix start | ix >= V.length vec = retryLoop vec 0 start
+  let idx = tid `mod` length
+      retryLoop vec ix start | ix >= length = retryLoop vec 0 start
       retryLoop vec ix start = do
-        tick <- readForCAS $ bag V.! ix;
+        tick <- readArrayElem vec ix;
         case peekTicket tick of
           Val v -> case v of
             [] -> let ix' = ix + 1 in
-              if ix' == start || (ix' >= V.length vec && start == 0)
+              if ix' == start || (ix' >= length && start == 0)
               then return Nothing -- looped around once, nothing to pop
               else retryLoop vec ix' start -- keep going
             _ -> do
-              res <- popVector bag ix
+              res <- popArray vec ix
               case res of
                 Nothing -> retryLoop vec ix start -- someone else stole what we were going to pop
                 jx -> return jx
           Copied _ ->
             let ix' = ix + 1 in
-            if ix' == start || (ix' >= V.length vec && start == 0)
+            if ix' == start || (ix' >= length && start == 0)
             then return Nothing -- looped around once, nothing to pop
             else retryLoop vec ix' start -- keep going
   retryLoop bag idx idx
 
-{-# INLINE insVector #-}
-insVector :: ScalableBag a -> a -> Int -> IO (Maybe a)
-insVector vec x ix = 
-  do !tick <- readForCAS $ vec V.! ix;
+{-# INLINE pushArray #-}
+pushArray :: SBag a -> Int -> a -> IO (Maybe a)
+pushArray ary ix x = 
+  do !tick <- readArrayElem ary ix;
      case peekTicket tick of
-       Val v ->
-         let !newVal = Val $ x:v
+       Val xs ->
+         let !newVal = Val $ x:xs
          in do
-           (success, tick') <- casIORef (vec V.! ix) tick newVal;
-           dbgPrint$ "ins: CAS["++show ix++"]="++show success
+           (success, tick') <- casArrayElem ary ix tick newVal;
+           dbgPrint$ "push CAS["++show ix++"]="++show success
            if success
              then return (Just x)
-             else return Nothing
+             else pushArray ary ix x
        Copied _ ->
          return Nothing
 
-{-# INLINE popVector #-}
-popVector :: ScalableBag a -> Int -> IO (Maybe a)
-popVector vec ix =
-  do !tick <- readForCAS $ vec V.! ix
+{-# INLINE popArray #-}
+popArray :: SBag a -> Int -> IO (Maybe a)
+popArray vec ix =
+  do !tick <- readArrayElem vec ix
      case peekTicket tick of
           Val v ->
             case v of
             x:xs -> do
-              (success, tick') <- casIORef (vec V.! ix) tick $ Val xs
-              dbgPrint$ "rem: CAS["++show ix++"]="++show success
+              (success, tick') <- casArrayElem vec ix tick $ Val xs
+              dbgPrint$ "pop: CAS["++show ix++"]="++show success
               if success
                 then return (Just x)
                 else return Nothing
