@@ -24,6 +24,7 @@ import EntryRef
 data Hybrid a = A !(PB.PureBag a) Int
               | AB !(PB.PureBag a) !(SB.ScalableBag a) Int
               | B !(SB.ScalableBag a) Int
+              | BA !(SB.ScalableBag a) !(PB.PureBag a) Int
 
 type AdaptiveBag a = IORef (Hybrid a)
 
@@ -62,7 +63,11 @@ add bag x = do
       case result of
         Just x -> return ()
         Nothing -> add bag x
-
+    BA sbag pbag _ -> do
+      result <- PB.add pbag x
+      case result of
+        Just x -> return ()
+        Nothing -> add bag x
 
 -- Attempt to pop from the bag, returning Nothing if it's empty.
 remove :: AdaptiveBag a -> IO (Maybe a)
@@ -103,9 +108,21 @@ remove bag = do
           if empty
             then return Nothing
             else remove bag
+    BA sbag pbag thresh -> do
+      result <- SB.remove sbag
+      case result of
+        Just x -> return (Just x)
+        Nothing -> do
+          empty <- SB.empty sbag
+          if empty
+            then casIORef bag tick (A pbag thresh) >> remove bag
+            else remove bag
 
 transition :: AdaptiveBag a -> IO ()
 transition bag = do
+  let mark x = case x of
+        Val v -> Copied v
+        Copied v -> Copied v
   tick <- readForCAS bag
   case peekTicket tick of
     A pbag thresh -> do
@@ -115,8 +132,12 @@ transition bag = do
         then transition bag
         else return ()
     AB pbag sbag _ -> do
-      PB.transition pbag
-        (\x -> case x of
-           Val v -> Copied v
-           Copied v -> Copied v)
-    _ -> return ()
+      PB.transition pbag mark
+    B sbag thresh ->  do
+      pbag <- PB.newPureBag
+      (success, _) <- casIORef bag tick (BA sbag pbag thresh)
+      if success
+        then transition bag
+        else return ()
+    BA sbag pbag _ -> do
+      SB.transition sbag mark
