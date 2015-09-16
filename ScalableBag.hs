@@ -78,22 +78,33 @@ remove (bag, length) = do
       retryLoop vec ix start | ix >= length = retryLoop vec 0 start
       retryLoop vec ix start = do
         tick <- readArrayElem vec ix;
-        case peekTicket tick of
+        let ix' = ix + 1 in
+          case peekTicket tick of
           Val v -> case v of
-            [] -> let ix' = ix + 1 in
+            [] -> 
               if ix' == start || (ix' >= length && start == 0)
               then return Nothing -- looped around once, nothing to pop
               else retryLoop vec ix' start -- keep going
             _ -> do
-              res <- popArray vec ix
+              res <- popArray vec ix pop
               case res of
-                Nothing -> retryLoop vec ix start -- someone else stole what we were going to pop
+                Nothing -> retryLoop vec ix' start -- someone else stole what we were going to pop
                 jx -> return jx
-          Copied _ ->
-            let ix' = ix + 1 in
-            if ix' == start || (ix' >= length && start == 0)
-            then return Nothing -- looped around once, nothing to pop
-            else retryLoop vec ix' start -- keep going
+          Copied v -> case v of 
+            [] -> 
+              if ix' == start || (ix' >= length && start == 0)
+              then return Nothing -- looped around once, nothing to pop
+              else retryLoop vec ix' start -- keep going
+            _ -> do
+              res <- popArray vec ix pop
+              case res of
+                Nothing -> retryLoop vec ix' start -- someone else stole what we were going to pop
+                jx -> return jx
+                
+      pop v = case v of
+        Val (x:xs) -> Just (x, Val xs)
+        Copied (x:xs) -> Just (x, Val xs)
+        _ -> Nothing
   retryLoop bag idx idx
 
 {-# INLINE pushArray #-}
@@ -104,26 +115,25 @@ pushArray ary ix x =
        Val xs ->
          let !newVal = Val $ x:xs
          in do
-           (success, tick') <- casArrayElem ary ix tick newVal;
+           (success, tick') <- casArrayElem ary ix tick newVal
            dbgPrint$ "push CAS["++show ix++"]="++show success
            if success
              then return (Just x)
-             else pushArray ary ix x
+             else return Nothing
        Copied _ ->
          return Nothing
 
 {-# INLINE popArray #-}
-popArray :: SBag a -> Int -> IO (Maybe a)
-popArray vec ix =
+popArray :: SBag a -> Int -> (EntryVal [a] -> Maybe(a, EntryVal [a])) -> IO (Maybe a)
+popArray vec ix f =
   do !tick <- readArrayElem vec ix
-     case peekTicket tick of
-          Val v ->
-            case v of
-            x:xs -> do
-              (success, tick') <- casArrayElem vec ix tick $ Val xs
-              dbgPrint$ "pop: CAS["++show ix++"]="++show success
-              if success
-                then return (Just x)
-                else return Nothing
-            [] -> return Nothing
-          Copied _ -> return Nothing
+     let !newVal = f $ peekTicket tick
+     case newVal of
+       Just (x, xs) -> do
+         (success, tick') <- casArrayElem vec ix tick xs
+         dbgPrint$ "pop: CAS["++show ix++"]="++show success
+         if success
+           then return (Just x)
+           else return Nothing
+       Nothing ->
+         return Nothing
