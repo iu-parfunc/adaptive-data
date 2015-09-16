@@ -104,28 +104,14 @@ remove bag = do
             else remove bag
 
 transition :: AdaptiveBag a -> IO ()
-transition = undefined
-{-
 transition bag = do
   tick <- readForCAS bag
   case peekTicket tick of
-    Pure _ xs -> do
-      caps <- getNumCapabilities
-      scalable <- SB.newBag
-      (success, _) <- casIORef bag tick (Trans xs scalable)
-      when success $ do
-        forkIO $ forM_ xs (SB.add scalable)
-        casLoop_ bag (const $ LockFree scalable)
+    A pbag thresh -> do
+      sbag <- SB.newScalableBag
+      (success, _) <- casIORef bag tick (AB pbag sbag)
+      if success
+        then return ()
+        else transition bag
     _ -> return ()
 
-casLoop_ :: IORef a -> (a -> a) -> IO ()
-casLoop_ ref f = casLoop ref f'
-  where f' x = (f x, ())
-
-casLoop :: IORef a -> (a -> (a, b)) -> IO b
-casLoop ref f = retryLoop =<< readForCAS ref
-  where retryLoop tick = do
-          let (new, ret) = f $! peekTicket tick
-          (success, tick') <- casIORef ref tick new
-          if success then return ret else retryLoop tick'
--}
