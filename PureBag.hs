@@ -2,9 +2,10 @@
 module PureBag
        (
          PureBag
-       , newBag
+       , newPureBag
        , add
        , remove
+       , empty
        )
        where
 
@@ -14,9 +15,18 @@ import EntryRef
 
 type PureBag a = EntryRef [a]
 
-{-# INLINABLE newBag #-}
-newBag :: IO (PureBag a)
-newBag = newEntryRef []
+{-# INLINABLE newPureBag #-}
+newPureBag :: IO (PureBag a)
+newPureBag = newEntryRef []
+
+{-# INLINABLE empty #-}
+empty :: PureBag a -> IO (Bool)
+empty bag = do
+  tik <- readForCAS bag
+  case peekTicket tik of
+    Val (x:xs) -> return False
+    Copied (x:xs) -> return False
+    _ -> return True
 
 {-# INLINABLE add #-}
 add :: PureBag a -> a -> IO (Maybe a)

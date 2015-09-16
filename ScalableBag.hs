@@ -5,10 +5,11 @@
 module ScalableBag
        (
          ScalableBag
-       , newBag
+       , newScalableBag
        , add
        , remove
        , osThreadID
+       , empty
        )
        where
 
@@ -52,13 +53,24 @@ padFactor = 8
 padDiv :: Int -> Int
 padDiv x = shiftR x 3
 
-newBag :: IO (ScalableBag a)
-newBag = do
+newScalableBag :: IO (ScalableBag a)
+newScalableBag = do
   caps <- getNumCapabilities
   let length = padFactor * caps
   array <- newArray (padFactor * caps) (Val [])
   let bag = (array, length)
   return bag
+
+empty :: ScalableBag a -> IO (Bool)
+empty (bag, length) =
+  let loop i | i >= length = return True
+      loop i = do
+        tick <- readArrayElem bag i
+        case peekTicket tick of
+          Val (x:xs) -> return False
+          Copied (x:xs) -> return False
+          _ -> loop $ i+1
+  in loop 0
 
 add :: ScalableBag a -> a -> IO (Maybe a)
 add (bag, length) x = do
