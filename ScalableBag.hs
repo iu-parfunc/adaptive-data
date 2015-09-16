@@ -10,6 +10,7 @@ module ScalableBag
        , remove
        , osThreadID
        , empty
+       , transition
        )
        where
 
@@ -149,3 +150,15 @@ popArray vec ix f =
            else return Nothing
        Nothing ->
          return Nothing
+
+transition :: ScalableBag a -> (EntryVal [a] -> EntryVal [a]) -> IO ()
+transition (bag, length) f = do
+  let loop i | i>= length = return ()
+      loop i = do
+        tik <- readArrayElem bag i
+        let newVal = f $ peekTicket tik
+        (success, t2) <- casArrayElem bag i tik newVal
+        if success
+          then loop $ i+1
+          else loop i
+  loop 0
