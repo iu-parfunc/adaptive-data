@@ -6,6 +6,7 @@ module PureBag
        , add
        , remove
        , empty
+       , transition
        )
        where
 
@@ -54,3 +55,12 @@ remove bag = do
           then return (Just x)
           else return Nothing
     Copied _ -> return Nothing
+
+transition :: PureBag a -> (EntryVal [a] -> EntryVal [a]) -> IO ()
+transition bag f = do
+    tik <- readForCAS bag
+    let newVal = f $ peekTicket tik
+    (success, t2) <- casIORef bag tik newVal
+    if success
+      then return ()
+      else transition bag f

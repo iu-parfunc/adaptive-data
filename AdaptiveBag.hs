@@ -19,6 +19,7 @@ import Unsafe.Coerce
 
 import qualified ScalableBag as SB
 import qualified PureBag as PB
+import EntryRef
 
 data Hybrid a = A !(PB.PureBag a) Int
               | AB !(PB.PureBag a) !(SB.ScalableBag a)
@@ -111,7 +112,11 @@ transition bag = do
       sbag <- SB.newScalableBag
       (success, _) <- casIORef bag tick (AB pbag sbag)
       if success
-        then return ()
-        else transition bag
+        then transition bag
+        else return ()
+    AB pbag sbag -> do
+      PB.transition pbag
+        (\x -> case x of
+           Val v -> Copied v
+           v -> error "Impossible")
     _ -> return ()
-
