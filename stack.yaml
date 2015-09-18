@@ -6,6 +6,7 @@ packages:
  - ./lockfree-test
  - ./concurrent-skiplist
  - ./haskell-lockfree/atomic-primops-vector
+ - ./chen_bag
 
 extra-deps:
  - atomic-primops-0.8
