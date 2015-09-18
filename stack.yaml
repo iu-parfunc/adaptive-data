@@ -1,0 +1,18 @@
+flags: {}
+
+packages:
+ # This is out of date:
+ # - '.'
+ - ./lockfree-test
+ - ./concurrent-skiplist
+ - ./haskell-lockfree/atomic-primops-vector
+
+extra-deps:
+ - atomic-primops-0.8
+ - chaselev-deque-0.5.0.5
+ - thread-local-storage-0.1.0.3
+
+# FIXME: released version requires atomic-primops-0.8:
+# - atomic-primops-vector-0.1.0.1
+
+resolver: lts-2.22
