@@ -1,3 +1,5 @@
 *.hi
 *.o
-*test*
+
+# This would ignore the "tests" directory.
+# *test*
