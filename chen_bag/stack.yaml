@@ -1,7 +1,12 @@
 flags: {}
+
 packages:
  - '.'
-extra-deps: 
+ # Temporary, need to update hackage:
+ - ../haskell-lockfree/atomic-primops-vector
+
+extra-deps:
  - thread-local-storage-0.1.0.3
+ - lockfree-queue-0.2.3.1
 
 resolver: lts-3.5

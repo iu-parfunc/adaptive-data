@@ -13,7 +13,6 @@ maintainer:          pfogg@indiana.edu
 -- copyright:
 -- category:
 build-type:          Simple
-extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
