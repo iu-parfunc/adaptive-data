@@ -42,7 +42,7 @@ add bag x = do
   tick <- readForCAS bag
   case peekTicket tick of
     A pbag thresh ->
-      let loop 0 = transition bag >> add bag x
+      let loop 0 = transition bag tick >> add bag x
           loop i = do
             tick <- readForCAS bag
             case peekTicket tick of
@@ -75,7 +75,7 @@ remove bag = do
   tick <- readForCAS bag
   case peekTicket tick of
     A pbag thresh -> 
-      let loop 0 = transition bag >> remove bag
+      let loop 0 = transition bag tick >> remove bag
           loop i = do
             tick <- readForCAS bag
             case peekTicket tick of
@@ -118,26 +118,25 @@ remove bag = do
             then casIORef bag tick (A pbag thresh) >> remove bag
             else remove bag
 
-transition :: AdaptiveBag a -> IO ()
-transition bag = do
+transition :: AdaptiveBag a -> Ticket (Hybrid a) -> IO ()
+transition bag tick = do
   let mark x = case x of
         Val v -> Copied v
         Copied v -> Copied v
-  tick <- readForCAS bag
   case peekTicket tick of
     A pbag thresh -> do
       sbag <- SB.newScalableBag
-      (success, _) <- casIORef bag tick (AB pbag sbag thresh)
+      (success, tick') <- casIORef bag tick (AB pbag sbag thresh)
       if success
-        then transition bag
+        then transition bag tick'
         else return ()
     AB pbag sbag _ -> do
       PB.transition pbag mark
     B sbag thresh ->  do
       pbag <- PB.newPureBag
-      (success, _) <- casIORef bag tick (BA sbag pbag thresh)
+      (success, tick') <- casIORef bag tick (BA sbag pbag thresh)
       if success
-        then transition bag
+        then transition bag tick'
         else return ()
     BA sbag pbag _ -> do
       SB.transition sbag mark
