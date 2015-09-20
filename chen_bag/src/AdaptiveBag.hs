@@ -11,11 +11,11 @@ module AdaptiveBag
        )
        where
 
-import Control.Concurrent
-import Control.Monad
+-- import Control.Concurrent
+-- import Control.Monad
 import Data.Atomics
 import Data.IORef
-import Unsafe.Coerce
+-- import Unsafe.Coerce
 
 import qualified ScalableBag as SB
 import qualified PureBag as PB
@@ -74,7 +74,7 @@ remove :: AdaptiveBag a -> IO (Maybe a)
 remove bag = do
   tick <- readForCAS bag
   case peekTicket tick of
-    A pbag thresh -> 
+    A pbag thresh ->
       let loop 0 = transition bag tick >> remove bag
           loop i = do
             tick <- readForCAS bag

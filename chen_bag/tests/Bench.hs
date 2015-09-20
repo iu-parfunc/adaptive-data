@@ -26,8 +26,8 @@ import qualified Data.TLS.PThread as TLS
 
 import qualified AdaptiveBag as AB
 import qualified PureBag as PB
+import qualified ScalableBag as SB
 -- import qualified Data.Concurrent.OldBag as OB
--- import qualified Data.Concurrent.ScalableBag as UB
 -- import qualified Data.Concurrent.ScalableBagBoxed  as SB
 -- import qualified Data.Concurrent.ScalableBagChaseLev as SBCL
 
@@ -223,13 +223,13 @@ main = do
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomFloats randomFloats (getNumEnvVar 0.5 "HOT_RATIO")) ]
 
-  pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
-  oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
-  scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
+  pure     <- mkBagBenchSet PB.newPureBag PB.add PB.remove
+--  oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
+  scalable <- mkBagBenchSet SB.newScalableBag SB.add SB.remove
   hybrid   <- mkBagBenchSet (AB.newBagThreshold $ getNumEnvVar 5 "CAS_TRIES") AB.add AB.remove
 
-  scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
-  scalableCL <- mkBagBenchSet SBCL.newBag SBCL.add SBCL.remove
+--  scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
+--  scalableCL <- mkBagBenchSet SBCL.newBag SBCL.add SBCL.remove
 
   -- These are not specific to an implementation:
   let basicBenchmarks =
@@ -241,7 +241,7 @@ main = do
            -- Sanity check about scalability:
         , bench ("team-separate-bags") $ Benchmarkable $ \ num ->
           let quota = num `quot` fromIntegral splits in
-          forkJoin splits (\_ -> do bg <- PB.newBag
+          forkJoin splits (\_ -> do bg <- PB.newPureBag
                                     for_ 1 quota (PB.add bg))
         ]
 
@@ -249,15 +249,15 @@ main = do
   let (args',list) =
        case args of
        "pure":t     -> (t,pure ++ basicBenchmarks)
-       "oldpure":t  -> (t,oldpure)
+--       "oldpure":t  -> (t,oldpure)
        "scalable":t -> (t,scalable)
-       "scalable-chaselev":t -> (t,scalableCL)
+--       "scalable-chaselev":t -> (t,scalableCL)
        "hybrid":t   -> (t,hybrid)
        t            -> (t,[ bgroup "pure"     pure,
-                            bgroup "oldpure"  oldpure,
+--                            bgroup "oldpure"  oldpure,
                             bgroup "scalable" scalable,
-                            bgroup "scalable-chaselev" scalableCL,
-                            bgroup "scalable-unbox" scalableUB,
+--                            bgroup "scalable-chaselev" scalableCL,
+--                            bgroup "scalable-unbox" scalableUB,
                             bgroup "hybrid"   hybrid,
                             bgroup "basic"    basicBenchmarks
                           ])

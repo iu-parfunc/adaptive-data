@@ -11,7 +11,7 @@ module PureBag
        where
 
 import Data.Atomics
-import Data.IORef
+-- import Data.IORef
 import EntryRef
 
 type PureBag a = EntryRef [a]
@@ -34,7 +34,7 @@ add :: PureBag a -> a -> IO (Maybe a)
 add bag !x = do
   tik <- readForCAS bag
   case peekTicket tik of
-    Val rst -> 
+    Val rst ->
       do (success, t2) <- casIORef bag tik $ Val (x:rst) ;
          if success
            then return (Just x)
