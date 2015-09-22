@@ -85,17 +85,17 @@ add (bag, length) x = do
   pushArray bag idx' x
 
 remove :: ScalableBag a -> IO (Maybe a)
-remove (bag, length) = do
+remove (bag, len) = do
   tid <- getTLS osThreadID
-  let idx = tid `mod` length
-      retryLoop vec ix start | ix >= length = retryLoop vec 0 start
+  let idx = tid `mod` len
+      retryLoop vec ix start | ix >= len = retryLoop vec 0 start
       retryLoop vec ix start = do
         tick <- readArrayElem vec ix;
         let ix' = ix + 1 in
           case peekTicket tick of
           Val v -> case v of
             [] -> 
-              if ix' == start || (ix' >= length && start == 0)
+              if ix' == start || (ix' >= len && start == 0)
               then return Nothing -- looped around once, nothing to pop
               else retryLoop vec ix' start -- keep going
             _ -> do
@@ -105,7 +105,7 @@ remove (bag, length) = do
                 jx -> return jx
           Copied v -> case v of 
             [] -> 
-              if ix' == start || (ix' >= length && start == 0)
+              if ix' == start || (ix' >= len && start == 0)
               then return Nothing -- looped around once, nothing to pop
               else retryLoop vec ix' start -- keep going
             _ -> do
