@@ -56,11 +56,13 @@ remove bag = do
           else return Nothing
     Copied _ -> return Nothing
 
-transition :: PureBag a -> (EntryVal [a] -> EntryVal [a]) -> IO ()
+transition :: PureBag a -> (EntryVal [a] -> (Bool, EntryVal [a])) -> IO ()
 transition bag f = do
     tik <- readForCAS bag
-    let newVal = f $ peekTicket tik
-    (success, t2) <- casIORef bag tik newVal
-    if success
-      then return ()
-      else transition bag f
+    let (copy, newVal) = f $ peekTicket tik
+    if copy
+      then do (success, t2) <- casIORef bag tik newVal
+              if success
+                then return ()
+                else transition bag f
+      else return ()

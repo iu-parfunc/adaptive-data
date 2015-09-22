@@ -151,14 +151,16 @@ popArray vec ix f =
        Nothing ->
          return Nothing
 
-transition :: ScalableBag a -> (EntryVal [a] -> EntryVal [a]) -> IO ()
+transition :: ScalableBag a -> (EntryVal [a] -> (Bool, EntryVal [a])) -> IO ()
 transition (bag, length) f = do
   let loop i | i>= length = return ()
       loop i = do
         tik <- readArrayElem bag i
-        let newVal = f $ peekTicket tik
-        (success, t2) <- casArrayElem bag i tik newVal
-        if success
-          then loop $ i+1
-          else loop i
+        let (copy, newVal) = f $ peekTicket tik
+        if copy
+          then do (success, t2) <- casArrayElem bag i tik newVal
+                  if success
+                    then loop $ i+1
+                    else loop i
+          else loop $ i+1
   loop 0

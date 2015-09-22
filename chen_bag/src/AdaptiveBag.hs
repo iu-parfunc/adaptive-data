@@ -121,8 +121,8 @@ remove bag = do
 transition :: AdaptiveBag a -> Ticket (Hybrid a) -> IO ()
 transition bag tick = do
   let mark x = case x of
-        Val v -> Copied v
-        Copied v -> Copied v
+        Val v -> (True, Copied v)
+        Copied v -> (False, Copied v)
   case peekTicket tick of
     A pbag thresh -> do
       sbag <- SB.newScalableBag
