@@ -41,44 +41,43 @@ add :: AdaptiveBag a -> a -> IO ()
 add bag x = do
   tick <- readForCAS bag
   case peekTicket tick of
-    A pbag thresh ->
-      let loop 0 = transition bag tick >> add bag x
-          loop i = do
-            tick <- readForCAS bag
-            case peekTicket tick of
+    A _ thresh ->
+      let loop 0 tick' = transition bag tick' >> add bag x
+          loop i tick' = do
+            case peekTicket tick' of
               A pbag _ -> do
                 result <- PB.add pbag x
-                case result of
-                  Just x -> return ()
-                  Nothing -> loop (i-1)
+                if result
+                  then return ()
+                  else do tick'' <- readForCAS bag
+                          loop (i-1) tick''
               _ -> add bag x
-      in loop thresh
-    AB pbag sbag _ -> do
+      in loop thresh tick
+    AB _ sbag _ -> do
       result <- SB.add sbag x
-      case result of
-        Just x -> return ()
-        Nothing -> add bag x
+      if result 
+        then return ()
+        else add bag x
     B sbag _ -> do
       result <- SB.add sbag x
-      case result of
-        Just x -> return ()
-        Nothing -> add bag x
-    BA sbag pbag _ -> do
+      if result 
+        then return ()
+        else add bag x
+    BA _ pbag _ -> do
       result <- PB.add pbag x
-      case result of
-        Just x -> return ()
-        Nothing -> add bag x
+      if result
+        then return ()
+        else add bag x
 
 -- Attempt to pop from the bag, returning Nothing if it's empty.
 remove :: AdaptiveBag a -> IO (Maybe a)
 remove bag = do
   tick <- readForCAS bag
   case peekTicket tick of
-    A pbag thresh ->
-      let loop 0 = transition bag tick >> remove bag
-          loop i = do
-            tick <- readForCAS bag
-            case peekTicket tick of
+    A _ thresh ->
+      let loop 0 tick' = transition bag tick' >> remove bag
+          loop i tick' = do
+            case peekTicket tick' of
               A pbag _ -> do
                 result <- PB.remove pbag
                 case result of
@@ -87,9 +86,10 @@ remove bag = do
                     empty <- PB.empty pbag
                     if empty
                       then return Nothing
-                      else loop (i-1)
+                      else do tick'' <- readForCAS bag
+                              loop (i-1) tick''
               _ -> remove bag
-      in loop thresh
+      in loop thresh tick
     AB pbag sbag thresh -> do
       result <- PB.remove pbag
       case result of
@@ -130,7 +130,7 @@ transition bag tick = do
       if success
         then transition bag tick'
         else return ()
-    AB pbag sbag _ -> do
+    AB pbag _ _ -> do
       PB.transition pbag mark
     B sbag thresh ->  do
       pbag <- PB.newPureBag
@@ -138,5 +138,5 @@ transition bag tick = do
       if success
         then transition bag tick'
         else return ()
-    BA sbag pbag _ -> do
+    BA sbag _ _ -> do
       SB.transition sbag mark

@@ -57,26 +57,26 @@ padDiv x = shiftR x 3
 newScalableBag :: IO (ScalableBag a)
 newScalableBag = do
   caps <- getNumCapabilities
-  let length = padFactor * caps
+  let len = padFactor * caps
   array <- newArray (padFactor * caps) (Val [])
-  let bag = (array, length)
+  let bag = (array, len)
   return bag
 
 empty :: ScalableBag a -> IO (Bool)
-empty (bag, length) =
-  let loop i | i >= length = return True
+empty (bag, len) =
+  let loop i | i >= len = return True
       loop i = do
         tick <- readArrayElem bag i
         case peekTicket tick of
-          Val (x:xs) -> return False
-          Copied (x:xs) -> return False
+          Val (_:_) -> return False
+          Copied (_:_) -> return False
           _ -> loop $ i+1
   in loop 0
 
-add :: ScalableBag a -> a -> IO (Maybe a)
-add (bag, length) x = do
+add :: ScalableBag a -> a -> IO (Bool)
+add (bag, len') x = do
   tid <- getTLS osThreadID
-  let len = padDiv length
+  let len = padDiv len'
   dbgPrint$ "tid "++show tid++"Length of bag: "++show len
   -- We try to keep this collision-free:
   let idx = tid `mod` len
@@ -121,20 +121,18 @@ remove (bag, len) = do
   retryLoop bag idx idx
 
 {-# INLINE pushArray #-}
-pushArray :: SBag a -> Int -> a -> IO (Maybe a)
+pushArray :: SBag a -> Int -> a -> IO (Bool)
 pushArray ary ix x = 
   do !tick <- readArrayElem ary ix;
      case peekTicket tick of
        Val xs ->
          let !newVal = Val $ x:xs
          in do
-           (success, tick') <- casArrayElem ary ix tick newVal
+           (success, _) <- casArrayElem ary ix tick newVal
            dbgPrint$ "push CAS["++show ix++"]="++show success
-           if success
-             then return (Just x)
-             else return Nothing
+           return success
        Copied _ ->
-         return Nothing
+         return False
 
 {-# INLINE popArray #-}
 popArray :: SBag a -> Int -> (EntryVal [a] -> Maybe(a, EntryVal [a])) -> IO (Maybe a)
@@ -143,7 +141,7 @@ popArray vec ix f =
      let !newVal = f $ peekTicket tick
      case newVal of
        Just (x, xs) -> do
-         (success, tick') <- casArrayElem vec ix tick xs
+         (success, _) <- casArrayElem vec ix tick xs
          dbgPrint$ "pop: CAS["++show ix++"]="++show success
          if success
            then return (Just x)
@@ -152,13 +150,13 @@ popArray vec ix f =
          return Nothing
 
 transition :: ScalableBag a -> (EntryVal [a] -> (Bool, EntryVal [a])) -> IO ()
-transition (bag, length) f = do
-  let loop i | i>= length = return ()
+transition (bag, len) f = do
+  let loop i | i>= len = return ()
       loop i = do
         tik <- readArrayElem bag i
         let (copy, newVal) = f $ peekTicket tik
         if copy
-          then do (success, t2) <- casArrayElem bag i tik newVal
+          then do (success, _) <- casArrayElem bag i tik newVal
                   if success
                     then loop $ i+1
                     else loop i
