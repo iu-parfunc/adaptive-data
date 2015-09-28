@@ -25,11 +25,10 @@ import qualified Data.TLS.PThread as TLS
 -- import qualified Data.Concurrent.Queue.MichaelScott as MS
 
 import qualified AdaptiveBag as AB
-import qualified PureBag as PB
-import qualified ScalableBag as SB
--- import qualified Data.Concurrent.OldBag as OB
--- import qualified Data.Concurrent.ScalableBagBoxed  as SB
--- import qualified Data.Concurrent.ScalableBagChaseLev as SBCL
+
+
+import qualified Data.Concurrent.PureBag as PB
+import qualified Data.Concurrent.ScalableBag  as SB
 
 --------------------------------------------------------------------------------
 -- Queue benchmarks:
@@ -223,9 +222,9 @@ main = do
         [ bench ("array-bag_hotcold-insert-"++ show hotkeySize) $
           Benchmarkable $ rep (hotKeyOrRandom newBag add hotkeySize splits nothingVec randomFloats randomFloats (getNumEnvVar 0.5 "HOT_RATIO")) ]
 
-  pure     <- mkBagBenchSet PB.newPureBag PB.add PB.remove
+  pure     <- mkBagBenchSet PB.newBag PB.add PB.remove
 --  oldpure  <- mkBagBenchSet OB.newBag OB.add OB.remove
-  scalable <- mkBagBenchSet SB.newScalableBag SB.add SB.remove
+  scalable <- mkBagBenchSet SB.newBag SB.add SB.remove
   hybrid   <- mkBagBenchSet (AB.newBagThreshold $ getNumEnvVar 5 "CAS_TRIES") AB.add AB.remove
 
 --  scalableUB <- mkBagBenchSet UB.newBag UB.add UB.remove
@@ -241,7 +240,7 @@ main = do
            -- Sanity check about scalability:
         , bench ("team-separate-bags") $ Benchmarkable $ \ num ->
           let quota = num `quot` fromIntegral splits in
-          forkJoin splits (\_ -> do bg <- PB.newPureBag
+          forkJoin splits (\_ -> do bg <- PB.newBag
                                     for_ 1 quota (PB.add bg))
         ]
 

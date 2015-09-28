@@ -42,7 +42,7 @@ benchmark bench-lockfree-test
     main-is: Bench.hs
     ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
     hs-source-dirs: test/
-    build-depends: base >= 4.6 && <= 4.8
+    build-depends: base >= 4.6 && <= 4.9
                    , criterion >= 1.0
                    , lockfree-queue >= 0.2
                    , async >= 2.0 && < 2.1
