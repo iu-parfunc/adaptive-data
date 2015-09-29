@@ -4,4 +4,4 @@ j_benchmark/*.*~
 j_benchmark/*.log
 j_benchmark/src/main/java/benchmark/MapTest.java
 
-
+.stack-work*
