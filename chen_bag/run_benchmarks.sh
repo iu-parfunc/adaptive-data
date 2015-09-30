@@ -1,32 +1,25 @@
 #!/bin/bash
 
+# This script responds to env vars:
+#  * BENCHVARIANT - pure, scalable, hybrid
+
 echo "Begin benchmarks for lockfree-test."
 set -xe
 
 export HSBENCHER_GOOGLE_CLIENTID=759282369766-ijonhc4662ot2qos4lgud0e0sltjshlj.apps.googleusercontent.com
 export HSBENCHER_GOOGLE_CLIENTSECRET=yI8GfZXsHPrW44udqklCHeDH
 
-# Make sure we go to the right directory
-cd $1
-shift
-
 EXTRAARGS=$*
 
-if [ "$BENCHCOMPILER" == "" ]; then
-    export BENCHCOMPILER=ghc-7.8.3
-    echo "BENCHCOMPILER unset, defaulting to $BENCHCOMPILER"
-fi
-export PATH=$HOME/opt/$BENCHCOMPILER/bin:$PATH
-which $BENCHCOMPILER
-which cabal
-cabal --version
-which ghc
-ghc --version
+which -a stack
+stack --version
 
-# Run only certain benchmarks from the criterion suite:
-# SEQBENCHES=""
+RESOLVER=lts-3.5
+STACK="stack --install-ghc --resolver=$RESOLVER"
+TARGET=adaptive-bag:bench-adaptive-bag
 
-PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 array-bag_hotcold-team-fill-N "
+# PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 array-bag_hotcold-team-fill-N "
+PARBENCHES=""
 
 # Criterion regressions
 REGRESSES="--regress=allocated:iters --regress=bytesCopied:iters --regress=cycles:iters \
@@ -50,28 +43,13 @@ FAILDIR=$BAKDIR/failed_upload
 mkdir -p $WINDIR
 mkdir -p $FAILDIR
 
-
-
-CRITUPLOAD=hsbencher-fusion-upload-criterion-0.3.15
-CSVUPLOAD=hsbencher-fusion-upload-csv-0.3.12
-# If we don't have the Criterion uploader, don't bother trying
-which $CRITUPLOAD
-
-# CABAL=cabal-1.20
-# Cabal 1.20 has working parallel builds but it is too old to drive
-# GHC 7.10 it seems.  We get this error:
-#
-#    ghc: ghc no longer supports single-file style package databases
-#    (dist/package.conf.inplace) use 'ghc-pkg init' to create the
-#    database with the correct format.
-#
-# E.g. in build #7.
-# CABAL=cabal-1.22
-CABAL=cabal
+CRITUPLOAD="stack exec hsbencher-fusion-upload-criterion -- "
+CSVUPLOAD="stack exec hsbencher-fusion-upload-csv -- "
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
-function runcritbench () {
+function runcritbench ()
+{
     i=$1
     shift
     benches=$*
@@ -82,9 +60,9 @@ function runcritbench () {
     CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.crit
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
-    ./dist/build/$executable/$executable $BENCHVARIANT $benches \
+    $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
-       +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M
+       +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
@@ -100,38 +78,13 @@ function runcritbench () {
     else
 	cp $CSVREPORT $WINDIR/
     fi
-    
 }
 
-function go() {    
-    VARIANT=${BENCHVARIANT}-${BENCHCOMPILER}
-
-    echo "Installing benchmark program."
-    # Put the sandbox here in the lockfree-test/ subdir.
-    $CABAL sandbox init
-    # Grab the Chase-Lev deque packages from the submodule.
-#    $CABAL install ../haskell-lockfree/chaselev-deque
-#    $CABAL install   $CONFOPTS -j --ghc-option=-j3 $EXTRAARGS . ../haskell-lockfree/chaselev-deque
-    $CABAL configure $CONFOPTS -f-debug
-    $CABAL build ${executable}
-    
-    # Remove old versions to prevent inconsistent data
-    # for i in 1 2 4 8 16 32; do
-    # 	CRITREPORT=$REPORT-N$i.crit
-    # 	rm -f $CRITREPORT
-    # 	rm -f $CRITREPORT.html
-    # done
+function go() {
+    VARIANT=${BENCHVARIANT}-${RESOLVER}
 
     echo "Listing supported benchmarks:"
-    ./dist/build/$executable/$executable -l
-
-    # REPORT=report_seq_${executable}
-    # runcritbench 1 $SEQBENCHES
-
-    # REPORT=report_par_${executable}
-    # for i in 13 14 15 16; do
-    #     runcritbench $i $PARBENCHES
-    # done
+    $STACK bench $TARGET --benchmark-arguments="-l"
 
     REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
@@ -148,24 +101,15 @@ function go() {
     fi
 }
 
-
 case $BENCHVARIANT in
     pure)
 	echo "Running pure-in-a-box benchmarks..."
 	go
 	;;
-    # oldpure)
-    #     echo "Running old-style pure-in-a-box benchmarks..."
-    #     go 
-    #     ;;
     scalable)
 	echo "Running regular scalable/lock-free benchmarks..."
         go
 	;;
-    # scalable-chaselev)
-    #     echo "Running regular scalable/lock-free benchmarks..."	
-    #     go 
-    #     ;;
     hybrid)
 	echo "Running hybrid benchmarks..."
         for cas_tries in 1 2; do
