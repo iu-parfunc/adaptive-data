@@ -3,7 +3,7 @@
 # This script responds to env vars:
 #  * BENCHVARIANT - pure, scalable, hybrid
 
-echo "Begin benchmarks for lockfree-test."
+echo "Begin benchmarks for lockfree-test, running on $HOSTNAME"
 set -xe
 
 export HSBENCHER_GOOGLE_CLIENTID=759282369766-ijonhc4662ot2qos4lgud0e0sltjshlj.apps.googleusercontent.com
@@ -63,6 +63,7 @@ function runcritbench ()
     $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
        +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
+# TODO: Pass EXTRAARGS
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
