@@ -54,6 +54,7 @@ padFactor = 8
 padDiv :: Int -> Int
 padDiv x = shiftR x 3
 
+{-# INLINABLE newScalableBag #-}
 newScalableBag :: IO (ScalableBag a)
 newScalableBag = do
   caps <- getNumCapabilities
@@ -62,6 +63,7 @@ newScalableBag = do
   let bag = (array, len)
   return bag
 
+{-# INLINABLE empty #-}
 empty :: ScalableBag a -> IO (Bool)
 empty (bag, len) =
   let loop i | i >= len = return True
@@ -73,6 +75,7 @@ empty (bag, len) =
           _ -> loop $ i+1
   in loop 0
 
+{-# INLINABLE add #-}
 add :: ScalableBag a -> a -> IO (Bool)
 add (bag, len') x = do
   tid <- getTLS osThreadID
@@ -84,6 +87,7 @@ add (bag, len') x = do
   dbgPrint$ "tid "++show tid++" going into CAS loop on index "++show idx'
   pushArray bag idx' x
 
+{-# INLINABLE remove #-}
 remove :: ScalableBag a -> IO (Maybe a)
 remove (bag, len) = do
   tid <- getTLS osThreadID
@@ -116,7 +120,7 @@ remove (bag, len) = do
                 
       pop v = case v of
         Val (x:xs) -> Just (x, Val xs)
-        Copied (x:xs) -> Just (x, Val xs)
+        Copied (x:xs) -> Just (x, Copied xs)
         _ -> Nothing
   retryLoop bag idx idx
 

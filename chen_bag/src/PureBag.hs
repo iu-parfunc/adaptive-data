@@ -45,15 +45,17 @@ remove :: PureBag a -> IO (Maybe a)
 remove bag = do
   tik <- readForCAS bag
   case peekTicket tik of
-    Val rst ->
-      case rst of
-      [] -> return Nothing
-      (x:xs) -> do
-        (success, _) <- casIORef bag tik $ Val xs
-        if success
-          then return (Just x)
-          else return Nothing
-    Copied _ -> return Nothing
+    Val (x:xs) -> do
+      (success, _) <- casIORef bag tik $ Val xs
+      if success
+        then return (Just x)
+        else return Nothing
+    Copied (x:xs) -> do
+      (success, _) <- casIORef bag tik $ Copied xs
+      if success
+        then return (Just x)
+        else return Nothing
+    _ -> return Nothing
 
 transition :: PureBag a -> (EntryVal [a] -> (Bool, EntryVal [a])) -> IO ()
 transition bag f = do
