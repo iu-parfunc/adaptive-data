@@ -61,6 +61,9 @@ fi
 CRITUPLOAD="stack exec hsbencher-fusion-upload-criterion -- "
 CSVUPLOAD="stack exec hsbencher-fusion-upload-csv -- "
 
+# A first job for stack:
+$STACK build hsbencher-fusion
+
 CONFOPTS="--enable-benchmarks --allow-newer"
 
 function runcritbench ()
