@@ -43,6 +43,21 @@ FAILDIR=$BAKDIR/failed_upload
 mkdir -p $WINDIR
 mkdir -p $FAILDIR
 
+# RRN: Temp, this should be factored out somewhere else:
+if ! [ -d $HOME/.stack ]; then
+    if [ -L $HOME/.stack ];
+    then echo "Warning: broken .stack link found in home dir.";
+         if [ -d /home.local/$USER ];
+         then mkdir -p /home.local/$USER/.stack;
+              ln -s -f /home.local/$USER/.stack $HOME/.stack;
+              echo "Made and linked .stack directory in non-NFS storage."
+         else echo
+         fi
+    else echo "No .stack dir but we can just let stack create it...";
+    fi
+fi
+
+
 CRITUPLOAD="stack exec hsbencher-fusion-upload-criterion -- "
 CSVUPLOAD="stack exec hsbencher-fusion-upload-csv -- "
 
