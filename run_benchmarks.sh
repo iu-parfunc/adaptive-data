@@ -53,12 +53,12 @@ case $BENCHCOMPILER in
     java)
 	echo "Running Java version of benchmarks"
 	cd j_benchmark
-	./run_benchmarks.sh	
-	;;
-    ghc-*)
-	echo "Running GHC version of benchmarks."
-	cd lockfree-test
 	./run_benchmarks.sh
+	;;
+    ghc)
+	echo "Running GHC version of benchmarks."
+	cd chen_bag/
+	./run_benchmarks.sh $EXTRAARGS
 	;;
     *)
 	echo "ERROR: unrecognized BENCHCOMPILER: $BENCHCOMPILER"
