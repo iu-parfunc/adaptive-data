@@ -25,7 +25,7 @@ import EntryRef
 import Control.Monad.ST
 
 dbgPrint :: String -> IO ()
-#if 1
+#if 0
 dbgPrint s = putStrLn $ " [dbg] "++s
 #else
 dbgPrint _ = return ()
