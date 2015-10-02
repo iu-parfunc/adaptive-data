@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 
 module AdaptiveBag
        (
@@ -20,6 +21,14 @@ import Data.IORef
 import qualified ScalableBag as SB
 import qualified PureBag as PB
 import EntryRef
+
+dbgPrint :: String -> IO ()
+#if 1
+dbgPrint s = putStrLn $ " [dbg] "++s
+#else
+dbgPrint _ = return ()
+{-# INLINE dbgPrint #-}
+#endif
 
 data Hybrid a = A !(PB.PureBag a) Int
               | AB !(PB.PureBag a) !(SB.ScalableBag a) Int
@@ -127,16 +136,20 @@ transition bag tick = do
     A pbag thresh -> do
       sbag <- SB.newScalableBag
       (success, tick') <- casIORef bag tick (AB pbag sbag thresh)
+      dbgPrint$ "transition: A->AB" ++ show success
       if success
         then transition bag tick'
         else return ()
     AB pbag _ _ -> do
+      dbgPrint$ "transition: B->BA"
       PB.transition pbag mark
     B sbag thresh ->  do
       pbag <- PB.newPureBag
       (success, tick') <- casIORef bag tick (BA sbag pbag thresh)
+      dbgPrint$ "transition: B->BA"++show success
       if success
         then transition bag tick'
         else return ()
     BA sbag _ _ -> do
+      dbgPrint$ "transition: BA->A"
       SB.transition sbag mark
