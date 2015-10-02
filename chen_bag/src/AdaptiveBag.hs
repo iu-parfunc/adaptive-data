@@ -141,7 +141,7 @@ transition bag tick = do
         then transition bag tick'
         else return ()
     AB pbag _ _ -> do
-      dbgPrint$ "transition: B->BA"
+      dbgPrint$ "transition: AB->B"
       PB.transition pbag mark
     B sbag thresh ->  do
       pbag <- PB.newPureBag
