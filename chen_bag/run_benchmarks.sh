@@ -62,7 +62,7 @@ CRITUPLOAD="stack exec hsbencher-fusion-upload-criterion -- "
 CSVUPLOAD="stack exec hsbencher-fusion-upload-csv -- "
 
 # A first job for stack:
-$STACK build hsbencher-fusion
+time $STACK build hsbencher-fusion
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
@@ -78,20 +78,20 @@ function runcritbench ()
     CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.crit
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
-    $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
+    time $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
       --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
        +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
 # TODO: Pass EXTRAARGS
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
-    $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
+    time $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
 		--threads=$i $CRITREPORT --runflags="$RTSOPTS" \
                 --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES,$benches
     # --args=""
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
-    $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+    time $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
     if [ "$FAILED" == 1 ]; then
 	cp $CSVREPORT $FAILDIR/
     else
@@ -103,7 +103,7 @@ function go() {
     VARIANT=${BENCHVARIANT}-${RESOLVER}
 
     echo "Listing supported benchmarks:"
-    $STACK bench $TARGET --benchmark-arguments="-l"
+    time $STACK bench $TARGET --benchmark-arguments="-l"
 
     REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
