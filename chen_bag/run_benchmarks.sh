@@ -70,7 +70,7 @@ function runcritbench ()
 {
     i=$1
     shift
-    benches=$*
+#   benches=$*
 
     NURSERY_SIZE=$((30000/$i))
     echo "Using nursery of size $NURSERY_SIZE"
@@ -87,7 +87,7 @@ function runcritbench ()
     # If not, our archived file below will not match the server schema.
     $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
 		--threads=$i $CRITREPORT --runflags="$RTSOPTS" \
-                --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES
+                --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES,$benches
     # --args=""
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
