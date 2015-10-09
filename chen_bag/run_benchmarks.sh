@@ -18,6 +18,9 @@ RESOLVER=lts-3.5
 STACK="stack --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-bag:bench-adaptive-bag
 
+export GIT_DEPTH=`git log --pretty=oneline | wc -l`
+echo "Running at GIT_DEPTH:" $GIT_DEPTH
+
 # PARBENCHES=" array-bag_hotcold-team-fill-insert-10000000 array-bag_hotcold-team-fill-N "
 PARBENCHES=""
 
@@ -75,23 +78,26 @@ function runcritbench ()
     NURSERY_SIZE=$((30000/$i))
     echo "Using nursery of size $NURSERY_SIZE"
 
-    CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.crit
+    CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     time $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
-      --output=$CRITREPORT.html --raw $CRITREPORT $REGRESSES \
+      --output=$CRITREPORT.html --csv=$CRITREPORT  \
        +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
 # TODO: Pass EXTRAARGS
 
     # FIXME: does criterion uploader reorder for the server?
     # If not, our archived file below will not match the server schema.
-    time $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
-		--threads=$i $CRITREPORT --runflags="$RTSOPTS" \
-                --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES,$benches
+    # time $CRITUPLOAD --noupload --csv=$CSVREPORT --variant=$VARIANT \
+    # 		--threads=$i $CRITREPORT --runflags="$RTSOPTS" \
+    #             --custom=HOT_RATIO,$HOT_RATIO --custom=CAS_TRIES,$CAS_TRIES,$benches
     # --args=""
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
-    time $CSVUPLOAD $CSVREPORT --fusion-upload --name=$TABLENAME || FAILED=1
+    awk 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "BENCHVARIANT" : ENVIRON["BENCHVARIANT"]} 1' $CRITREPORT > $CRITREPORT.1
+    awk 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "benches" : ENVIRON["benches"]} 1' $CRITREPORT.1 > $CRITREPORT.2
+
+    $CSVUPLOAD $CSVREPORT.2 --fusion-upload --name=$TABLENAME || FAILED=1
     if [ "$FAILED" == 1 ]; then
 	cp $CSVREPORT $FAILDIR/
     else
