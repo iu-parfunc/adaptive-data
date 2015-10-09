@@ -95,7 +95,7 @@ function runcritbench ()
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
     awk 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "BENCHVARIANT" : ENVIRON["BENCHVARIANT"]} 1' $CRITREPORT > $CRITREPORT.1
-    awk 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "benches" : ENVIRON["benches"]} 1' $CRITREPORT.1 > $CRITREPORT.2
+    awk 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "PROGNAME" : ENVIRON["benches"]} 1' $CRITREPORT.1 > $CRITREPORT.2
 
     $CSVUPLOAD $CSVREPORT.2 --fusion-upload --name=$TABLENAME || FAILED=1
     if [ "$FAILED" == 1 ]; then
