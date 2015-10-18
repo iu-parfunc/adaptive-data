@@ -12,38 +12,139 @@ import Control.Concurrent.Extra
 --import Data.Atomics
 --import Data.Atomics.Vector
 --import qualified Data.Atomics.Counter as C
+import Data.Int
 import Data.IORef
 --import qualified Data.Vector.Mutable as VM
 --import qualified Data.Vector.Storable as VS
 --import System.Environment
 import System.Console.CmdArgs
 --import System.IO.Unsafe
---import System.IO
---import System.Random
+import System.IO
+import System.Random
 --import System.Posix.Unistd
 import Data.Time.Clock
 
 --import qualified Data.TLS.PThread
 
---import qualified AdaptiveBag as AB
+import qualified AdaptiveBag as AB
 import qualified Data.Concurrent.PureBag as PB
---import qualified Data.Concurrent.ScalableBag  as SB
+import qualified Data.Concurrent.ScalableBag as SB
 
-test :: Int -> (Int -> IO()) -> (() -> IO(Maybe Int)) -> Flag -> Barrier b -> IORef(Bool) -> IO(Int)
-test tid ws rs option bar cont = do
-  let loop i = do
+thread :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> Barrier Bool -> IORef(Bool) -> Int -> IO(Int)
+thread tid ws rs option bar cont seedn = do
+  let loop i g = do
         c <- readIORef cont
-        if c then
-          do ws i
-             loop $ i+1
+        if c
+          then do
+          let (p, g') = randomR (0.0, 1.0) g :: (Double, StdGen)
+          let (a, g'')= random g' :: (Int64, StdGen)
+          if p> ratio option
+            then ws a
+            else do
+            !r <- rs ()
+            return ()
+          loop (i+1) g''
           else return (i)
+
   putStrLn $ "Thread " ++ show tid ++ "started"
   !b <- waitBarrier bar
-  putStrLn $ "Thread id: " ++ show tid
-  loop 0
+  putStrLn $ "Thread id: " ++ show tid ++  ", seed: " ++ show seedn
+  if b
+    then loop 0 $ mkStdGen seedn
+    else return (0)
 
-timeout :: Int -> IO()
-timeout t = threadDelay t
+test :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> IO (Double)
+test threadn ws rs option = do
+  !bar <- newBarrier
+  !ref <- newIORef True
+  !asyncs <- mapM (\tid -> do
+                       s <- randomIO
+                       async $ thread tid ws rs option bar ref s) [1..threadn]
+  signalBarrier bar True
+  !start <- getCurrentTime
+  threadDelay $ 1000000 * duration option
+  writeIORef ref False
+  !end <- getCurrentTime
+  !res <- mapM wait asyncs
+  return $ ((fromIntegral $ sum res)::Double) / ((realToFrac $ diffUTCTime end start)::Double)
+
+mean :: [Double] -> Double
+mean xs = (sum xs) / ((realToFrac $ length xs) :: Double)
+
+stddev :: [Double] -> Double
+stddev xs = sqrt $ (sum (map (\x -> (x - avg) * (x - avg)) xs)) / len
+  where len = (realToFrac $ length xs) :: Double
+        avg = mean xs
+
+run_pb :: Int -> Flag -> IO()
+run_pb threadn option = do
+  outh <- openFile ((file option) ++ "_pb.csv") WriteMode
+  hPutStrLn outh "threadn,Mean,Stddev"
+  setStdGen $ mkStdGen $ seed option
+
+  let loop t i | i>0 = do
+                   !bag <- PB.newBag
+                   !ops <- test t (PB.add bag) (\() -> PB.remove bag) option
+                   putStrLn $ "PureBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   xs <- (loop t $ i-1)
+                   return $ ops : xs
+      loop _ _ = return []
+
+  let loop_n n | n <= threadn = do
+                   res <- loop n $ runs option
+                   hPutStrLn outh $ (show n) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
+                   loop_n $ n+1
+      loop_n _ = return ()
+
+  loop_n 1
+  hClose outh
+
+run_sb :: Int -> Flag -> IO()
+run_sb threadn option = do
+  outh <- openFile ((file option) ++ "_sb.csv") WriteMode
+  hPutStrLn outh "threadn,Mean,Stddev"
+  setStdGen $ mkStdGen $ seed option
+
+  let loop t i | i>0 = do
+                   !bag <- SB.newBag
+                   !ops <- test t (SB.add bag) (\() -> SB.remove bag) option
+                   putStrLn $ "ScalableBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   xs <- (loop t $ i-1)
+                   return $ ops : xs
+      loop _ _ = return []
+
+  let loop_n n | n <= threadn = do
+                   res <- loop n $ runs option
+                   hPutStrLn outh $ (show n) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
+                   loop_n $ n+1
+      loop_n _ = return ()
+
+  loop_n 1
+  hClose outh
+
+run_ab :: Int -> Flag -> IO()
+run_ab threadn option = do
+  outh <- openFile ((file option) ++ "_ab.csv") WriteMode
+  hPutStrLn outh "threadn,Mean,Stddev"
+  setStdGen $ mkStdGen $ seed option
+
+  let loop t i | i>0 = do
+                   !bag <- AB.newBag
+                   !ops <- test t (AB.add bag) (\() -> AB.remove bag) option
+                   putStrLn $ "AdaptiveBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   xs <- (loop t $ i-1)
+                   return $ ops : xs
+      loop _ _ = return []
+
+  let loop_n n | n <= threadn = do
+                   res <- loop n $ runs option
+                   hPutStrLn outh $ (show n) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
+                   loop_n $ n+1
+      loop_n _ = return ()
+
+  loop_n 1
+  hClose outh
+
 
 main :: IO ()
 main = do
@@ -53,34 +154,29 @@ main = do
   putStrLn $ "Duration:      " ++ show (duration option) ++ "s"
   putStrLn $ "Ratio:         " ++ show (ratio option)
   putStrLn $ "Initial size:  " ++ show (initial option)
+  putStrLn $ "Number of runs:" ++ show (runs option)
   putStrLn $ "Seed:          " ++ show (seed option)
-  !bar <- newBarrier
-  !bag <- PB.newBag
-  !ref <- newIORef True
-  !asyncs <- mapM (\tid -> async $ test tid (PB.add bag) (\() -> PB.remove bag) option bar ref) [1..threadn]
-  signalBarrier bar True
-  !start <- getCurrentTime
-  threadDelay $ 1000000 * duration option
-  writeIORef ref False
-  !end <- getCurrentTime
-  !res <- mapM wait asyncs
+  putStrLn $ "File:          " ++ show (file option)
 
-  print $ sum res
-  print $ (realToFrac $ diffUTCTime end start)
-  print $ (fromIntegral $ sum res)
-  print $ (fromIntegral $ sum res) / (realToFrac $ diffUTCTime end start)
+  run_pb threadn option
+  run_sb threadn option
+  run_ab threadn option
   return ()
   
 
 data Flag
   = Flag {duration :: Int,
-          ratio :: Float,
+          ratio :: Double,
           initial :: Int,
-          seed :: Int}
+          seed :: Int,
+          file :: String,
+          runs :: Int}
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
 flag = Flag {duration = 100 &= help "Duration",
              ratio = 0.5 &= help "Ratio",
              initial = 0 &= help "Initial size",
-             seed = 4096 &= help "Seed"}
+             seed = 4096 &= help "Seed",
+             file = "report" &= help "Report file prefix",
+             runs = 25 &= help "Number of runs"}
