@@ -148,6 +148,29 @@ run_ab threadn option = do
   loop_n 1
   hClose outh
 
+run_nop :: Int -> Flag -> IO()
+run_nop threadn option = do
+  outh <- openFile ((file option) ++ "_nop.csv") WriteMode
+  hPutStrLn outh "threadn,Mean,Stddev"
+  setStdGen $ mkStdGen $ seed option
+
+  let loop t i | i>0 = do
+                   !ops <- test t (\_ -> do return ()) (\() -> return Nothing) option
+                   putStrLn $ "NOP: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   hFlush stdout
+                   xs <- (loop t $ i-1)
+                   return $ ops : xs
+      loop _ _ = return []
+
+  let loop_n n | n <= threadn = do
+                   res <- loop n $ runs option
+                   hPutStrLn outh $ (show n) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
+                   loop_n $ n+1
+      loop_n _ = return ()
+
+  loop_n 1
+  hClose outh
+
 
 main :: IO ()
 main = do
@@ -161,6 +184,7 @@ main = do
   putStrLn $ "Seed:          " ++ show (seed option)
   putStrLn $ "File:          " ++ show (file option)
 
+  run_nop threadn option
   run_pb threadn option
   run_sb threadn option
   run_ab threadn option
