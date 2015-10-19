@@ -46,9 +46,9 @@ thread tid ws rs option bar cont seedn = do
           loop (i+1) g''
           else return (i)
 
-  putStrLn $ "Thread " ++ show tid ++ "started"
+--  putStrLn $ "Thread " ++ show tid ++ "started"
   !b <- waitBarrier bar
-  putStrLn $ "Thread id: " ++ show tid ++  ", seed: " ++ show seedn
+--  putStrLn $ "Thread id: " ++ show tid ++  ", seed: " ++ show seedn
   if b
     then loop 0 $ mkStdGen seedn
     else return (0)
@@ -86,6 +86,7 @@ run_pb threadn option = do
                    !bag <- PB.newBag
                    !ops <- test t (PB.add bag) (\() -> PB.remove bag) option
                    putStrLn $ "PureBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   hFlush stdout
                    xs <- (loop t $ i-1)
                    return $ ops : xs
       loop _ _ = return []
@@ -109,6 +110,7 @@ run_sb threadn option = do
                    !bag <- SB.newBag
                    !ops <- test t (SB.add bag) (\() -> SB.remove bag) option
                    putStrLn $ "ScalableBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   hFlush stdout
                    xs <- (loop t $ i-1)
                    return $ ops : xs
       loop _ _ = return []
@@ -132,6 +134,7 @@ run_ab threadn option = do
                    !bag <- AB.newBag
                    !ops <- test t (AB.add bag) (\() -> AB.remove bag) option
                    putStrLn $ "AdaptiveBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
+                   hFlush stdout
                    xs <- (loop t $ i-1)
                    return $ ops : xs
       loop _ _ = return []
