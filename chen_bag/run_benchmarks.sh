@@ -14,7 +14,7 @@ EXTRAARGS=$*
 which -a stack
 stack --version
 
-RESOLVER=lts-3.5
+RESOLVER=lts-3.9
 STACK="stack --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-bag:bench-adaptive-bag
 
@@ -43,29 +43,29 @@ BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
 WINDIR=$BAKDIR/uploaded
 FAILDIR=$BAKDIR/failed_upload
 
-mkdir -p $WINDIR
-mkdir -p $FAILDIR
+#mkdir -p $WINDIR
+#mkdir -p $FAILDIR
 
 # RRN: Temp, this should be factored out somewhere else:
-if ! [ -d $HOME/.stack ]; then
-    if [ -L $HOME/.stack ];
-    then echo "Warning: broken .stack link found in home dir.";
-         if [ -d /home.local/$USER ];
-         then mkdir -p /home.local/$USER/.stack;
-              ln -s -f /home.local/$USER/.stack $HOME/.stack;
-              echo "Made and linked .stack directory in non-NFS storage."
-         else echo
-         fi
-    else echo "No .stack dir but we can just let stack create it...";
-    fi
-fi
+# if ! [ -d $HOME/.stack ]; then
+#     if [ -L $HOME/.stack ];
+#     then echo "Warning: broken .stack link found in home dir.";
+#          if [ -d /home.local/$USER ];
+#          then mkdir -p /home.local/$USER/.stack;
+#               ln -s -f /home.local/$USER/.stack $HOME/.stack;
+#               echo "Made and linked .stack directory in non-NFS storage."
+#          else echo
+#          fi
+#     else echo "No .stack dir but we can just let stack create it...";
+#     fi
+# fi
 
 
 CRITUPLOAD="stack exec hsbencher-fusion-upload-criterion -- "
 CSVUPLOAD="stack exec hsbencher-fusion-upload-csv -- "
 
 # A first job for stack:
-time $STACK build hsbencher-fusion
+#time $STACK build hsbencher-fusion
 
 CONFOPTS="--enable-benchmarks --allow-newer"
 
@@ -81,8 +81,8 @@ function runcritbench ()
     CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
-    time $STACK bench $TARGET --benchmark-arguments="$BENCHVARIANT $benches \
-      --output=$CRITREPORT.html --csv=$CRITREPORT  \
+    $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
+      --file=$TAG --seed=$TAG  --runs=25 -d=1000\
        +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
 # TODO: Pass EXTRAARGS
 
@@ -94,39 +94,39 @@ function runcritbench ()
     # --args=""
 
     # NOTE: could aggregate these to ONE big CSV and then do the upload.
-    awk -v RS='\r\n' 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "BENCHVARIANT" : ENVIRON["BENCHVARIANT"]} 1' $CRITREPORT > $CRITREPORT.1
-    awk -v RS='\n' 'BEGIN{FS = OFS = ","} {$(NF+1) = NR==1 ? "PROGNAME" : ENVIRON["benches"]} 1' $CRITREPORT.1 > $CRITREPORT.2
 
-    $CSVUPLOAD $CSVREPORT.2 --fusion-upload --name=$TABLENAME || FAILED=1
-    if [ "$FAILED" == 1 ]; then
-	cp $CSVREPORT $FAILDIR/
-    else
-	cp $CSVREPORT $WINDIR/
-    fi
+    # $CSVUPLOAD $CSVREPORT.2 --fusion-upload --name=$TABLENAME || FAILED=1
+    # if [ "$FAILED" == 1 ]; then
+    # 	cp $CSVREPORT $FAILDIR/
+    # else
+    # 	cp $CSVREPORT $WINDIR/
+    # fi
 }
 
 function go() {
     VARIANT=${BENCHVARIANT}-${RESOLVER}
 
-    echo "Listing supported benchmarks:"
-    time $STACK bench $TARGET --benchmark-arguments="-l"
 
     REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
         runcritbench $i $PARBENCHES
     done
 
-    if [ $? = 0 ]; then
-	mkdir -p reports
-	cp ${TAG}_*.html reports
-	cp ${TAG}_*.crit reports
-	tar -cvf reports_${TAG}.tar reports/
-    else
-	echo "Some benchmarks errored out! Don't expect good data."
-    fi
+    # if [ $? = 0 ]; then
+    # 	mkdir -p reports
+    # 	cp ${TAG}_*.html reports
+    # 	cp ${TAG}_*.crit reports
+    # 	tar -cvf reports_${TAG}.tar reports/
+    # else
+    # 	echo "Some benchmarks errored out! Don't expect good data."
+    # fi
 }
 
 case $BENCHVARIANT in
+    nop)
+	echo "Running nop benchmarks..."
+        go
+	;;
     pure)
 	echo "Running pure-in-a-box benchmarks..."
 	go

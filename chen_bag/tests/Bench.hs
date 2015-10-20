@@ -62,11 +62,11 @@ test threadn ws rs option = do
                        async $ thread tid ws rs option bar ref s) [1..threadn]
   signalBarrier bar True
   !start <- getCurrentTime
-  threadDelay $ 1000000 * duration option
+  threadDelay $ 1000 * duration option
   writeIORef ref False
   !end <- getCurrentTime
   !res <- mapM wait asyncs
-  return $ ((fromIntegral $ sum res)::Double) / ((realToFrac $ diffUTCTime end start)::Double)
+  return $ ((fromIntegral $ sum res)::Double) / ((realToFrac $ diffUTCTime end start) * 1000.0 ::Double)
 
 mean :: [Double] -> Double
 mean xs = (sum xs) / ((realToFrac $ length xs) :: Double)
@@ -75,7 +75,7 @@ stddev :: [Double] -> Double
 stddev xs = sqrt $ (sum (map (\x -> (x - avg) * (x - avg)) xs)) / len
   where len = (realToFrac $ length xs) :: Double
         avg = mean xs
-
+{-
 run_pb :: Int -> Flag -> IO()
 run_pb threadn option = do
   outh <- openFile ((file option) ++ "_pb.csv") WriteMode
@@ -131,7 +131,7 @@ run_ab threadn option = do
   setStdGen $ mkStdGen $ seed option
 
   let loop t i | i>0 = do
-                   !bag <- AB.newBag
+                   !bag <- AB.newBagThreshold 1
                    !ops <- test t (AB.add bag) (\() -> AB.remove bag) option
                    putStrLn $ "AdaptiveBag: " ++ show t ++ " threads, " ++ show ops ++ " ops/s"
                    hFlush stdout
@@ -170,24 +170,57 @@ run_nop threadn option = do
 
   loop_n 1
   hClose outh
+-}
 
+run :: Int -> Flag -> IO()
+run threadn option = do
+  outh <- openFile ((file option) ++ "_" ++ (bench option) ++ ".csv") AppendMode
+--  hPutStrLn outh "threadn,Mean,Stddev"
+  setStdGen $ mkStdGen $ seed option
+
+  let loop i | i>0 = do
+                 !ops <- case bench option of
+                   "pure" -> do
+                     !bag <- PB.newBag
+                     test threadn (PB.add bag) (\() -> PB.remove bag) option
+                   "scalable" -> do
+                     !bag <- SB.newBag
+                     test threadn (SB.add bag) (\() -> SB.remove bag) option
+                   "adaptive" -> do
+                     !bag <- AB.newBag
+                     test threadn (AB.add bag) (\() -> AB.remove bag) option
+                   _ -> test threadn (\_ -> do return ()) (\() -> return Nothing) option
+                     
+                 putStrLn $ ": " ++ show threadn ++ " threads, " ++ show ops ++ " ops/ms"
+                 hFlush stdout
+                 xs <- (loop $ i-1)
+                 return $ ops : xs
+      loop _ = return []
+
+  res <- loop $ runs option
+  hPutStrLn outh $ (show threadn) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
+
+  hClose outh
 
 main :: IO ()
 main = do
   option <- cmdArgs $ flag
   threadn <- getNumCapabilities
   putStrLn $ "Thread number: " ++ show threadn
-  putStrLn $ "Duration:      " ++ show (duration option) ++ "s"
+  putStrLn $ "Duration:      " ++ show (duration option) ++ "ms"
   putStrLn $ "Ratio:         " ++ show (ratio option)
   putStrLn $ "Initial size:  " ++ show (initial option)
   putStrLn $ "Number of runs:" ++ show (runs option)
   putStrLn $ "Seed:          " ++ show (seed option)
   putStrLn $ "File:          " ++ show (file option)
-
+{-
   run_nop threadn option
   run_pb threadn option
   run_sb threadn option
-  run_ab threadn option
+  run_ab threadn option-}
+  if length (bench option) == 0
+    then return ()
+    else run threadn option
   return ()
   
 
@@ -197,7 +230,8 @@ data Flag
           initial :: Int,
           seed :: Int,
           file :: String,
-          runs :: Int}
+          runs :: Int,
+          bench :: String}
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
@@ -206,4 +240,5 @@ flag = Flag {duration = 100 &= help "Duration",
              initial = 0 &= help "Initial size",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
-             runs = 25 &= help "Number of runs"}
+             runs = 25 &= help "Number of runs",
+             bench = "" &= help "Benchvariant"}
