@@ -197,7 +197,8 @@ run threadn option = do
                  return $ ops : xs
       loop _ = return []
 
-  res <- loop $ runs option
+  xs <- loop $ (runs option) + (warmup option)
+  let res = drop (warmup option) xs
   hPutStrLn outh $ (show threadn) ++ "," ++ (show $ mean res) ++ "," ++ (show $ stddev res)
 
   hClose outh
@@ -211,6 +212,7 @@ main = do
   putStrLn $ "Ratio:         " ++ show (ratio option)
   putStrLn $ "Initial size:  " ++ show (initial option)
   putStrLn $ "Number of runs:" ++ show (runs option)
+  putStrLn $ "Warmup runs:   " ++ show (warmup option)
   putStrLn $ "Seed:          " ++ show (seed option)
   putStrLn $ "File:          " ++ show (file option)
 {-
@@ -231,11 +233,13 @@ data Flag
           seed :: Int,
           file :: String,
           runs :: Int,
+          warmup :: Int,
           bench :: String}
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
 flag = Flag {duration = 100 &= help "Duration",
+             warmup = 5 &= help "number of warmup run",
              ratio = 0.5 &= help "Ratio",
              initial = 0 &= help "Initial size",
              seed = 4096 &= help "Seed",

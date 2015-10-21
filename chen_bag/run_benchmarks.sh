@@ -36,7 +36,8 @@ TAG=`date +'%s'`
 TABLENAME=AdaptivelyScalable
 
 # These are good settings for insert benchmarks on cutter:
-RTSOPTS=" -qa -qm -T -G1 "
+#RTSOPTS=" -qa -qm -T -G1 "
+RTSOPTS=" -qa -G1 "
 
 REPORT=report_${executable}
 BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
@@ -82,8 +83,8 @@ function runcritbench ()
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=$TAG --seed=$TAG  --runs=25 -d=1000\
-       +RTS -T -s -N$i $RTSOPTS -A${NURSERY_SIZE}M"
+      --file=$TAG --seed=$TAG  --runs=25 -d=500\
+       +RTS -N$i $RTSOPTS -A${NURSERY_SIZE}M"
 # TODO: Pass EXTRAARGS
 
     # FIXME: does criterion uploader reorder for the server?
