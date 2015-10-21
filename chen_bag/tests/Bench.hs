@@ -21,6 +21,7 @@ import System.Console.CmdArgs
 --import System.IO.Unsafe
 import System.IO
 import System.Random
+import System.Mem
 --import System.Posix.Unistd
 import Data.Time.Clock
 
@@ -36,9 +37,9 @@ thread tid ws rs option bar cont seedn = do
         c <- readIORef cont
         if c
           then do
-          let (p, g') = randomR (0.0, 1.0) g :: (Double, StdGen)
-          let (a, g'')= random g' :: (Int64, StdGen)
-          if p> ratio option
+          let (!p, !g') = randomR (0.0, 1.0) g :: (Double, StdGen)
+          let (!a, !g'')= random g' :: (Int64, StdGen)
+          if p > ratio option
             then ws a
             else do
             !r <- rs ()
@@ -57,9 +58,11 @@ test :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> IO (Double)
 test threadn ws rs option = do
   !bar <- newBarrier
   !ref <- newIORef True
+  performMajorGC
   !asyncs <- mapM (\tid -> do
                        s <- randomIO
                        async $ thread tid ws rs option bar ref s) [1..threadn]
+  -- performMajorGC
   signalBarrier bar True
   !start <- getCurrentTime
   threadDelay $ 1000 * duration option
@@ -190,7 +193,7 @@ run threadn option = do
                      !bag <- AB.newBag
                      test threadn (AB.add bag) (\() -> AB.remove bag) option
                    _ -> test threadn (\_ -> do return ()) (\() -> return Nothing) option
-                     
+
                  putStrLn $ ": " ++ show threadn ++ " threads, " ++ show ops ++ " ops/ms"
                  hFlush stdout
                  xs <- (loop $ i-1)
@@ -224,7 +227,7 @@ main = do
     then return ()
     else run threadn option
   return ()
-  
+
 
 data Flag
   = Flag {duration :: Int,

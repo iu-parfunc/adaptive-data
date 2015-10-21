@@ -48,7 +48,7 @@ benchmark bench-adaptive-bag
     ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N
     hs-source-dirs: tests/
     build-depends: base >= 4.6,
-                   criterion >= 1.0,
+--                   criterion >= 1.0,
                    lockfree-queue >= 0.2,
                    async >= 2.0 && < 2.1,
                    vector >= 0.10,
