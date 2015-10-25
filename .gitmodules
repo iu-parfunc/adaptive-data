@@ -4,3 +4,6 @@
 [submodule "concurrent-skiplist"]
 	path = concurrent-skiplist
 	url = git@github.com:rrnewton/concurrent-skiplist.git
+[submodule "pcg-random"]
+	path = pcg-random
+	url = git@github.com:rrnewton/pcg-random.git
