@@ -14,6 +14,7 @@ import Data.Int
 import Data.IORef
 import System.Console.CmdArgs
 import System.IO
+import System.Mem
 import Data.Time.Clock
 import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
@@ -50,6 +51,7 @@ thread tid ws rs option bar cont seedn = do
 
 test :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> PCG.GenIO -> IO (Double)
 test threadn ws rs option gen = do
+  performGC
   !bar <- newBarrier
   !ref <- newIORef True
   !asyncs <- mapM (\tid -> do
