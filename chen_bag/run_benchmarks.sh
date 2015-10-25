@@ -125,4 +125,3 @@ function go() {
 }
 
 go
-esac
