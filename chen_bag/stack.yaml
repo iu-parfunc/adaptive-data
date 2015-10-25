@@ -4,6 +4,7 @@ packages:
  - '.'
  # Temporary, need to update hackage:
  - ../haskell-lockfree/atomic-primops-vector
+ - ../pcg-random
 
 extra-deps:
  - thread-local-storage-0.1.0.3

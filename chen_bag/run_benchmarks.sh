@@ -37,7 +37,7 @@ TABLENAME=AdaptivelyScalable
 
 # These are good settings for insert benchmarks on cutter:
 #RTSOPTS=" -qa -qm -T -G1 "
-RTSOPTS=" -qa -G1 "
+RTSOPTS=" -qa "
 
 REPORT=report_${executable}
 BAKDIR=$HOME/benchdata_bak/$TABLENAME/depth_${GIT_DEPTH}/$executable
@@ -105,12 +105,13 @@ function runcritbench ()
 }
 
 function go() {
-    VARIANT=${BENCHVARIANT}-${RESOLVER}
 
 
     REPORT=report_par_${executable}
     for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
-        runcritbench $i $PARBENCHES
+	    for BENCHVARIANT in nop pure scalable adaptive; do
+		    runcritbench $i $BENCHVARIANT
+	    done
     done
 
     # if [ $? = 0 ]; then
@@ -123,27 +124,5 @@ function go() {
     # fi
 }
 
-case $BENCHVARIANT in
-    nop)
-	echo "Running nop benchmarks..."
-        go
-	;;
-    pure)
-	echo "Running pure-in-a-box benchmarks..."
-	go
-	;;
-    scalable)
-	echo "Running regular scalable/lock-free benchmarks..."
-        go
-	;;
-    hybrid)
-	echo "Running hybrid benchmarks..."
-        for cas_tries in 1 2; do
-	    CAS_TRIES=$cas_tries go
-        done
-	;;
-    *)
-	echo "ERROR: unrecognized BENCHVARIANT: $BENCHVARIANT"
-	exit 1
-	;;
+go
 esac
