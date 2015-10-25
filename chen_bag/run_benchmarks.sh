@@ -84,7 +84,7 @@ function runcritbench ()
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
       --file=$TAG --seed=$TAG  --runs=25 -d=500\
-       +RTS -N$i $RTSOPTS -A${NURSERY_SIZE}M"
+       +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 
     # FIXME: does criterion uploader reorder for the server?
