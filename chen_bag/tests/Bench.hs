@@ -87,7 +87,7 @@ run threadn option = do
                      !bag <- SB.newBag
                      test threadn (SB.add bag) (\() -> SB.remove bag) option gen
                    "adaptive" -> do
-                     !bag <- AB.newBag
+                     !bag <- AB.newBagThreshold 1
                      test threadn (AB.add bag) (\() -> AB.remove bag) option gen
                    _ -> test threadn (\_ -> do return ()) (\() -> return Nothing) option gen
                      
