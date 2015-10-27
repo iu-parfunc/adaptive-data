@@ -83,7 +83,7 @@ function runcritbench ()
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=$TAG --seed=$TAG  --runs=25 -d=500\
+      --file=$TAG --seed=$TAG  --runs=10 -d=500\
        +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 

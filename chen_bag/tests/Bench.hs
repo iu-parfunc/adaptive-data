@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -24,33 +23,32 @@ import qualified Data.Concurrent.PureBag as PB
 import qualified Data.Concurrent.ScalableBag as SB
 
 thread :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
-thread tid ws rs option bar cont seedn = do
-  let loop i g = do
-        c <- readIORef cont
+thread !tid !ws !rs !option !bar !cont !seedn = do
+  !g <- PCG.restore $ PCG.initFrozen seedn
+  let loop !i = do
+        !c <- readIORef cont
         if c
           then do
-          p <- PCG.uniformRD (0.0, 1.0) g :: IO Double
-          a <- PCG.uniformI64 g :: IO Int64
-          if p> ratio option
+          !p <- PCG.uniformRD (0.0, 1.0) g :: IO Double
+          !a <- PCG.uniformI64 g :: IO Int64
+          if p > ratio option
             then ws a
             else do
             !r <- rs ()
             return ()
           
-          loop (i+1) g
-          else return (i)
+          loop $ i+1
+          else return i
 
 --  putStrLn $ "Thread " ++ show tid ++ "started"
   !b <- waitBarrier bar
 --  putStrLn $ "Thread id: " ++ show tid ++  ", seed: " ++ show seedn
   if b
-    then do
-    g <- PCG.restore $ PCG.initFrozen seedn
-    loop 0 g
-    else return (0)
+    then loop 0
+    else return 0
 
 test :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> PCG.GenIO -> IO (Double)
-test threadn ws rs option gen = do
+test !threadn !ws !rs !option !gen = do
   performGC
   !bar <- newBarrier
   !ref <- newIORef True
