@@ -86,8 +86,9 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
-                   _ -> test threadn [nop, nop, nop] ratios option gen
+                   "nop" -> test threadn [nop, nop, nop] ratios option gen
                      where nop _ _ = do return ()
+                   _ -> undefined
                      
                  putStrLn $ show threadn ++ " threads: " ++ show ops ++ " ops/ms"
                  hFlush stdout
@@ -116,7 +117,7 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
 
   if length (bench option) == 0
-    then return ()
+    then putStrLn $ "Need to specify benchvariant. (By --bench={nop,pure})"
     else run threadn option
   return ()
   
@@ -144,4 +145,4 @@ flag = Flag {duration = 100 &= help "Duration",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "nop" &= help "Benchvariant"}
+             bench = "" &= help "Benchvariant"}
