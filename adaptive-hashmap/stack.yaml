@@ -1,0 +1,11 @@
+flags: {}
+
+packages:
+ - '.'
+ # Temporary, need to update hackage:
+ - ../pcg-random
+
+extra-deps:
+ - thread-local-storage-0.1.0.3
+
+resolver: lts-3.11

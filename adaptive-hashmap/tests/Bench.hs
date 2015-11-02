@@ -18,26 +18,26 @@ import Data.Time.Clock
 import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import qualified AdaptiveBag as AB
-import qualified Data.Concurrent.PureBag as PB
-import qualified Data.Concurrent.ScalableBag as SB
+import qualified PureMap as PM
 
-thread :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
-thread !tid !ws !rs !option !bar !cont !seedn = do
+thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
+thread !_ !ops !ratios !option !bar !cont !seedn = do
   !g <- PCG.restore $ PCG.initFrozen seedn
   let loop !i = do
         !c <- readIORef cont
         if c
           then do
           !p <- PCG.uniformRD (0.0, 1.0) g :: IO Double
-          !a <- PCG.uniformI64 g :: IO Int64
-          if p > ratio option
-            then ws a
-            else do
-            !r <- rs ()
-            return ()
-          
+          !k <- PCG.uniformRI64 (0, range option) g :: IO Int64
+          !v <- PCG.uniformRI64 (0, range option) g :: IO Int64
+          let op = ops !! snd (foldl (\(z,j) -> \x ->
+                                       if (x+z>=p)
+                                       then (x+z,j)
+                                       else (x+z,j+1))
+                               (0.0::Double,0) ratios)
+          op k v
           loop $ i+1
+          
           else return i
 
 --  putStrLn $ "Thread " ++ show tid ++ "started"
@@ -47,14 +47,14 @@ thread !tid !ws !rs !option !bar !cont !seedn = do
     then loop 0
     else return 0
 
-test :: Int -> (Int64 -> IO()) -> (() -> IO(Maybe Int64)) -> Flag -> PCG.GenIO -> IO (Double)
-test !threadn !ws !rs !option !gen = do
+test :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> PCG.GenIO -> IO (Double)
+test !threadn !ops !ratios !option !gen = do
   performGC
   !bar <- newBarrier
   !ref <- newIORef True
   !asyncs <- mapM (\tid -> do
                        s <- PCG.uniformW64 gen :: IO Word64
-                       async $ thread tid ws rs option bar ref s) [1..threadn]
+                       async $ thread tid ops ratios option bar ref s) [1..threadn]
   signalBarrier bar True
   !start <- getCurrentTime
   threadDelay $ 1000 * duration option
@@ -77,19 +77,17 @@ run threadn option = do
 --  hPutStrLn outh "threadn,Mean,Stddev"
 --  setStdGen $ mkStdGen $ seed option
   !gen <- PCG.restore $ PCG.initFrozen $ seed option
+  let ratios = [gratio option, iratio option, 1.0 - (gratio option) - (iratio option)]
 
   let loop !i | i>0 = do
                  !ops <- case bench option of
                    "pure" -> do
-                     !bag <- PB.newBag
-                     test threadn (PB.add bag) (\() -> PB.remove bag) option gen
-                   "scalable" -> do
-                     !bag <- SB.newBag
-                     test threadn (SB.add bag) (\() -> SB.remove bag) option gen
-                   "adaptive" -> do
-                     !bag <- AB.newBagThreshold 1
-                     test threadn (AB.add bag) (\() -> AB.remove bag) option gen
-                   _ -> test threadn (\_ -> do return ()) (\() -> return Nothing) option gen
+                     !m <- PM.newMap
+                     test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
+                                   (\k v -> PM.ins k v m),
+                                   (\k _ -> PM.del k m)] ratios option gen
+                   _ -> test threadn [nop, nop, nop] ratios option gen
+                     where nop _ _ = do return ()
                      
                  putStrLn $ show threadn ++ " threads: " ++ show ops ++ " ops/ms"
                  hFlush stdout
@@ -108,7 +106,9 @@ main = do
   threadn <- getNumCapabilities
   putStrLn $ "Thread number: " ++ show threadn
   putStrLn $ "Duration:      " ++ show (duration option) ++ "ms"
-  putStrLn $ "Ratio:         " ++ show (ratio option)
+  putStrLn $ "Get Ratio:     " ++ show (gratio option)
+  putStrLn $ "Delete Ratio:  " ++ show (1.0 - (gratio option) - (iratio option))
+  putStrLn $ "Insert Ratio:  " ++ show (iratio option)
   putStrLn $ "Initial size:  " ++ show (initial option)
   putStrLn $ "Number of runs:" ++ show (runs option)
   putStrLn $ "Warmup runs:   " ++ show (warmup option)
@@ -123,21 +123,25 @@ main = do
 
 data Flag
   = Flag {duration :: Int,
-          ratio :: Double,
+          gratio :: Double,
+          iratio :: Double,
           initial :: Int,
           seed :: Word64,
           file :: String,
           runs :: Int,
           warmup :: Int,
-          bench :: String}
+          bench :: String,
+          range :: Int64}
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
 flag = Flag {duration = 100 &= help "Duration",
              warmup = 5 &= help "number of warmup run",
-             ratio = 0.5 &= help "Ratio",
+             gratio = 1.0/3.0 &= help "Get Ratio",
+             iratio = 1.0/3.0 &= help "Insert ratio",
              initial = 0 &= help "Initial size",
+             range = 10000 &= help "Key range",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "" &= help "Benchvariant"}
+             bench = "nop" &= help "Benchvariant"}
