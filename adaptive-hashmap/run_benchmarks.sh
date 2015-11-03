@@ -83,7 +83,7 @@ function runcritbench ()
     CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=$TAG --seed=$TAG  --runs=10 -d=500\
+      --file=$TAG --seed=$TAG  --runs=25 -d=500\
        +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 
@@ -108,7 +108,7 @@ function go() {
 
 
     REPORT=report_par_${executable}
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+    for i in $(seq $1); do
 	    for BENCHVARIANT in nop pure ctrie; do
 		    runcritbench $i $BENCHVARIANT
 	    done
@@ -124,4 +124,4 @@ function go() {
     # fi
 }
 
-go
+go $1
