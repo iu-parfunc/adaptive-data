@@ -17,6 +17,8 @@ stack --version
 RESOLVER=lts-3.11
 STACK="stack --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-hashmap:bench-adaptive-hashmap
+GRATIO=$2
+IRATIO=$3
 
 export GIT_DEPTH=`git log --pretty=oneline | wc -l`
 echo "Running at GIT_DEPTH:" $GIT_DEPTH
@@ -79,11 +81,11 @@ function runcritbench ()
     NURSERY_SIZE=$((30000/$i))
     echo "Using nursery of size $NURSERY_SIZE"
 
-    CRITREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
-    CSVREPORT=${TAG}_${REPORT}${HOT_RATIO}-N$i.csv
+    CRITREPORT=${TAG}_${REPORT}${GRATIO}-{$IRATIO}-N$i.csv
+    CSVREPORT=${TAG}_${REPORT}${GRATIO}-{$IRATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=$TAG --seed=$TAG  --runs=25 -d=500\
+      --file=${TAG}_G${GRATIO}-I${IRATIO} --seed=$TAG --runs=25 -d=500 --gratio=$GRATIO --iratio=$IRATIO\
        +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 
