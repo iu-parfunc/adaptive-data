@@ -19,6 +19,7 @@ import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified PureMap as PM
+import qualified Control.Concurrent.Map as CM
 
 thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
 thread !_ !ops !ratios !option !bar !cont !seedn = do
@@ -86,6 +87,11 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
+                   "ctrie" -> do
+                     !m <- CM.empty
+                     test threadn [(\k _ -> do !r <- CM.lookup k m ; return ()),
+                                   (\k v -> CM.insert k v m),
+                                   (\k _ -> CM.delete k m)] ratios option gen
                    "nop" -> test threadn [nop, nop, nop] ratios option gen
                      where nop _ _ = do return ()
                    _ -> undefined
@@ -117,7 +123,7 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={nop,pure})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, ctrie})"
     else run threadn option
   return ()
   
@@ -145,4 +151,4 @@ flag = Flag {duration = 100 &= help "Duration",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "" &= help "Benchvariant"}
+             bench = "" &= help "Benchvariant {nop, pure, ctrie}"}
