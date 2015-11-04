@@ -131,6 +131,6 @@ go $1
 mkdir "${TAG}_G${GRATIO}-I${IRATIO}"
 mv ${TAG}_G${GRATIO}-I${IRATIO}_* ${TAG}_G${GRATIO}-I${IRATIO}/
 cd ${TAG}_G${GRATIO}-I${IRATIO}/
-gnuplot -e "filename='${TAG}_G${GRATIO}-I${IRATIO}'" ../bench.plt
+gnuplot -e "filename='${TAG}_G${GRATIO}-I${IRATIO}' ; ncore=$1" ../bench.plt
 
 
