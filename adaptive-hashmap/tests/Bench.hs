@@ -19,6 +19,7 @@ import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified PureMap as PM
+import qualified PureMapL as PML
 import qualified Control.Concurrent.Map as CM
 
 thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
@@ -87,6 +88,11 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
+                   "pureL" -> do
+                     !m <- PML.newMap
+                     test threadn [(\k _ -> do !r <- PML.get k m ; return ()),
+                                   (\k v -> PML.ins k v m),
+                                   (\k _ -> PML.del k m)] ratios option gen
                    "ctrie" -> do
                      !m <- CM.empty
                      test threadn [(\k _ -> do !r <- CM.lookup k m ; return ()),
@@ -123,7 +129,7 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, ctrie})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, pureL, ctrie})"
     else run threadn option
   return ()
   
@@ -151,4 +157,4 @@ flag = Flag {duration = 100 &= help "Duration",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "" &= help "Benchvariant {nop, pure, ctrie}"}
+             bench = "" &= help "Benchvariant {nop, pure, pureL, ctrie}"}
