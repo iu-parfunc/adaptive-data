@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module AdaptiveMap
-       (AdaptiveMap
+       (
+         AdaptiveMap
        , newMap
        , get
        , ins

@@ -25,7 +25,12 @@ flag debug
 library
   exposed-modules:     Control.Concurrent.PureMap,
                        Control.Concurrent.PureMapL,
-                       Control.Concurrent.Map
+                       Control.Concurrent.Map,
+                       Control.Concurrent.Map.Array,
+                       EntryRef,
+                       PureMap,
+                       Ctrie,
+                       AdaptiveMap
 
   -- other-modules:
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable

@@ -21,6 +21,7 @@ import qualified System.Random.PCG.Fast.Pure as PCG
 import qualified Control.Concurrent.PureMap as PM
 import qualified Control.Concurrent.PureMapL as PML
 import qualified Control.Concurrent.Map as CM
+import qualified AdaptiveMap as AM
 
 thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
 thread !_ !ops !ratios !option !bar !cont !seedn = do
@@ -98,6 +99,11 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- CM.lookup k m ; return ()),
                                    (\k v -> CM.insert k v m),
                                    (\k _ -> CM.delete k m)] ratios option gen
+                   "adaptive" -> do
+                     !m <- AM.newMap
+                     test threadn [(\k _ -> do !r <- AM.get k m ; return ()),
+                                   (\k v -> AM.ins k v m),
+                                   (\k _ -> AM.del k m)] ratios option gen
                    "nop" -> test threadn [nop, nop, nop] ratios option gen
                      where nop _ _ = do return ()
                    _ -> undefined
@@ -129,7 +135,7 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, pureL, ctrie})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, pureL, ctrie, adaptive})"
     else run threadn option
   return ()
   
@@ -157,4 +163,4 @@ flag = Flag {duration = 100 &= help "Duration",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "" &= help "Benchvariant {nop, pure, pureL, ctrie}"}
+             bench = "" &= help "Benchvariant {nop, pure, pureL, ctrie, adaptive}"}
