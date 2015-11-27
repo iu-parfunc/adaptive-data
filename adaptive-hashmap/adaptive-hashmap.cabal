@@ -23,8 +23,8 @@ flag debug
 
 
 library
-  exposed-modules:     PureMap,
-                       PureMapL,
+  exposed-modules:     Control.Concurrent.PureMap,
+                       Control.Concurrent.PureMapL,
                        Control.Concurrent.Map
 
   -- other-modules:

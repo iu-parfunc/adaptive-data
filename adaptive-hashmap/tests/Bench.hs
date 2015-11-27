@@ -18,8 +18,8 @@ import Data.Time.Clock
 import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import qualified PureMap as PM
-import qualified PureMapL as PML
+import qualified Control.Concurrent.PureMap as PM
+import qualified Control.Concurrent.PureMapL as PML
 import qualified Control.Concurrent.Map as CM
 
 thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
