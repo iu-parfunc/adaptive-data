@@ -7,13 +7,11 @@ set xlabel 'Thread number'
 set ylabel 'Ops/ms'
 plot filename.'_nop.csv' using 1:2:3 title 'NOP' with yerrorlines, \
      filename.'_pure.csv' using 1:2:3 title 'Pure' with yerrorlines, \
-     filename.'_pureL.csv' using 1:2:3 title 'Pure with lock' with yerrorlines, \
      filename.'_ctrie.csv' using 1:2:3 title 'Ctrie' with yerrorlines, \
      filename.'_adaptive.csv' using 1:2:3 title 'Adaptive' with yerrorlines
 
 set output filename.'_no_nop.png'
 plot filename.'_pure.csv' using 1:2:3 title 'Pure' with yerrorlines, \
-     filename.'_pureL.csv' using 1:2:3 title 'Pure with lock' with yerrorlines, \
      filename.'_ctrie.csv' using 1:2:3 title 'Ctrie' with yerrorlines, \
      filename.'_adaptive.csv' using 1:2:3 title 'Adaptive' with yerrorlines
 
