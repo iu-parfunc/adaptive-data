@@ -18,9 +18,6 @@ import qualified Data.HashMap.Strict as HM
 
 type PureMap k v = EntryRef (HM.HashMap k v)
 
-threshold :: Int
-threshold = 2
-
 {-# INLINABLE newMap #-}
 newMap :: (Eq k, Hashable k) => IO (PureMap k v)
 newMap = newEntryRef HM.empty
@@ -32,25 +29,19 @@ get !k !m = do m' <- readEntryRef m
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> PureMap k v -> IO ()
-ins !k !v !m = do
-  tik <- readEntryRefForCAS m
-  loop tik threshold
-  where loop !_   !i | i == 0 = throwIO TransitionException
-        loop !tik !i = do
+ins !k !v !m = loop =<< readEntryRefForCAS m
+  where loop !tik = do
           let !m' = peekEntryRefTicket tik
-          (success, t2) <- casEntryRef m tik $ HM.insert k v m'
-          if success then return () else loop t2 $ i - 1
+          (success, _) <- casEntryRef m tik $ HM.insert k v m'
+          if success then return () else throwIO TransitionException
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> PureMap k v -> IO ()
-del !k !m = do
-  tik <- readEntryRefForCAS m
-  loop tik threshold
-  where loop !_   !i | i == 0 = throwIO TransitionException
-        loop !tik !i = do
+del !k !m = loop =<< readEntryRefForCAS m
+  where loop !tik = do
           let !m' = peekEntryRefTicket tik
-          (success, t2) <- casEntryRef m tik $ HM.delete k m'
-          if success then return () else loop t2 $ i - 1
+          (success, _) <- casEntryRef m tik $ HM.delete k m'
+          if success then return () else throwIO TransitionException
 
 {-# INLINABLE toList #-}
 toList :: (Eq k, Hashable k) => PureMap k v -> IO ([(k, v)])
