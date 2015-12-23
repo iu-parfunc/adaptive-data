@@ -14,7 +14,7 @@ EXTRAARGS=$*
 which -a stack
 stack --version
 
-RESOLVER=lts-3.15
+RESOLVER=lts-3.19
 STACK="stack --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-hashmap:bench-adaptive-hashmap
 GRATIO=$2

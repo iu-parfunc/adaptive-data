@@ -27,7 +27,7 @@ library
                        Control.Concurrent.PureMapL,
                        Control.Concurrent.Map,
                        Control.Concurrent.Map.Array,
-                       EntryRef,
+                       Data.Concurrent.IORef,
                        PureMap,
                        Ctrie,
                        AdaptiveMap

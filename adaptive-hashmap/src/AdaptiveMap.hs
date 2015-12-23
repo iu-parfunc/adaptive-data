@@ -13,7 +13,7 @@ import Data.Atomics
 import Data.IORef
 import Data.Hashable
 import Control.Exception
-import EntryRef
+import qualified Data.Concurrent.IORef as FIR
 import qualified PureMap as PM
 import qualified Ctrie as CM
 
@@ -40,9 +40,9 @@ get !k !m = do
     B cm -> CM.lookup k cm
     BA cm _ -> CM.lookup k cm
   `catches`
-  [Handler (\e -> let _ = (e :: CASEntryRefException)
+  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in get k m),
-   Handler (\e -> let _ = (e :: TransitionException)
+   Handler (\e -> let _ = (e :: FIR.TransitionException)
                   in do tik <- readForCAS m
                         transition m tik
                         get k m)]
@@ -57,9 +57,9 @@ ins !k !v !m = do
     B cm -> CM.insert k v cm
     BA _ _ -> ins k v m
   `catches`
-  [Handler (\e -> let _ = (e :: CASEntryRefException)
+  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in ins k v m),
-   Handler (\e -> let _ = (e :: TransitionException)
+   Handler (\e -> let _ = (e :: FIR.TransitionException)
                   in do tik <- readForCAS m
                         transition m tik
                         ins k v m)]
@@ -74,9 +74,9 @@ del !k !m = do
     B cm -> CM.delete k cm
     BA _ _ -> del k m
   `catches`
-  [Handler (\e -> let _ = (e :: CASEntryRefException)
+  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in del k m),
-   Handler (\e -> let _ = (e :: TransitionException)
+   Handler (\e -> let _ = (e :: FIR.TransitionException)
                   in do tik <- readForCAS m
                         transition m tik
                         del k m)]

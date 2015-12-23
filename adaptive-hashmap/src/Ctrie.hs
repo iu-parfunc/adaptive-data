@@ -48,13 +48,13 @@ import Data.Word
 import Prelude hiding (lookup)
 
 import qualified Control.Concurrent.Map.Array as A
-import EntryRef
+import Data.Concurrent.IORef
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.
 newtype Map k v = Map (INode k v)
 
-type INode k v = EntryRef (MainNode k v)
+type INode k v = IORef (MainNode k v)
 
 data MainNode k v = CNode !Bitmap !(A.Array (Branch k v))
                   | Tomb !(SNode k v)
@@ -83,7 +83,7 @@ hash = fromIntegral . H.hash
 
 -- | /O(1)/. Construct an empty map.
 empty :: IO (Map k v)
-empty = Map <$> newEntryRef (CNode 0 A.empty)
+empty = Map <$> newIORef (CNode 0 A.empty)
 
 
 -----------------------------------------------------------------------
@@ -97,8 +97,8 @@ insert k v (Map root) = go0
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            ticket <- readEntryRefForCAS inode
-            case peekEntryRefTicket ticket of
+            ticket <- readForCAS inode
+            case peekTicket ticket of
                 CNode bmp arr -> do
                     let m = mask h lev
                         i = sparseIndex bmp m
@@ -107,21 +107,21 @@ insert k v (Map root) = go0
                         then do
                             let arr' = A.insert (SNode (S k v)) i n arr
                                 cn'  = CNode (bmp .|. m) arr'
-                            unlessM (fst <$> casEntryRef inode ticket cn') go0
+                            unlessM (fst <$> casIORef inode ticket cn') go0
 
                         else case A.index arr i of
                             SNode (S k2 v2)
                                 | k == k2 -> do
                                     let arr' = A.update (SNode (S k v)) i n arr
                                         cn'  = CNode bmp arr'
-                                    unlessM (fst <$> casEntryRef inode ticket cn') go0
+                                    unlessM (fst <$> casIORef inode ticket cn') go0
 
                                 | otherwise -> do
                                     let h2 = hash k2
                                     inode2 <- newINode h k v h2 k2 v2 (nextLevel lev)
                                     let arr' = A.update (INode inode2) i n arr
                                         cn'  = CNode bmp arr'
-                                    unlessM (fst <$> casEntryRef inode ticket cn') go0
+                                    unlessM (fst <$> casIORef inode ticket cn') go0
 
                             INode inode2 -> go (nextLevel lev) inode inode2
 
@@ -130,22 +130,22 @@ insert k v (Map root) = go0
                 Collision arr -> do
                     let arr' = S k v : filter (\(S k2 _) -> k2 /= k) arr
                         col' = Collision arr'
-                    unlessM (fst <$> casEntryRef inode ticket col') go0
+                    unlessM (fst <$> casIORef inode ticket col') go0
 
 {-# INLINABLE insert #-}
 
 newINode :: Hash -> k -> v -> Hash -> k -> v -> Int -> IO (INode k v)
 newINode h1 k1 v1 h2 k2 v2 lev
-    | lev >= hashLength = newEntryRef $ Collision [S k1 v1, S k2 v2]
+    | lev >= hashLength = newIORef $ Collision [S k1 v1, S k2 v2]
     | otherwise = do
         let i1 = index h1 lev
             i2 = index h2 lev
             bmp = (unsafeShiftL 1 i1) .|. (unsafeShiftL 1 i2)
         case compare i1 i2 of
-            LT -> newEntryRef $ CNode bmp $ A.pair (SNode (S k1 v1)) (SNode (S k2 v2))
-            GT -> newEntryRef $ CNode bmp $ A.pair (SNode (S k2 v2)) (SNode (S k1 v1))
+            LT -> newIORef $ CNode bmp $ A.pair (SNode (S k1 v1)) (SNode (S k2 v2))
+            GT -> newIORef $ CNode bmp $ A.pair (SNode (S k2 v2)) (SNode (S k1 v1))
             EQ -> do inode' <- newINode h1 k1 v1 h2 k2 v2 (nextLevel lev)
-                     newEntryRef $ CNode bmp $ A.singleton (INode inode')
+                     newIORef $ CNode bmp $ A.singleton (INode inode')
 
 
 -- | /O(log n)/. Remove the given key and its associated value from the map,
@@ -156,8 +156,8 @@ delete k (Map root) = go0
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            ticket <- readEntryRefForCAS inode
-            case peekEntryRefTicket ticket of
+            ticket <- readForCAS inode
+            case peekTicket ticket of
                 CNode bmp arr -> do
                     let m = mask h lev
                         i = sparseIndex bmp m
@@ -169,8 +169,8 @@ delete k (Map root) = go0
                                     let arr' = A.delete i (popCount bmp) arr
                                         cn'  = CNode (bmp `xor` m) arr'
                                         cn'' = contract lev cn'
-                                    unlessM (fst <$> casEntryRef inode ticket cn'') go0
-                                    whenM (isTomb <$> readEntryRef inode) $
+                                    unlessM (fst <$> casIORef inode ticket cn'') go0
+                                    whenM (isTomb <$> readIORef inode) $
                                         cleanParent parent inode h (prevLevel lev)
 
                                 | otherwise -> return ()  -- not found
@@ -183,7 +183,7 @@ delete k (Map root) = go0
                     let arr' = filter (\(S k2 _) -> k2 /= k) $ arr
                         col' | [s] <- arr' = Tomb s
                              | otherwise   = Collision arr'
-                    unlessM (fst <$> casEntryRef inode ticket col') go0
+                    unlessM (fst <$> casIORef inode ticket col') go0
 
 {-# INLINABLE delete #-}
 
@@ -197,7 +197,7 @@ lookup k (Map root) = go0
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            main <- readEntryRef inode
+            main <- readIORef inode
             case main of
                 CNode bmp arr -> do
                     let m = mask h lev
@@ -223,27 +223,27 @@ lookup k (Map root) = go0
 
 clean :: INode k v -> Level -> IO ()
 clean inode lev = do
-    ticket <- readEntryRefForCAS inode
-    case peekEntryRefTicket ticket of
+    ticket <- readForCAS inode
+    case peekTicket ticket of
         cn@(CNode _ _) -> do
             cn' <- compress lev cn
-            void $ casEntryRef inode ticket cn'
+            void $ casIORef inode ticket cn'
         _ -> return ()
 {-# INLINE clean #-}
 
 cleanParent :: INode k v -> INode k v -> Hash -> Level -> IO ()
 cleanParent parent inode h lev = do
-    ticket <- readEntryRefForCAS parent
-    case peekEntryRefTicket ticket of
+    ticket <- readForCAS parent
+    case peekTicket ticket of
         cn@(CNode bmp arr) -> do
             let m = mask h lev
                 i = sparseIndex bmp m
             unless (bmp .&. m == 0) $
                 case A.index arr i of
                     INode inode2 | inode2 == inode ->
-                        whenM (isTomb <$> readEntryRef inode) $ do
+                        whenM (isTomb <$> readIORef inode) $ do
                             cn' <- compress lev cn
-                            unlessM (fst <$> casEntryRef parent ticket cn') $
+                            unlessM (fst <$> casIORef parent ticket cn') $
                                 cleanParent parent inode h lev
                     _ -> return ()
         _ -> return ()
@@ -256,7 +256,7 @@ compress _ x = return x
 
 resurrect :: Branch k v -> IO (Branch k v)
 resurrect b@(INode inode) = do
-    main <- readEntryRef inode
+    main <- readIORef inode
     case main of
         Tomb s -> return (SNode s)
         _      -> return b
@@ -287,7 +287,7 @@ unsafeToList :: Map k v -> IO [(k,v)]
 unsafeToList (Map root) = go root
     where
         go inode = do
-            main <- readEntryRef inode
+            main <- readIORef inode
             case main of
                 CNode bmp arr -> A.foldM' go2 [] (popCount bmp) arr
                 Tomb (S k v) -> return [(k,v)]
@@ -301,8 +301,8 @@ freeze :: Map k v -> IO ()
 freeze (Map root) = go root
     where
         go inode = do
-          freezeloop inode =<< readEntryRefForCAS inode
-          main <- readEntryRef inode
+          freezeloop inode =<< readForCAS inode
+          main <- readIORef inode
           case main of
             CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
             Tomb (S _ _) -> return ()
@@ -311,7 +311,7 @@ freeze (Map root) = go root
         go2 (INode inode) = go inode
         go2 (SNode (S _ _)) = return ()
         freezeloop ref tik = do
-          (success, tik') <- freezeEntryRef ref tik
+          (success, tik') <- freezeIORef ref tik
           if success
             then return ()
             else freezeloop ref tik'
