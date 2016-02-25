@@ -11,5 +11,5 @@ RUN git config --global url."https://github.com/".insteadOf "git@github.com:"
 WORKDIR /root
 RUN git clone --recursive https://github.com/iu-parfunc/adaptive-data.git
 
-WORKDIR /root/adaptive-hashmap
-RUN stack build
+WORKDIR /root/adaptive-data/adaptive-hashmap
+RUN stack setup && stack build
