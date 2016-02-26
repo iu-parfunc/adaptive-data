@@ -31,7 +31,6 @@ library
                        Control.Concurrent.Adaptive.AdaptiveMap
 
   other-modules:       Control.Concurrent.Adaptive.Ctrie
-                     , Control.Concurrent.Adaptive.PureMap
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
   build-depends:       base >=4.7 && <4.9,
                        atomic-primops >= 0.8,
