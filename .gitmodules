@@ -1,6 +1,6 @@
 [submodule "haskell-lockfree"]
 	path = haskell-lockfree
-	url = https://github.com/rrnewton/haskell-lockfree.git
+	url = https://github.com/iu-parfunc/haskell-lockfree.git
 [submodule "concurrent-skiplist"]
 	path = concurrent-skiplist
 	url = https://github.com/rrnewton/concurrent-skiplist.git
