@@ -1,27 +1,27 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
-module Main
-       where
+module Main where
 
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Concurrent.Extra
 --import qualified Data.Atomics.Counter as C
-import Data.Int
-import Data.IORef
-import System.Console.CmdArgs
-import System.IO
-import System.Mem
-import Data.Time.Clock
-import GHC.Word
+import           Data.Int
+import           Data.IORef
+import           Data.Time.Clock
+import           GHC.Word
+import           System.Console.CmdArgs
+import           System.IO
+import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import qualified Control.Concurrent.PureMap as PM
-import qualified Control.Concurrent.PureMapL as PML
-import qualified Control.Concurrent.Map as CM
-import qualified AdaptiveMap as AM
+import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
+import qualified Control.Concurrent.Compact.PureMap      as CPM
+import qualified Control.Concurrent.Map                  as CM
+import qualified Control.Concurrent.PureMap              as PM
+import qualified Control.Concurrent.PureMapL             as PML
 
 thread :: Int -> [Int64 -> Int64 -> IO()] -> [Double] -> Flag -> Barrier Bool -> IORef(Bool) -> Word64 -> IO(Int)
 thread !_ !ops !ratios !option !bar !cont !seedn = do
@@ -40,7 +40,7 @@ thread !_ !ops !ratios !option !bar !cont !seedn = do
                                (0.0::Double,0) ratios)
           op k v
           loop $ i+1
-          
+
           else return i
 
 --  putStrLn $ "Thread " ++ show tid ++ "started"
@@ -89,6 +89,11 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
+                   "cpure" -> do
+                     !m <- CPM.newMap
+                     test threadn [(\k _ -> do !r <- CPM.get k m ; return ()),
+                                   (\k v -> CPM.ins k v m),
+                                   (\k _ -> CPM.del k m)] ratios option gen
                    "pureL" -> do
                      !m <- PML.newMap
                      test threadn [(\k _ -> do !r <- PML.get k m ; return ()),
@@ -107,7 +112,7 @@ run threadn option = do
                    "nop" -> test threadn [nop, nop, nop] ratios option gen
                      where nop _ _ = do return ()
                    _ -> undefined
-                     
+
                  putStrLn $ show threadn ++ " threads: " ++ show ops ++ " ops/ms"
                  hFlush stdout
                  !xs <- (loop $ i-1)
@@ -135,22 +140,22 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, pureL, ctrie, adaptive})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={nop, pure, cpure, pureL, ctrie, adaptive})"
     else run threadn option
   return ()
-  
+
 
 data Flag
   = Flag {duration :: Int,
-          gratio :: Double,
-          iratio :: Double,
-          initial :: Int,
-          seed :: Word64,
-          file :: String,
-          runs :: Int,
-          warmup :: Int,
-          bench :: String,
-          range :: Int64}
+          gratio   :: Double,
+          iratio   :: Double,
+          initial  :: Int,
+          seed     :: Word64,
+          file     :: String,
+          runs     :: Int,
+          warmup   :: Int,
+          bench    :: String,
+          range    :: Int64}
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
@@ -163,4 +168,4 @@ flag = Flag {duration = 100 &= help "Duration",
              seed = 4096 &= help "Seed",
              file = "report" &= help "Report file prefix",
              runs = 25 &= help "Number of runs",
-             bench = "" &= help "Benchvariant {nop, pure, pureL, ctrie, adaptive}"}
+             bench = "" &= help "Benchvariant {nop, pure, cpure, pureL, ctrie, adaptive}"}

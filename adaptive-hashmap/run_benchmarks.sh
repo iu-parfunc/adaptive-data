@@ -14,8 +14,8 @@ EXTRAARGS=$*
 which -a stack
 stack --version
 
-RESOLVER=lts-3.19
-STACK="stack --install-ghc --resolver=$RESOLVER"
+# RESOLVER=lts-3.19
+STACK="stack" # --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-hashmap:bench-adaptive-hashmap
 GRATIO=$2
 IRATIO=$3
@@ -111,7 +111,7 @@ function go() {
 
     REPORT=report_par_${executable}
     for i in $(seq $1); do
-	    for BENCHVARIANT in nop pure ctrie adaptive; do
+	    for BENCHVARIANT in nop pure cpure ctrie adaptive; do
 		    runcritbench $i $BENCHVARIANT
 	    done
     done
