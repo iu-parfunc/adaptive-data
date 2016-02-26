@@ -12,7 +12,7 @@ import           Control.DeepSeq
 import           Data.Atomics
 import           Data.Compact
 import           Data.Hashable
-import qualified Data.HashMap.Lazy as HM
+import qualified Data.HashMap.Strict as HM
 import           Data.IORef
 
 type PureMap k v = IORef (Compact (HM.HashMap k v))
