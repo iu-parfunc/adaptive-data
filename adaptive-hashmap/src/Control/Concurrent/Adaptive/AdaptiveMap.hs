@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module AdaptiveMap
+module Control.Concurrent.Adaptive.AdaptiveMap
        (
          AdaptiveMap
        , newMap
@@ -9,13 +9,13 @@ module AdaptiveMap
        )
        where
 
-import Data.Atomics
-import Data.IORef
-import Data.Hashable
-import Control.Exception
-import qualified Data.Concurrent.IORef as FIR
-import qualified PureMap as PM
-import qualified Ctrie as CM
+import qualified Control.Concurrent.Adaptive.Ctrie   as CM
+import qualified Control.Concurrent.Adaptive.PureMap as PM
+import           Control.Exception
+import           Data.Atomics
+import qualified Data.Concurrent.IORef               as FIR
+import           Data.Hashable
+import           Data.IORef
 
 data Hybrid k v = A !(PM.PureMap k v)
                 | AB !(PM.PureMap k v) !(CM.Map k v)
@@ -112,6 +112,6 @@ transition m tick = do
                 CM.freeze cm
                 l <- CM.unsafeToList cm
                 mapM_ (\(k, v) -> PM.ins k v pm) l
-                loop tick'                
+                loop tick'
         else return ()
     BA _ _ -> return ()

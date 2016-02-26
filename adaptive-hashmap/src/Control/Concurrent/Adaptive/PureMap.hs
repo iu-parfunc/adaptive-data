@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module PureMap
+module Control.Concurrent.Adaptive.PureMap
        (
          PureMap
        , newMap
@@ -11,10 +11,10 @@ module PureMap
        )
        where
 
-import Data.Hashable
-import Control.Exception
-import Data.Concurrent.IORef
-import qualified Data.HashMap.Strict as HM
+import           Control.Exception
+import           Data.Concurrent.IORef
+import           Data.Hashable
+import qualified Data.HashMap.Strict   as HM
 
 type PureMap k v = IORef (HM.HashMap k v)
 

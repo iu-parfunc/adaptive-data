@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns, PatternGuards, MagicHash #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -----------------------------------------------------------------------
 -- | A non-blocking concurrent map from hashable keys to values.
@@ -16,7 +17,7 @@
 --
 -----------------------------------------------------------------------
 
-module Ctrie
+module Control.Concurrent.Adaptive.Ctrie
     ( Map
 
       -- * Construction
@@ -38,17 +39,17 @@ module Ctrie
     ) where
 
 --import Control.Applicative ((<$>))
-import Control.Monad
-import Data.Bits
-import Data.Hashable (Hashable)
+import           Control.Monad
+import           Data.Bits
+import           Data.Hashable (Hashable)
 import qualified Data.Hashable as H
-import qualified Data.List as List
-import Data.Maybe
-import Data.Word
-import Prelude hiding (lookup)
+import qualified Data.List     as List
+import           Data.Maybe
+import           Data.Word
+import           Prelude       hiding (lookup)
 
 import qualified Control.Concurrent.Map.Array as A
-import Data.Concurrent.IORef
+import           Data.Concurrent.IORef
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.
