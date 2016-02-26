@@ -19,6 +19,7 @@ import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
 import qualified Control.Concurrent.Compact.PureMap      as CPM
+import qualified Control.Concurrent.Compact.PureMap2     as CPM2
 import qualified Control.Concurrent.Map                  as CM
 import qualified Control.Concurrent.PureMap              as PM
 import qualified Control.Concurrent.PureMapL             as PML
@@ -94,6 +95,11 @@ run threadn option = do
                      test threadn [(\k _ -> do !r <- CPM.get k m ; return ()),
                                    (\k v -> CPM.ins k v m),
                                    (\k _ -> CPM.del k m)] ratios option gen
+                   "cpure2" -> do
+                     !m <- CPM2.newMap
+                     test threadn [(\k _ -> do !r <- CPM2.get k m ; return ()),
+                                   (\k v -> CPM2.ins k v m),
+                                   (\k _ -> CPM2.del k m)] ratios option gen
                    "pureL" -> do
                      !m <- PML.newMap
                      test threadn [(\k _ -> do !r <- PML.get k m ; return ()),

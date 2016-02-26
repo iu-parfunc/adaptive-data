@@ -28,8 +28,9 @@ library
                        Control.Concurrent.Map,
                        Control.Concurrent.Map.Array,
                        Data.Concurrent.IORef,
-                       Control.Concurrent.Adaptive.AdaptiveMap
-                       Control.Concurrent.Compact.PureMap
+                       Control.Concurrent.Adaptive.AdaptiveMap,
+                       Control.Concurrent.Compact.PureMap,
+                       Control.Concurrent.Compact.PureMap2
 
   other-modules:       Control.Concurrent.Adaptive.Ctrie
                      , Control.Concurrent.Adaptive.PureMap

@@ -111,7 +111,7 @@ function go() {
 
     REPORT=report_par_${executable}
     for i in $(seq $1); do
-	    for BENCHVARIANT in nop pure cpure ctrie adaptive; do
+	    for BENCHVARIANT in nop pure cpure cpure2 ctrie adaptive; do
 		    runcritbench $i $BENCHVARIANT
 	    done
     done
