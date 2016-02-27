@@ -19,6 +19,8 @@ STACK="stack --install-ghc --resolver=$RESOLVER"
 TARGET=adaptive-hashmap:bench-adaptive-hashmap
 GRATIO=$2
 IRATIO=$3
+OPS1=$4
+OPS2=$5
 
 export GIT_DEPTH=`git log --pretty=oneline | wc -l`
 echo "Running at GIT_DEPTH:" $GIT_DEPTH
@@ -85,7 +87,7 @@ function runcritbench ()
     CSVREPORT=${TAG}_${REPORT}${GRATIO}-{$IRATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=${TAG}_G${GRATIO}-I${IRATIO} --seed=$TAG --runs=25 -d=500 --gratio=$GRATIO --iratio=$IRATIO\
+      --file=${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2} --seed=$TAG --runs=25 -d=500 --gratio=$GRATIO --iratio=$IRATIO --ops1=$OPS1 --ops2=$OPS2\
        +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 
@@ -128,9 +130,9 @@ function go() {
 
 go $1
 
-mkdir "${TAG}_G${GRATIO}-I${IRATIO}"
-mv ${TAG}_G${GRATIO}-I${IRATIO}_* ${TAG}_G${GRATIO}-I${IRATIO}/
-cd ${TAG}_G${GRATIO}-I${IRATIO}/
-gnuplot -e "filename='${TAG}_G${GRATIO}-I${IRATIO}' ; ncore=$1" ../bench.plt
+mkdir "${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2}"
+mv ${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2}_* ${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2}/
+cd ${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2}/
+gnuplot -e "filename='${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2}' ; ncore=$1" ../bench.plt
 
 
