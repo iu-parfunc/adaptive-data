@@ -1,10 +1,10 @@
 [submodule "haskell-lockfree"]
 	path = haskell-lockfree
-	url = https://github.com/rrnewton/haskell-lockfree.git
+	url = git@github.com:rrnewton/haskell-lockfree
 [submodule "concurrent-skiplist"]
 	path = concurrent-skiplist
-	url = https://github.com/rrnewton/concurrent-skiplist.git
+	url = git@github.com:rrnewton/concurrent-skiplist.git
 [submodule "pcg-random"]
 	path = pcg-random
-	url = https://github.com/rrnewton/pcg-random.git
+	url = git@github.com:rrnewton/pcg-random.git
 	ignore = untracked
