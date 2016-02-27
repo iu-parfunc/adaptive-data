@@ -63,8 +63,9 @@ del !k !m = do
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in del k m)]
 
-transition :: (Eq k, Hashable k) => AdaptiveMap k v -> Ticket (Hybrid k v) -> IO ()
-transition m tick = do
+transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
+transition m = do
+  tick <- readForCAS m
   case peekTicket tick of
     A cm ->  do
       pm <- PM.newMap
