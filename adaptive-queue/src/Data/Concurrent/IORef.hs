@@ -5,6 +5,7 @@ module Data.Concurrent.IORef (
     IOVal,
     newIORef,
     readIORef,
+    writeIORef,
     casIORef,
     readForCAS,
     peekTicket,
@@ -14,6 +15,7 @@ module Data.Concurrent.IORef (
     ) where
 
 import           Control.Exception
+import           Control.Monad
 import qualified Data.Atomics      as A
 import qualified Data.IORef        as IR
 import           Data.Typeable
@@ -48,6 +50,14 @@ readIORef (IORef !ref) = do
   case v of
     Val t    -> return t
     Frozen t -> return t
+
+{-# INLINABLE writeIORef #-}
+writeIORef :: IORef a -> a -> IO ()
+writeIORef io !a = readForCAS io >>= loop
+  where
+    loop tik = do
+      (success, tik') <- casIORef io tik a
+      unless success $ loop tik'
 
 {-# INLINABLE readForCAS #-}
 readForCAS :: IORef a -> IO (A.Ticket (IOVal a))
