@@ -87,7 +87,7 @@ function runcritbench ()
     CSVREPORT=${TAG}_${REPORT}${GRATIO}-{$IRATIO}-N$i.csv
 
     $STACK bench $TARGET --benchmark-arguments="--bench=$BENCHVARIANT \
-      --file=${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2} --seed=$TAG --runs=25 -d=500 --gratio=$GRATIO --iratio=$IRATIO --ops1=$OPS1 --ops2=$OPS2\
+      --file=${TAG}_G${GRATIO}-I${IRATIO}-OPS${OPS1}-${OPS2} --seed=$TAG --runs=25 -d=500 --gratio=$GRATIO --iratio=$IRATIO --range=4294967296 --ops1=$OPS1 --ops2=$OPS2\
        +RTS -N$i $RTSOPTS "
 # TODO: Pass EXTRAARGS
 
