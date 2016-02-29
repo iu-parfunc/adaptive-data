@@ -49,7 +49,7 @@ ins !k !v !m = do
     B pm -> PM.ins k v pm
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in del k m)]
+                  in ins k m)]
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO ()
