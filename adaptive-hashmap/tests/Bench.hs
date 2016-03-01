@@ -74,6 +74,16 @@ stddev xs = sqrt $ (sum (map (\x -> (x - avg) * (x - avg)) xs)) / len
   where len = (realToFrac $ length xs) :: Double
         avg = mean xs
 
+-- My own forM for numeric ranges (not requiring deforestation optimizations).
+-- Inclusive start, exclusive end.
+{-# INLINE for_ #-}
+for_ :: Monad m => Int -> Int -> (Int -> m ()) -> m ()
+for_ start end _fn | start > end = error "for_: start is greater than end"
+for_ start end fn = loop start
+  where
+       loop !i | i == end  = return ()
+                  | otherwise = do fn i; loop (i+1)
+
 run :: Int -> Flag -> IO()
 run threadn option = do
   outh <- openFile ((file option) ++ "_" ++ (bench option) ++ ".csv") AppendMode
@@ -82,35 +92,41 @@ run threadn option = do
   !gen <- PCG.restore $ PCG.initFrozen $ seed option
   let ratios = [gratio option, iratio option, 1.0 - (gratio option) - (iratio option)]
 
+--  let size = 100000 
+--  let size = 1000 * 1000
+  let size = fromIntegral (initial option) :: Int64
   let loop !i | i>0 = do
                  !ops <- case bench option of
                    "pure" -> do
                      !m <- PM.newMap
-                     mapM_ (\k -> PM.ins k (k + 1) m) [1..100000]
+                     mapM_ (\k -> PM.ins k (k + 1) m) [1..size]
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
-                   "cpure" -> do
-                     !m <- CPM.newMap
-                     mapM_ (\k -> CPM.ins k (k + 1) m) [1..100000]
+                   "cpure" -> do -- Compact Pure.
+                     !mp <- PM.newMap
+                     mapM_ (\k -> PM.ins k (k + 1) mp) [1..size]
+                     mp2 <- PM.snapshot mp
+                     !m <- CPM.fromMap mp2
+                     -- mapM_ (\k -> CPM.ins k (k + 1) m) [1..size]
                      test threadn [(\k _ -> do !r <- CPM.get k m ; return ()),
                                    (\k v -> CPM.ins k v m),
                                    (\k _ -> CPM.del k m)] ratios option gen
                    "pureL" -> do
                      !m <- PML.newMap
-                     mapM_ (\k -> PML.ins k (k + 1) m) [1..100000]
+                     mapM_ (\k -> PML.ins k (k + 1) m) [1..size]
                      test threadn [(\k _ -> do !r <- PML.get k m ; return ()),
                                    (\k v -> PML.ins k v m),
                                    (\k _ -> PML.del k m)] ratios option gen
                    "ctrie" -> do
                      !m <- CM.empty
-                     mapM_ (\k -> CM.insert k (k + 1) m) [1..100000]
+                     mapM_ (\k -> CM.insert k (k + 1) m) [1..size]
                      test threadn [(\k _ -> do !r <- CM.lookup k m ; return ()),
                                    (\k v -> CM.insert k v m),
                                    (\k _ -> CM.delete k m)] ratios option gen
                    "adaptive" -> do
                      !m <- AM.newMap
-                     mapM_ (\k -> AM.ins k (k + 1) m) [1..100000]
+                     mapM_ (\k -> AM.ins k (k + 1) m) [1..size]
                      test threadn [(\k _ -> do !r <- AM.get k m ; return ()),
                                    (\k v -> AM.ins k v m),
                                    (\k _ -> AM.del k m)] ratios option gen

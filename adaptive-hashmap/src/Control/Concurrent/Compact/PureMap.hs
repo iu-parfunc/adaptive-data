@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Control.Concurrent.Compact.PureMap
        ( PureMap
        , newMap
+       , fromMap
        , get
        , ins
        , del
@@ -19,7 +21,13 @@ type PureMap k v = IORef (Compact (HM.HashMap k v))
 
 {-# INLINABLE newMap #-}
 newMap :: (Eq k, Hashable k, NFData k, NFData v) => IO (PureMap k v)
-newMap = newCompact 64 HM.empty >>= newIORef
+newMap = newCompact 4096 HM.empty >>= newIORef
+
+fromMap :: (Eq k, Hashable k, NFData k, NFData v) => HM.HashMap k v -> IO (PureMap k v)
+fromMap !m = do let sz = fromIntegral $ HM.size m
+                    bytes :: Double = 24 * sz + 256 * logBase 16 sz
+                c <- newCompact (fromIntegral $ round bytes) m
+                newIORef c
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)

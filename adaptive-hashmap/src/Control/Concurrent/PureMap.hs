@@ -6,6 +6,7 @@ module Control.Concurrent.PureMap
        , get
        , ins
        , del
+       , snapshot
        )
        where
 
@@ -19,6 +20,9 @@ type PureMap k v = IORef (HM.HashMap k v)
 {-# INLINABLE newMap #-}
 newMap :: (Eq k, Hashable k) => IO (PureMap k v)
 newMap = newIORef HM.empty
+
+snapshot :: PureMap k v -> IO (HM.HashMap k v)
+snapshot = readIORef
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
