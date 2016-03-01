@@ -1,4 +1,6 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Control.Concurrent.Adaptive.AdaptiveMap
        (
          AdaptiveMap
@@ -10,11 +12,12 @@ module Control.Concurrent.Adaptive.AdaptiveMap
        )
        where
 
-import qualified Control.Concurrent.Adaptive.Ctrie   as CM
-import qualified Control.Concurrent.PureMap          as PM
+import qualified Control.Concurrent.Adaptive.Ctrie as CM
+import qualified Control.Concurrent.PureMap        as PM
 import           Control.Exception
+import           Control.Monad
 import           Data.Atomics
-import qualified Data.Concurrent.IORef               as FIR
+import qualified Data.Concurrent.IORef             as FIR
 import           Data.Hashable
 import           Data.IORef
 
@@ -35,9 +38,9 @@ get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
 get !k !m = do
   state <- readIORef m
   case state of
-    A cm -> CM.lookup k cm
+    A cm  -> CM.lookup k cm
     AB cm -> CM.lookup k cm
-    B pm -> PM.get k pm
+    B pm  -> PM.get k pm
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> AdaptiveMap k v -> IO ()
@@ -48,8 +51,7 @@ ins !k !v !m = do
     AB _ -> ins k v m
     B pm -> PM.ins k v pm
   `catches`
-  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in ins k v m)]
+  [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO ()
@@ -60,26 +62,22 @@ del !k !m = do
     AB _ -> del k m
     B pm -> PM.del k pm
   `catches`
-  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in del k m)]
+  [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
 
 transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
 transition m = do
   tick <- readForCAS m
   case peekTicket tick of
-    A cm ->  do
+    A cm -> do
       pm <- PM.newMap
       (success, tick') <- casIORef m tick (AB cm)
-      if success
-        then do let loop tik = do
-                      (s, tik') <- casIORef m tik (B pm)
-                      if s
-                        then return ()
-                        else loop tik'
-                CM.freeze cm
-                l <- CM.unsafeToList cm
-                mapM_ (\(k, v) -> PM.ins k v pm) l
-                loop tick'
-        else return ()
+      when success $ do
+        let loop tik = do
+              (s, tik') <- casIORef m tik (B pm)
+              unless success $ loop tik'
+        CM.freeze cm
+        l <- CM.unsafeToList cm
+        mapM_ (\(k, v) -> PM.ins k v pm) l
+        loop tick'
     AB _ -> return ()
     B _ -> return ()

@@ -300,22 +300,19 @@ unsafeToList (Map root) = go root
 
 freeze :: Map k v -> IO ()
 freeze (Map root) = go root
-    where
-        go inode = do
-          freezeloop inode =<< readForCAS inode
-          main <- readIORef inode
-          case main of
-            CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
-            Tomb (S _ _) -> return ()
-            Collision _ -> return ()
-
-        go2 (INode inode) = go inode
-        go2 (SNode (S _ _)) = return ()
-        freezeloop ref tik = do
-          (success, tik') <- freezeIORef ref tik
-          if success
-            then return ()
-            else freezeloop ref tik'
+  where
+    go inode = do
+      freezeloop inode =<< readForCAS inode
+      main <- readIORef inode
+      case main of
+        CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
+        Tomb (S _ _)  -> return ()
+        Collision _   -> return ()
+    go2 (INode inode) = go inode
+    go2 (SNode (S _ _)) = return ()
+    freezeloop ref tik = do
+      (success, tik') <- freezeIORef ref tik
+      unless success $ freezeloop ref tik'
 {-# INLINABLE freeze #-}
 
 -----------------------------------------------------------------------
