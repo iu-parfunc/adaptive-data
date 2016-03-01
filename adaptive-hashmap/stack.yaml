@@ -20,4 +20,5 @@ extra-deps:
 - thread-local-storage-0.1.0.3
 - unbounded-delays-0.1.0.9
 - unordered-containers-0.2.5.1
-resolver: ghc-7.11.20160126
+- stm-2.4.4.1
+resolver: ghc-7.11.20160226

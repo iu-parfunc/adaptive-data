@@ -86,26 +86,31 @@ run threadn option = do
                  !ops <- case bench option of
                    "pure" -> do
                      !m <- PM.newMap
+                     mapM_ (\k -> PM.ins k (k + 1) m) [1..100000]
                      test threadn [(\k _ -> do !r <- PM.get k m ; return ()),
                                    (\k v -> PM.ins k v m),
                                    (\k _ -> PM.del k m)] ratios option gen
                    "cpure" -> do
                      !m <- CPM.newMap
+                     mapM_ (\k -> CPM.ins k (k + 1) m) [1..100000]
                      test threadn [(\k _ -> do !r <- CPM.get k m ; return ()),
                                    (\k v -> CPM.ins k v m),
                                    (\k _ -> CPM.del k m)] ratios option gen
                    "pureL" -> do
                      !m <- PML.newMap
+                     mapM_ (\k -> PML.ins k (k + 1) m) [1..100000]
                      test threadn [(\k _ -> do !r <- PML.get k m ; return ()),
                                    (\k v -> PML.ins k v m),
                                    (\k _ -> PML.del k m)] ratios option gen
                    "ctrie" -> do
                      !m <- CM.empty
+                     mapM_ (\k -> CM.insert k (k + 1) m) [1..100000]
                      test threadn [(\k _ -> do !r <- CM.lookup k m ; return ()),
                                    (\k v -> CM.insert k v m),
                                    (\k _ -> CM.delete k m)] ratios option gen
                    "adaptive" -> do
                      !m <- AM.newMap
+                     mapM_ (\k -> AM.ins k (k + 1) m) [1..100000]
                      test threadn [(\k _ -> do !r <- AM.get k m ; return ()),
                                    (\k v -> AM.ins k v m),
                                    (\k _ -> AM.del k m)] ratios option gen
