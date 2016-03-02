@@ -63,8 +63,8 @@ forkNInsDel newMap insert delete elems splits = do
                                               else insert i (i + 1) m)
 
 {-# INLINABLE fork5050 #-}
-fork5050 :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> (Int64 -> m -> IO ()) -> Int -> Int -> VS.Vector Int -> IO ()
-fork5050 newMap insert delete elems splits vec = do
+fork5050 :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> (Int64 -> m -> IO ()) -> Int -> VS.Vector Int -> Int -> IO ()
+fork5050 newMap insert delete elems vec splits = do
   m <- newMap
   let quota = fromIntegral $ elems `quot` splits
   forkJoin splits
@@ -193,18 +193,28 @@ measure !iters !f = do
         }
   return m
 
+randomInts :: IO (VS.Vector Int)
+randomInts = do
+  gen <- PCG.createSystemRandom
+  VS.replicateM (100000 :: Int) (PCG.uniformR (0, 1) gen :: IO Int)
+
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
 benchmark "pure" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns PM.newMap PM.ins size
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel PM.newMap PM.ins PM.del size
+  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 PM.newMap PM.ins PM.del size =<< randomInts
 benchmark "ctrie" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns CM.empty CM.insert size
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CM.empty CM.insert CM.delete
                                                           size
+  | bench == "random" = fori 1 threads .
+                        (measure runs .) .
+                        fork5050 CM.empty CM.insert CM.delete size =<< randomInts
 benchmark "adaptive" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns AM.newMap AM.ins size
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel AM.newMap AM.ins AM.del size
+  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 AM.newMap AM.ins AM.del size =<< randomInts
 benchmark _ _ = error "unknown"
 
 main :: IO ()
@@ -235,7 +245,7 @@ main = do
   plotListsStyle
     [ XLabel "Threads"
     , YLabel "Time in seconds"
-    , Title "Insert"
+    , Title (bench opts)
     , Custom "grid" []
     , term
     , Custom "style line" ["3", "lc", "3", "lw", "3"]
@@ -260,11 +270,11 @@ data Flag =
 
 flag :: Flag
 flag = Flag
-  { warmup = 5 &= help "number of warmup runs"
+  { warmup = 5 &= help "Number of warmup runs"
   , size = 100000 &= help "Key size"
   , file = "report" &= help "Report file prefix"
   , output = "svg" &= help "Output {svg, x11}"
-  , runs = 25 &= help "Number of runs"
+  , runs = 50 &= help "Number of runs"
   , bench = "insdel" &= help "Benchmark {ins, insdel, random}"
   , variants = ["pure", "ctrie", "adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive}"
   , threads = 0 &= help "Number of threads"
