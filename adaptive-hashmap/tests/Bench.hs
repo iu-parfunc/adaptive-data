@@ -51,7 +51,7 @@ thread !_ !ops !ratios !option !bar !seedn = do
                                                then (x + z, j)
                                                else (x + z, j + 1))
                                (0.0 :: Double, 0)
-                               [0.9999, 5.0e-5, 5.0e-5])
+                               [1.0, 0.0, 0.0])
           op k v
           read_loop $ i - 1
 
