@@ -245,6 +245,7 @@ main = do
   plotListsStyle
     [ XLabel "Threads"
     , YLabel "Time in seconds"
+    , XTicks $ Just ["1"]
     , Title (bench opts)
     , Custom "grid" []
     , term
