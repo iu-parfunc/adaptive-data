@@ -19,7 +19,7 @@ import qualified Data.HashMap.Strict as HM
 type PureMap k v = IORef (HM.HashMap k v)
 
 threshold :: Int
-threshold = 2
+threshold = 1
 
 {-# INLINABLE newMap #-}
 newMap :: (Eq k, Hashable k) => IO (PureMap k v)
