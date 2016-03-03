@@ -15,12 +15,11 @@ import Data.Hashable
 import Control.Exception
 import qualified Data.Concurrent.IORef as FIR
 import qualified PureMap as PM
-import qualified Ctrie as CM
+import qualified Control.Concurrent.Map as CM
 
 data Hybrid k v = A !(PM.PureMap k v)
                 | AB !(PM.PureMap k v) !(CM.Map k v)
                 | B !(CM.Map k v)
-                | BA !(CM.Map k v) !(PM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
 
@@ -38,7 +37,6 @@ get !k !m = do
     A pm -> PM.get k pm
     AB pm _ -> PM.get k pm
     B cm -> CM.lookup k cm
-    BA cm _ -> CM.lookup k cm
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in get k m),
@@ -55,7 +53,6 @@ ins !k !v !m = do
     A pm -> PM.ins k v pm
     AB _ _ -> ins k v m
     B cm -> CM.insert k v cm
-    BA _ _ -> ins k v m
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in ins k v m),
@@ -72,7 +69,6 @@ del !k !m = do
     A pm -> PM.del k pm
     AB _ _ -> del k m
     B cm -> CM.delete k cm
-    BA _ _ -> del k m
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in del k m),
@@ -98,20 +94,6 @@ transition m tick = do
                 mapM_ (\(k, v) -> CM.insert k v cm) l
                 loop tick'
         else return ()
-
     AB _ _ -> return ()
-    B cm ->  do
-      pm <- PM.newMap
-      (success, tick') <- casIORef m tick (BA cm pm)
-      if success
-        then do let loop tik = do
-                      (s, tik') <- casIORef m tik (A pm)
-                      if s
-                        then return ()
-                        else loop tik'
-                CM.freeze cm
-                l <- CM.unsafeToList cm
-                mapM_ (\(k, v) -> PM.ins k v pm) l
-                loop tick'                
-        else return ()
-    BA _ _ -> return ()
+    B _ ->  return ()
+

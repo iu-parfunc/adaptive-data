@@ -7,5 +7,6 @@ packages:
 
 extra-deps:
  - thread-local-storage-0.1.0.3
+ - concurrent-extra-0.7.0.10
 
-resolver: lts-3.19
+resolver: lts-5.5

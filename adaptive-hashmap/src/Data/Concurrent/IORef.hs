@@ -19,7 +19,7 @@ import qualified Data.Atomics as A
 import Control.Exception
 import Data.Typeable
 
-data IORef t = IORef !(IR.IORef (IOVal t)) deriving (Eq, Typeable)
+newtype IORef t = IORef (IR.IORef (IOVal t)) deriving (Eq, Typeable)
 data IOVal t = Val !t | Frozen !t deriving (Show, Typeable)
 
 data CASIORefException = CASIORefException deriving (Show, Typeable)

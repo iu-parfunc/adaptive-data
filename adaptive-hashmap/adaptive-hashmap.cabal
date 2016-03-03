@@ -29,12 +29,11 @@ library
                        Control.Concurrent.Map.Array,
                        Data.Concurrent.IORef,
                        PureMap,
-                       Ctrie,
                        AdaptiveMap
 
   -- other-modules:
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
-  build-depends:       base >=4.7 && <4.9,
+  build-depends:       base >=4.7,
                        atomic-primops >= 0.8,
                        thread-local-storage >= 0.1.0.3,
                        primitive >= 0.6,
@@ -51,7 +50,7 @@ benchmark bench-adaptive-hashmap
     ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N
     hs-source-dirs: tests/
     build-depends: base >= 4.6,
-                   async >= 2.0 && < 2.1,
+                   async >= 2.0,
                    atomic-primops >= 0.8,
                    thread-local-storage >= 0.1.0.3,
                    cmdargs >=0.10.13,
