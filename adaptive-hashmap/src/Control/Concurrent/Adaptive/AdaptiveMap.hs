@@ -66,18 +66,15 @@ del !k !m = do
 
 transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
 transition m = do
-  tick <- readForCAS m
-  case peekTicket tick of
+  tik <- readForCAS m
+  case peekTicket tik of
     A cm -> do
       pm <- PM.newMap
-      (success, tick') <- casIORef m tick (AB cm)
+      (success, tik') <- casIORef m tik (AB cm)
       when success $ do
-        let loop tik = do
-              (s, tik') <- casIORef m tik (B pm)
-              unless success $ loop tik'
         CM.freeze cm
         l <- CM.unsafeToList cm
         mapM_ (\(k, v) -> PM.ins k v pm) l
-        loop tick'
+        FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
     AB _ -> return ()
     B _ -> return ()

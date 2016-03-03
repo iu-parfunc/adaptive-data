@@ -10,10 +10,11 @@ module Control.Concurrent.PureMap
        )
        where
 
-import Data.Atomics
-import Data.IORef
-import Data.Hashable
-import qualified Data.HashMap.Strict as HM
+import           Data.Atomics
+import           Data.Concurrent.IORef (spinlock)
+import           Data.Hashable
+import qualified Data.HashMap.Strict   as HM
+import           Data.IORef
 
 type PureMap k v = IORef (HM.HashMap k v)
 
@@ -26,21 +27,20 @@ snapshot = readIORef
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
-get !k !m = do m' <- readIORef m
-               return $ HM.lookup k m'
+get !k !m = do
+  m' <- readIORef m
+  return $ HM.lookup k m'
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> PureMap k v -> IO ()
 ins !k !v !m = loop =<< readForCAS m
-  where loop tik = do
-          let !m' = peekTicket tik
-          (success, t2) <- casIORef m tik $ HM.insert k v m'
-          if success then return () else loop t2
+  where
+    loop = spinlock (\tik -> let !m' = peekTicket tik
+                             in casIORef m tik $ HM.insert k v m')
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> PureMap k v -> IO ()
 del !k !m = loop =<< readForCAS m
-  where loop tik = do
-          let !m' = peekTicket tik
-          (success, t2) <- casIORef m tik $ HM.delete k m'
-          if success then return () else loop t2
+  where
+    loop = spinlock (\tik -> let !m' = peekTicket tik
+                             in casIORef m tik $ HM.delete k m')

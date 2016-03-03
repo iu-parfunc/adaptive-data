@@ -310,9 +310,7 @@ freeze (Map root) = go root
         Collision _   -> return ()
     go2 (INode inode) = go inode
     go2 (SNode (S _ _)) = return ()
-    freezeloop ref tik = do
-      (success, tik') <- freezeIORef ref tik
-      unless success $ freezeloop ref tik'
+    freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINABLE freeze #-}
 
 -----------------------------------------------------------------------
