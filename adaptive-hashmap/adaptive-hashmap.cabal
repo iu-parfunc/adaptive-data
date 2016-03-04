@@ -25,8 +25,8 @@ library
                        Control.Concurrent.Map,
                        Control.Concurrent.Map.Array,
                        Data.Concurrent.IORef,
-                       Control.Concurrent.Adaptive.AdaptiveMap
-                       Control.Concurrent.Compact.PureMap
+                       Control.Concurrent.Adaptive.AdaptiveMap,
+                       Control.Concurrent.Compact.PureMap,
                        Control.Concurrent.Compact.AdaptiveMap
   other-modules:       Control.Concurrent.Adaptive.Ctrie
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
