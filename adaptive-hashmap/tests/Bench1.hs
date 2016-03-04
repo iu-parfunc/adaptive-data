@@ -87,6 +87,26 @@ forkJoin num act = loop num []
              putMVar mv ()
       loop (n - 1) (mv : ls)
 
+hotCold :: IO m
+        -> (Int64 -> m -> IO (Maybe Int64))
+        -> (Int64 -> Int64 -> m -> IO ())
+        -> (Int64 -> m -> IO ())
+        -> (m -> IO ())
+        -> Int -> Int -> IO ()
+hotCold newMap get insert delete transition elems splits = do
+  m <- newMap
+  let quota = fromIntegral $ elems `quot` splits
+  forkJoin splits
+    (\chunk -> do
+       let offset = fromIntegral $ chunk * fromIntegral quota
+           phase = quota `quot` 2
+       for_ offset (offset + phase) $ \i -> if even chunk
+                                              then delete i m
+                                              else insert i (i + 1) m
+       transition m
+       let offset' = offset + phase + 1
+       for_ offset' (offset' + phase) $ \i -> get i m)
+
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
 for_ start end _
@@ -198,23 +218,27 @@ randomInts = do
   gen <- PCG.createSystemRandom
   VS.replicateM (100000 :: Int) (PCG.uniformR (0, 1) gen :: IO Int)
 
+{-# INLINE nop #-}
+nop :: Applicative m => a -> m ()
+nop _ = pure ()
+
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
 benchmark "pure" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns PM.newMap PM.ins size
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel PM.newMap PM.ins PM.del size
   | bench == "random" = fori 1 threads . (measure runs .) . fork5050 PM.newMap PM.ins PM.del size =<< randomInts
+  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold PM.newMap PM.get PM.ins PM.del nop size
 benchmark "ctrie" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns CM.empty CM.insert size
-  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CM.empty CM.insert CM.delete
-                                                          size
-  | bench == "random" = fori 1 threads .
-                        (measure runs .) .
-                        fork5050 CM.empty CM.insert CM.delete size =<< randomInts
+  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CM.empty CM.insert CM.delete size
+  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 CM.empty CM.insert CM.delete size =<< randomInts
+  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold CM.empty CM.lookup CM.insert CM.delete nop size
 benchmark "adaptive" Flag { bench, runs, size, threads }
   | bench == "ins" = fori 1 threads $ measure runs . forkNIns AM.newMap AM.ins size
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel AM.newMap AM.ins AM.del size
   | bench == "random" = fori 1 threads . (measure runs .) . fork5050 AM.newMap AM.ins AM.del size =<< randomInts
+  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold AM.newMap AM.get AM.ins AM.del AM.transition size
 benchmark _ _ = error "unknown"
 
 main :: IO ()
@@ -276,7 +300,7 @@ flag = Flag
   , file = "report" &= help "Report file prefix"
   , output = "svg" &= help "Output {svg, x11}"
   , runs = 50 &= help "Number of runs"
-  , bench = "insdel" &= help "Benchmark {ins, insdel, random}"
+  , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold}"
   , variants = ["pure", "ctrie", "adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive}"
   , threads = 0 &= help "Number of threads"
   }
