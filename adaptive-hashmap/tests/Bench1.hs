@@ -27,7 +27,7 @@ import qualified Graphics.Gnuplot.Terminal.SVG as SVG
 import qualified Graphics.Gnuplot.Terminal.X11 as X11
 
 import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
-import qualified Control.Concurrent.Compact.PureMap      as CPM
+import qualified Control.Concurrent.Compact.AdaptiveMap  as CAM
 import qualified Control.Concurrent.Map                  as CM
 import qualified Control.Concurrent.PureMap              as PM
 import qualified Control.Concurrent.PureMapL             as PML
@@ -239,6 +239,11 @@ benchmark "adaptive" Flag { bench, runs, size, threads }
   | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel AM.newMap AM.ins AM.del size
   | bench == "random" = fori 1 threads . (measure runs .) . fork5050 AM.newMap AM.ins AM.del size =<< randomInts
   | bench == "hotcold" = fori 1 threads $ measure runs . hotCold AM.newMap AM.get AM.ins AM.del AM.transition size
+benchmark "c-adaptive" Flag { bench, runs, size, threads }
+  | bench == "ins" = fori 1 threads $ measure runs . forkNIns CAM.newMap CAM.ins size
+  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CAM.newMap CAM.ins CAM.del size
+  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 CAM.newMap CAM.ins CAM.del size =<< randomInts
+  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold CAM.newMap CAM.get CAM.ins CAM.del CAM.transition size
 benchmark _ _ = error "unknown"
 
 main :: IO ()
@@ -301,6 +306,6 @@ flag = Flag
   , output = "svg" &= help "Output {svg, x11}"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold}"
-  , variants = ["pure", "ctrie", "adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive}"
+  , variants = ["pure", "ctrie", "adaptive", "c-adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
   , threads = 0 &= help "Number of threads"
   }
