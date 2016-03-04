@@ -266,7 +266,7 @@ main = do
                then terminal $ (SVG.cons $ file opts ++ ".svg")
                else terminal $ (X11.persist $ X11.cons)
 
-  plotListsStyle
+  plotPathsStyle
     [ XLabel "Threads"
     , YLabel "Time in seconds"
     , XTicks $ Just ["1"]
@@ -275,7 +275,7 @@ main = do
     , term
     , Custom "style line" ["3", "lc", "3", "lw", "3"]
     ]
-    (map (\(v, z) -> (style v, (measTime . snd) `fmap` z)) (vs `zip` zs))
+    (map (\(v, z) -> (style v, (\(t, m) -> (fromIntegral t, measTime m)) `fmap` z)) (vs `zip` zs))
 
   where
     style v = defaultStyle { plotType = LinesPoints, lineSpec = CustomStyle [LineTitle v] }
