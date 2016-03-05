@@ -44,9 +44,9 @@ import qualified Control.Concurrent.PureMapL             as PML
 forkNIns :: IO m
          -> (Int64 -> Int64 -> m -> IO ())
          -> Int -> Int -> IO Measured
-forkNIns newMap insert elems splits = do
+forkNIns newMap insert ops splits = do
   !m <- newMap
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
     for_ offset (offset + quota) $ \i -> insert i (i + 1) m
@@ -56,9 +56,9 @@ forkNInsDel :: IO m
             -> (Int64 -> Int64 -> m -> IO ())
             -> (Int64 -> m -> IO ())
             -> Int -> Int -> IO Measured
-forkNInsDel newMap insert delete elems splits = do
+forkNInsDel newMap insert delete ops splits = do
   !m <- newMap
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
     for_ offset (offset + quota) $ \i -> if even chunk
@@ -70,10 +70,10 @@ fork5050 :: IO m
          -> (Int64 -> Int64 -> m -> IO ())
          -> (Int64 -> m -> IO ())
          -> Int -> IO (VU.Vector Int) -> Int -> IO Measured
-fork5050 newMap insert delete elems newVec splits = do
+fork5050 newMap insert delete ops newVec splits = do
   !m <- newMap
   !vec <- newVec
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
         shouldDel = (vec VU.! (fromIntegral offset `mod` VU.length vec)) == 0
@@ -107,10 +107,10 @@ hotCold :: IO m
         -> (Int64 -> m -> IO ())
         -> (m -> IO ())
         -> Int -> Int64 -> Int -> IO Measured
-hotCold newMap get insert delete transition elems ratio splits = do
+hotCold newMap get insert delete transition ops ratio splits = do
   !m <- newMap
   fill m insert
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
   measureOnce $ forkJoin splits $ \chunk -> do
@@ -127,10 +127,10 @@ hotPhase :: IO m
          -> (Int64 -> m -> IO ())
          -> (m -> IO ())
          -> Int -> Int64 -> Int -> IO Measured
-hotPhase newMap get insert delete transition elems ratio splits = do
+hotPhase newMap get insert delete transition ops ratio splits = do
   !m <- newMap
   fill m insert
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
@@ -143,10 +143,10 @@ coldPhase :: IO m
           -> (Int64 -> m -> IO ())
           -> (m -> IO ())
           -> Int -> Int64 -> Int -> IO Measured
-coldPhase newMap get insert delete transition elems ratio splits = do
+coldPhase newMap get insert delete transition ops ratio splits = do
   !m <- newMap
   fill m insert
-  let quota = fromIntegral $ elems `quot` splits
+  let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
   void $ forkJoin splits $ \chunk -> do
@@ -311,36 +311,37 @@ runAll threads runs fn = fori 1 threads $! run runs . fn
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
-benchmark "pure" Flag { bench, runs, size, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns PM.newMap PM.ins size
-  | bench == "insdel" = runAll threads runs $ forkNInsDel PM.newMap PM.ins PM.del size
-  | bench == "random" = runAll threads runs $ fork5050 PM.newMap PM.ins PM.del size randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold PM.newMap PM.get PM.ins PM.del nop size ratio
-  | bench == "hot" = runAll threads runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop size ratio
-  | bench == "cold" = runAll threads runs $ coldPhase PM.newMap PM.get PM.ins PM.del nop size ratio
-benchmark "ctrie" Flag { bench, runs, size, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns CM.empty CM.insert size
-  | bench == "insdel" = runAll threads runs $ forkNInsDel CM.empty CM.insert CM.delete size
-  | bench == "random" = runAll threads runs $ fork5050 CM.empty CM.insert CM.delete size randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop size ratio
-  | bench == "hot" = runAll threads runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop size ratio
-  | bench == "cold" = runAll threads runs $ coldPhase CM.empty CM.lookup CM.insert CM.delete nop size ratio
-benchmark "adaptive" Flag { bench, runs, size, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns AM.newMap AM.ins size
-  | bench == "insdel" = runAll threads runs $ forkNInsDel AM.newMap AM.ins AM.del size
-  | bench == "random" = runAll threads runs $ fork5050 AM.newMap AM.ins AM.del size randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold AM.newMap AM.get AM.ins AM.del nop size ratio
-  | bench == "hot" = runAll threads runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop size ratio
-  | bench == "cold" = runAll threads runs $ coldPhase AM.newMap AM.get AM.ins AM.del nop size ratio
-benchmark "c-adaptive" Flag { bench, runs, size, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns CAM.newMap CAM.ins size
-  | bench == "insdel" = runAll threads runs $ forkNInsDel CAM.newMap CAM.ins CAM.del size
-  | bench == "random" = runAll threads runs $ fork5050 CAM.newMap CAM.ins CAM.del size randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
-  | bench == "hot" = runAll threads runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
-  | bench == "cold" = runAll threads runs $ coldPhase CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
+benchmark "pure" Flag { bench, runs, ops, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns PM.newMap PM.ins ops
+  | bench == "insdel" = runAll threads runs $ forkNInsDel PM.newMap PM.ins PM.del ops
+  | bench == "random" = runAll threads runs $ fork5050 PM.newMap PM.ins PM.del ops randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "hot" = runAll threads runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "cold" = runAll threads runs $ coldPhase PM.newMap PM.get PM.ins PM.del nop ops ratio
+benchmark "ctrie" Flag { bench, runs, ops, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns CM.empty CM.insert ops
+  | bench == "insdel" = runAll threads runs $ forkNInsDel CM.empty CM.insert CM.delete ops
+  | bench == "random" = runAll threads runs $ fork5050 CM.empty CM.insert CM.delete ops randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "hot" = runAll threads runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "cold" = runAll threads runs $ coldPhase CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+benchmark "adaptive" Flag { bench, runs, ops, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns AM.newMap AM.ins ops
+  | bench == "insdel" = runAll threads runs $ forkNInsDel AM.newMap AM.ins AM.del ops
+  | bench == "random" = runAll threads runs $ fork5050 AM.newMap AM.ins AM.del ops randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "hot" = runAll threads runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "cold" = runAll threads runs $ coldPhase AM.newMap AM.get AM.ins AM.del nop ops ratio
+benchmark "c-adaptive" Flag { bench, runs, ops, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns CAM.newMap CAM.ins ops
+  | bench == "insdel" = runAll threads runs $ forkNInsDel CAM.newMap CAM.ins CAM.del ops
+  | bench == "random" = runAll threads runs $ fork5050 CAM.newMap CAM.ins CAM.del ops randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "hot" = runAll threads runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "cold" = runAll threads runs $ coldPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
 benchmark _ _ = error "unknown"
 
+main :: IO ()
 main = do
   args <- cmdArgs flag
   caps <- getNumCapabilities
@@ -348,13 +349,13 @@ main = do
                 then args { threads = caps }
                 else args
 
-  putStrLn $ "Key size:      " ++ show (size opts)
+  putStrLn $ "Operations:    " ++ show (ops opts)
   putStrLn $ "Number of runs:" ++ show (runs opts)
-  putStrLn $ "Warmup runs:   " ++ show (warmup opts)
   putStrLn $ "File:          " ++ show (file opts)
   putStrLn $ "Output:        " ++ show (output opts)
   putStrLn $ "Benchmark:     " ++ show (bench opts)
   putStrLn $ "Variants:      " ++ show (variants opts)
+  putStrLn $ "Ratio:         " ++ show (ratio opts)
   putStrLn $ "Threads:       " ++ show (threads opts)
   hFlush stdout
 
@@ -381,11 +382,10 @@ main = do
 
 data Flag =
        Flag
-         { size     :: Int
+         { ops      :: Int
          , file     :: String
          , output   :: String
          , runs     :: Int
-         , warmup   :: Int
          , bench    :: String
          , variants :: [String]
          , ratio    :: Int64
@@ -395,13 +395,12 @@ data Flag =
 
 flag :: Flag
 flag = Flag
-  { warmup = 5 &= help "Number of warmup runs"
-  , size = 100000 &= help "Key size"
+  { ops = 100000 &= help "Total number of operations"
   , file = "report" &= help "Report file prefix"
   , output = "svg" &= help "Output {svg, x11}"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
   , variants = ["pure", "ctrie", "adaptive", "c-adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
-  , ratio = 200 &= help "Cold-to-hot ratio"
+  , ratio = 200 &= help "Cold-to-hot ops ratio"
   , threads = 0 &= help "Number of threads"
   }
