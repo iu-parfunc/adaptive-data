@@ -1,8 +1,11 @@
+
 flags: {}
+
 packages:
 - '.'
 - ../pcg-random
 - ../haskell-lockfree/atomic-primops
+
 extra-deps:
 - async-2.0.2
 - clock-0.6.0.1
@@ -31,5 +34,11 @@ extra-deps:
 - unordered-containers-0.2.5.1
 - utility-ht-0.0.11
 - vector-0.11.0.0
-compiler-check: newer-minor
-resolver: ghc-7.11
+
+# This expects to use a specific implementation of GHC with the Compact
+# patches, i.e. ~crest-team/opt/ghc-mutable-cnf-0.2/
+resolver: ghc-7.11.20160226
+
+# Or you can make it more forgiving, like this:
+# compiler-check: newer-minor
+# resolver: ghc-7.11
