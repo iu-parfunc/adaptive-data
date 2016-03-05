@@ -8,6 +8,7 @@ module Control.Concurrent.Compact.AdaptiveMap (
     ins,
     del,
     transition,
+    fromList,
     ) where
 
 import qualified Control.Concurrent.Adaptive.Ctrie  as CM
@@ -83,3 +84,8 @@ transition m = do
         putMVar mv ()
     AB _ _ -> return ()
     B _ -> return ()
+
+fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
+fromList !l = do
+  !m <- CM.fromList l
+  newIORef $ A m

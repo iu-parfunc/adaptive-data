@@ -1,7 +1,11 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE NamedFieldPuns       #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 -- | This is a second (modified) version of the benchmark harness by Vikraman
 
@@ -13,7 +17,9 @@ import           Control.Concurrent.Extra
 import qualified Control.Exception           as E
 import           Control.Monad
 import           Data.Int
-import qualified Data.Vector.Storable        as VS
+import           Data.List
+import           Data.Monoid
+import qualified Data.Vector.Unboxed         as VU
 import           GHC.Stats                   (GCStats (..))
 import qualified GHC.Stats                   as Stats
 import           GHC.Word
@@ -34,80 +40,123 @@ import qualified Control.Concurrent.Map                  as CM
 import qualified Control.Concurrent.PureMap              as PM
 import qualified Control.Concurrent.PureMapL             as PML
 
-{-# INLINABLE insDelN #-}
-insDelN :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> (Int64 -> m -> IO ()) -> Int64 -> IO ()
-insDelN newMap insert delete total = do
-  m <- newMap
-  for_ 1 total $ \i -> if even i
-                         then delete i m
-                         else insert i (i + 1) m
-
 {-# INLINABLE forkNIns #-}
-forkNIns :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> Int -> Int -> IO ()
+forkNIns :: IO m
+         -> (Int64 -> Int64 -> m -> IO ())
+         -> Int -> Int -> IO Measured
 forkNIns newMap insert elems splits = do
-  m <- newMap
+  !m <- newMap
   let quota = fromIntegral $ elems `quot` splits
-  forkJoin splits
-    (\chunk -> do
-       let offset = fromIntegral $ chunk * fromIntegral quota
-       for_ offset (offset + quota) $ \i -> insert i (i + 1) m)
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset = fromIntegral $ chunk * fromIntegral quota
+    for_ offset (offset + quota) $ \i -> insert i (i + 1) m
 
 {-# INLINABLE forkNInsDel #-}
-forkNInsDel :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> (Int64 -> m -> IO ()) -> Int -> Int -> IO ()
+forkNInsDel :: IO m
+            -> (Int64 -> Int64 -> m -> IO ())
+            -> (Int64 -> m -> IO ())
+            -> Int -> Int -> IO Measured
 forkNInsDel newMap insert delete elems splits = do
-  m <- newMap
+  !m <- newMap
   let quota = fromIntegral $ elems `quot` splits
-  forkJoin splits
-    (\chunk -> do
-       let offset = fromIntegral $ chunk * fromIntegral quota
-       for_ offset (offset + quota) $ \i -> if even chunk
-                                              then delete i m
-                                              else insert i (i + 1) m)
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset = fromIntegral $ chunk * fromIntegral quota
+    for_ offset (offset + quota) $ \i -> if even chunk
+                                           then delete i m
+                                           else insert i (i + 1) m
 
 {-# INLINABLE fork5050 #-}
-fork5050 :: IO m -> (Int64 -> Int64 -> m -> IO ()) -> (Int64 -> m -> IO ()) -> Int -> VS.Vector Int -> Int -> IO ()
-fork5050 newMap insert delete elems vec splits = do
-  m <- newMap
+fork5050 :: IO m
+         -> (Int64 -> Int64 -> m -> IO ())
+         -> (Int64 -> m -> IO ())
+         -> Int -> IO (VU.Vector Int) -> Int -> IO Measured
+fork5050 newMap insert delete elems newVec splits = do
+  !m <- newMap
+  !vec <- newVec
   let quota = fromIntegral $ elems `quot` splits
-  forkJoin splits
-    (\chunk -> do
-       let offset = fromIntegral $ chunk * fromIntegral quota
-           shouldDel = (vec VS.! (fromIntegral offset `mod` VS.length vec)) == 0
-       for_ offset (offset + quota) $ \i -> if shouldDel
-                                              then delete i m
-                                              else insert i (i + 1) m)
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset = fromIntegral $ chunk * fromIntegral quota
+        shouldDel = (vec VU.! (fromIntegral offset `mod` VU.length vec)) == 0
+    for_ offset (offset + quota) $ \i -> if shouldDel
+                                           then delete i m
+                                           else insert i (i + 1) m
 
 {-# INLINABLE forkJoin #-}
-forkJoin :: Int -> (Int -> IO ()) -> IO ()
+forkJoin :: Int -> (Int -> IO a) -> IO [a]
 forkJoin num act = loop num []
   where
-    loop 0 ls = mapM_ takeMVar ls
-    loop n ls = do
+    loop 0 !ls = mapM takeMVar ls
+    loop n !ls = do
       mv <- newEmptyMVar
       _ <- forkOn (n - 1) $ do
-             act (n - 1)
-             putMVar mv ()
+             !v <- act (n - 1)
+             putMVar mv v
       loop (n - 1) (mv : ls)
 
+{-# INLINE fill #-}
+fill :: m -> (Int64 -> Int64 -> m -> IO ()) -> IO ()
+fill !m insert = do
+  !ps <- randomPairs
+  VU.forM_ ps $! \(k, v) -> insert k v m
+
+{-# INLINABLE hotCold #-}
 hotCold :: IO m
         -> (Int64 -> m -> IO (Maybe Int64))
         -> (Int64 -> Int64 -> m -> IO ())
         -> (Int64 -> m -> IO ())
         -> (m -> IO ())
-        -> Int -> Int -> IO ()
-hotCold newMap get insert delete transition elems splits = do
-  m <- newMap
+        -> Int -> Int64 -> Int -> IO Measured
+hotCold newMap get insert delete transition elems ratio splits = do
+  !m <- newMap
+  fill m insert
   let quota = fromIntegral $ elems `quot` splits
-  forkJoin splits
-    (\chunk -> do
-       let offset = fromIntegral $ chunk * fromIntegral quota
-           phase = quota `quot` 2
-       for_ offset (offset + phase) $ \i -> if even chunk
-                                              then delete i m
-                                              else insert i (i + 1) m
-       transition m
-       let offset' = offset + phase + 1
-       for_ offset' (offset' + phase) $ \i -> get i m)
+      phase1 = quota `quot` ratio
+      phase2 = (quota * (ratio - 1)) `quot` ratio
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset1 = fromIntegral $ chunk * fromIntegral quota
+        offset2 = offset1 + phase1 + 1
+    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
+    transition m
+    for_ offset2 (offset2 + phase2) $ \i -> get i m
+
+{-# INLINABLE hotPhase #-}
+hotPhase :: IO m
+         -> (Int64 -> m -> IO (Maybe Int64))
+         -> (Int64 -> Int64 -> m -> IO ())
+         -> (Int64 -> m -> IO ())
+         -> (m -> IO ())
+         -> Int -> Int64 -> Int -> IO Measured
+hotPhase newMap get insert delete transition elems ratio splits = do
+  !m <- newMap
+  fill m insert
+  let quota = fromIntegral $ elems `quot` splits
+      phase1 = quota `quot` ratio
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset1 = fromIntegral $ chunk * fromIntegral quota
+    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
+
+{-# INLINABLE coldPhase #-}
+coldPhase :: IO m
+          -> (Int64 -> m -> IO (Maybe Int64))
+          -> (Int64 -> Int64 -> m -> IO ())
+          -> (Int64 -> m -> IO ())
+          -> (m -> IO ())
+          -> Int -> Int64 -> Int -> IO Measured
+coldPhase newMap get insert delete transition elems ratio splits = do
+  !m <- newMap
+  fill m insert
+  let quota = fromIntegral $ elems `quot` splits
+      phase1 = quota `quot` ratio
+      phase2 = (quota * (ratio - 1)) `quot` ratio
+  void $ forkJoin splits $ \chunk -> do
+    let offset1 = fromIntegral $ chunk * fromIntegral quota
+        offset2 = offset1 + phase1 + 1
+    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
+    transition m
+  measureOnce $ forkJoin splits $ \chunk -> do
+    let offset1 = fromIntegral $ chunk * fromIntegral quota
+        offset2 = offset1 + phase1 + 1
+    for_ offset2 (offset2 + phase2) $ \i -> get i m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
@@ -118,6 +167,18 @@ for_ start end fn = loop start
     loop !i
       | i > end = return ()
       | otherwise = fn i >> loop (i + 1)
+
+for :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [a]
+for start end _
+  | start > end = error "start greater than end"
+for start end fn = loop start
+  where
+    loop !i
+      | i > end = return []
+      | otherwise = do
+          !x <- fn i
+          !xs <- loop (i + 1)
+          return $ x : xs
 
 {-# INLINABLE fori #-}
 fori :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [(n, a)]
@@ -132,7 +193,6 @@ fori start end fn = loop start
           !xs <- loop (i + 1)
           return $ (i, x) : xs
 
--- from criterion
 data Measured =
        Measured
          { measTime               :: !Double
@@ -147,7 +207,7 @@ data Measured =
          , measGcWallSeconds      :: !Double
          , measGcCpuSeconds       :: !Double
          }
-  deriving (Eq, Read, Show)
+  deriving (Eq, Ord, Read, Show)
 
 measured :: Measured
 measured = Measured
@@ -198,6 +258,7 @@ applyGCStats _ _ m = m
 {-# INLINE measure #-}
 measure :: Int64 -> IO a -> IO Measured
 measure !iters !f = do
+  performGC
   startStats <- getGCStats
   startTime <- getTime
   startCpuTime <- getCPUTime
@@ -215,40 +276,70 @@ measure !iters !f = do
         }
   return m
 
-randomInts :: IO (VS.Vector Int)
+{-# INLINE measureOnce #-}
+measureOnce :: IO a -> IO Measured
+measureOnce = measure 1
+
+randomInts :: IO (VU.Vector Int)
 randomInts = do
   gen <- PCG.createSystemRandom
-  VS.replicateM (100000 :: Int) (PCG.uniformR (0, 1) gen :: IO Int)
+  VU.replicateM 100000 (PCG.uniformR (0, 1) gen :: IO Int)
+
+randomPairs :: IO (VU.Vector (Int64, Int64))
+randomPairs = do
+  gen <- PCG.createSystemRandom
+  VU.replicateM 10000 (PCG.uniform gen :: IO (Int64, Int64))
 
 {-# INLINE nop #-}
 nop :: Applicative m => a -> m ()
 nop _ = pure ()
 
+{-# INLINE run #-}
+run :: Int -> IO Measured -> IO Measured
+run runs fn = do
+  let rs = if even runs
+             then (runs + 1)
+             else runs
+      mid = 1 + rs `quot` 2
+  ms <- for 1 rs $ \_ -> fn
+  return $! sort ms !! mid
+
+{-# INLINE runAll #-}
+runAll :: Int -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
+runAll threads runs fn = fori 1 threads $! run runs . fn
+
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
-benchmark "pure" Flag { bench, runs, size, threads }
-  | bench == "ins" = fori 1 threads $ measure runs . forkNIns PM.newMap PM.ins size
-  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel PM.newMap PM.ins PM.del size
-  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 PM.newMap PM.ins PM.del size =<< randomInts
-  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold PM.newMap PM.get PM.ins PM.del nop size
-benchmark "ctrie" Flag { bench, runs, size, threads }
-  | bench == "ins" = fori 1 threads $ measure runs . forkNIns CM.empty CM.insert size
-  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CM.empty CM.insert CM.delete size
-  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 CM.empty CM.insert CM.delete size =<< randomInts
-  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold CM.empty CM.lookup CM.insert CM.delete nop size
-benchmark "adaptive" Flag { bench, runs, size, threads }
-  | bench == "ins" = fori 1 threads $ measure runs . forkNIns AM.newMap AM.ins size
-  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel AM.newMap AM.ins AM.del size
-  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 AM.newMap AM.ins AM.del size =<< randomInts
-  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold AM.newMap AM.get AM.ins AM.del AM.transition size
-benchmark "c-adaptive" Flag { bench, runs, size, threads }
-  | bench == "ins" = fori 1 threads $ measure runs . forkNIns CAM.newMap CAM.ins size
-  | bench == "insdel" = fori 1 threads $ measure runs . forkNInsDel CAM.newMap CAM.ins CAM.del size
-  | bench == "random" = fori 1 threads . (measure runs .) . fork5050 CAM.newMap CAM.ins CAM.del size =<< randomInts
-  | bench == "hotcold" = fori 1 threads $ measure runs . hotCold CAM.newMap CAM.get CAM.ins CAM.del CAM.transition size
+benchmark "pure" Flag { bench, runs, size, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns PM.newMap PM.ins size
+  | bench == "insdel" = runAll threads runs $ forkNInsDel PM.newMap PM.ins PM.del size
+  | bench == "random" = runAll threads runs $ fork5050 PM.newMap PM.ins PM.del size randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold PM.newMap PM.get PM.ins PM.del nop size ratio
+  | bench == "hot" = runAll threads runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop size ratio
+  | bench == "cold" = runAll threads runs $ coldPhase PM.newMap PM.get PM.ins PM.del nop size ratio
+benchmark "ctrie" Flag { bench, runs, size, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns CM.empty CM.insert size
+  | bench == "insdel" = runAll threads runs $ forkNInsDel CM.empty CM.insert CM.delete size
+  | bench == "random" = runAll threads runs $ fork5050 CM.empty CM.insert CM.delete size randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop size ratio
+  | bench == "hot" = runAll threads runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop size ratio
+  | bench == "cold" = runAll threads runs $ coldPhase CM.empty CM.lookup CM.insert CM.delete nop size ratio
+benchmark "adaptive" Flag { bench, runs, size, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns AM.newMap AM.ins size
+  | bench == "insdel" = runAll threads runs $ forkNInsDel AM.newMap AM.ins AM.del size
+  | bench == "random" = runAll threads runs $ fork5050 AM.newMap AM.ins AM.del size randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold AM.newMap AM.get AM.ins AM.del nop size ratio
+  | bench == "hot" = runAll threads runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop size ratio
+  | bench == "cold" = runAll threads runs $ coldPhase AM.newMap AM.get AM.ins AM.del nop size ratio
+benchmark "c-adaptive" Flag { bench, runs, size, threads, ratio }
+  | bench == "ins" = runAll threads runs $ forkNIns CAM.newMap CAM.ins size
+  | bench == "insdel" = runAll threads runs $ forkNInsDel CAM.newMap CAM.ins CAM.del size
+  | bench == "random" = runAll threads runs $ fork5050 CAM.newMap CAM.ins CAM.del size randomInts
+  | bench == "hotcold" = runAll threads runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
+  | bench == "hot" = runAll threads runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
+  | bench == "cold" = runAll threads runs $ coldPhase CAM.newMap CAM.get CAM.ins CAM.del nop size ratio
 benchmark _ _ = error "unknown"
 
-main :: IO ()
 main = do
   args <- cmdArgs flag
   caps <- getNumCapabilities
@@ -267,7 +358,7 @@ main = do
   hFlush stdout
 
   let vs = variants opts
-  !zs <- forM vs $ \variant -> benchmark variant opts
+  !zs <- forM vs $! \variant -> benchmark variant opts
 
   let term = if (output opts) == "svg"
                then terminal $ (SVG.cons $ file opts ++ ".svg")
@@ -292,10 +383,11 @@ data Flag =
          { size     :: Int
          , file     :: String
          , output   :: String
-         , runs     :: Int64
+         , runs     :: Int
          , warmup   :: Int
          , bench    :: String
          , variants :: [String]
+         , ratio    :: Int64
          , threads  :: Int
          }
   deriving (Eq, Show, Data, Typeable)
@@ -307,7 +399,8 @@ flag = Flag
   , file = "report" &= help "Report file prefix"
   , output = "svg" &= help "Output {svg, x11}"
   , runs = 50 &= help "Number of runs"
-  , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold}"
+  , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
   , variants = ["pure", "ctrie", "adaptive", "c-adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
+  , ratio = 200 &= help "Cold-to-hot ratio"
   , threads = 0 &= help "Number of threads"
   }
