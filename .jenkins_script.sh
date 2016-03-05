@@ -12,7 +12,7 @@ cd "$TOP/adaptive-hashmap/"
 source setup_env.sh
 which -a ghc
 ghc --version
-stack --install-ghc --no-system-ghc build
+stack build
 
 # Building the top-level repo builds a bunch of the old code.
 # This uses an LTS build so it should ignore the GHC on path.
