@@ -72,20 +72,25 @@ transition m = do
       when success $ do
 
         -- Bad version, delete me after measuring:
-        CM.freeze cm
-        l <- CM.unsafeToList cm
-        pm <- PM.fromList l
+        ------------------------------------------
+        -- Actually, this one seems like it's hanging with this command [2016.03.05]:
+        -- stack bench adaptive-hashmap:bench-adaptive-hashmap --benchmark-arguments="-b adaptive --ops1=12 --ops2=12 --initial=10000 +RTS -s -N12"
+        -- CM.freeze cm
+        -- l <- CM.unsafeToList cm
+        -- pm <- PM.fromList l
 
         -- The basic algorithm:
         -----------------------
+        -- This is about 115ms on 12 thread magramal, with the same command as above.
         -- CM.freeze cm
         -- pm <- PM.newMap
         -- CM.unsafeTraverse_ (\ k v -> PM.ins k v pm) cm
 
         -- A small optimization.  Single-pass version.
         ------------------------
-        -- pm <- PM.newMap
-        -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+        -- Huh, this one is about the same time.
+        pm <- PM.newMap
+        CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
 
         -- FIXME: shouldn't be a spin here.  This make EVERY
         -- thread retry until *their* version of B is put in:
