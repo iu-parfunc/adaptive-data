@@ -95,8 +95,12 @@ transition m = do
         pm <- PM.newMap
         CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
 
-        -- FIXME: shouldn't be a spin here.  This make EVERY
-        -- thread retry until *their* version of B is put in:      
+
+        -- TODO: pollFreeze version:
+        -- if I-am-thread-zero-or-something
+        -- then normalFreeze
+        -- else pollFreeze
+
         let loop tik =
               do (success,tik') <- casIORef m tik (B pm)
                  unless success $

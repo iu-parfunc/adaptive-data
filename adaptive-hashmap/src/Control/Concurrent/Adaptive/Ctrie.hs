@@ -348,8 +348,30 @@ freeze (Map root) = go root
 -- | A version of `freeze` which periodically runs a polling action
 --  to check if it should keep going.  If the polling action returns
 --  `False`, then this procedure returns immediately.
+--
+--  The final return value is True if this function got to the end
+--  without aborting.
 pollFreeze :: IO Bool -> Map k v -> IO Bool
-pollFreeze = undefined
+pollFreeze poll (Map root) = go root
+  where
+    go inode = do
+      b <- poll
+      if b then
+        do freezeloop inode =<< readForCAS inode
+           main <- readIORef inode
+           case main of
+             CNode bmp arr ->
+               -- TODO short circuiting mapM_.  Could use maybe monad...               
+               do A.mapM_ go2 (popCount bmp) arr
+                  b <- poll -- Assumed to be monotonic.
+                  return b
+             Tomb (S _ _)  -> return True
+             Collision _   -> return True
+       else
+        return False
+    go2 (INode inode)   = go inode
+    go2 (SNode (S _ _)) = return True
+    freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINE pollFreeze #-}
 
 -----------------------------------------------------------------------
