@@ -301,12 +301,12 @@ unsafeToList (Map root) = go root
 {-# INLINABLE unsafeToList #-}
 
 -- | A procedure that combines freezing and traversal.
-freezeAndTraverse_ :: (k -> v -> IO ()) Map k v -> IO ()
+freezeAndTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
 freezeAndTraverse_ = undefined
 
 -- | A non-allocating way to traverse a frozen structure.
-unsafeTraverse_ :: (k -> v -> IO ()) Map k v -> IO ()
-unsafeTraverse_ (Map root) = undefined
+unsafeTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
+unsafeTraverse_ fn (Map root) = undefined
 {-# INLINABLE unsafeTraverse_ #-}
 
 -- | A blocking O(N) freeze operation that proceeds from root to leaves.
