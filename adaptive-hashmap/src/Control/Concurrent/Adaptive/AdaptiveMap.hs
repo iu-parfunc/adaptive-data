@@ -67,12 +67,11 @@ transition m = do
   tik <- readForCAS m
   case peekTicket tik of
     A cm -> do
-      pm <- PM.newMap
       (success, tik') <- casIORef m tik (AB cm)
       when success $ do
         CM.freeze cm
         l <- CM.unsafeToList cm
-        mapM_ (\(k, v) -> PM.ins k v pm) l
+        pm <- PM.fromList l
         FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
     AB _ -> return ()
     B _ -> return ()
