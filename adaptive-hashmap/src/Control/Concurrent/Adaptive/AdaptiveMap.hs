@@ -69,6 +69,8 @@ transition m = do
   case peekTicket tik of
     A cm -> do
       (success, tik') <- casIORef m tik (AB cm)
+      -- TODO: if not success, should probably verify that someone else has actually got it into the AB state,
+      -- if only for debugging/sanity checking.
       when success $ do
 
         -- Bad version, delete me after measuring:
@@ -93,7 +95,16 @@ transition m = do
         CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
 
         -- FIXME: shouldn't be a spin here.  This make EVERY
-        -- thread retry until *their* version of B is put in:
-        FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
+        -- thread retry until *their* version of B is put in:      
+        let loop tik =
+              do (success,tik') <- casIORef m tik (B pm)
+                 unless success $
+                   case peekTicket tik' of
+                     A _  -> error "this is impossible"                          
+                     AB _ -> loop tik' -- This should not actually happen, should it?
+                     -- Someone else beat us to the punch and that's just fine:
+                     B _  -> return ()
+        tik <- readForCAS m
+        loop tik
     AB _ -> return ()
     B _ -> return ()
