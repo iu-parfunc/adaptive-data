@@ -115,6 +115,8 @@ transition m = do
                      B _  -> return ()
         tik <- readForCAS m
         loop tik
+
+    -- Warning, the full lock-free version needs to call freeze/conversion here:
     AB _ -> return ()
     B _ -> return ()
 

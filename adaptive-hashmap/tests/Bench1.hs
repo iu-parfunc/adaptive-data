@@ -99,6 +99,7 @@ fill !m insert = do
   !ps <- randomPairs
   VU.forM_ ps $! \(k, v) -> insert k v m
 
+-- | This runs the hot-phase, transition, cold-phase benchmark.
 {-# INLINABLE hotCold #-}
 hotCold :: IO m
         -> (Int64 -> m -> IO (Maybe Int64))
