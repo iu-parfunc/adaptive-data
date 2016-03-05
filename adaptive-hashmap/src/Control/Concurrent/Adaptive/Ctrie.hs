@@ -302,12 +302,32 @@ unsafeToList (Map root) = go root
 
 -- | A procedure that combines freezing and traversal.
 freezeAndTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
-freezeAndTraverse_ = undefined
+freezeAndTraverse_ fn (Map root) = go root
+  where
+    go inode = do
+      freezeloop inode =<< readForCAS inode
+      main <- readIORef inode
+      case main of
+        CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
+        Tomb (S k v) -> fn k v
+        Collision xs -> mapM_ (\ (S k v) -> fn k v) xs
+    go2 (INode inode) = go inode
+    go2 (SNode (S k v)) = fn k v
+    freezeloop ref = spinlock $ freezeIORef ref
 
 -- | A non-allocating way to traverse a frozen structure.
 unsafeTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
-unsafeTraverse_ fn (Map root) = undefined
-{-# INLINABLE unsafeTraverse_ #-}
+unsafeTraverse_ fn (Map root) = go root
+  where
+    go inode = do
+        main <- readIORef inode
+        case main of
+            CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
+            Tomb (S k v) -> fn k v
+            Collision xs -> mapM_ (\ (S k v) -> fn k v) xs
+    go2 (INode inode)   = go inode
+    go2 (SNode (S k v)) = fn k v
+{-# INLINE unsafeTraverse_ #-}
 
 -- | A blocking O(N) freeze operation that proceeds from root to leaves.
 freeze :: Map k v -> IO ()

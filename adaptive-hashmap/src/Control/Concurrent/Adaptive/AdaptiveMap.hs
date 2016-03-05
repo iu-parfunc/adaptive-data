@@ -62,6 +62,7 @@ del !k !m = do
   `catches`
   [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
 
+
 transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
 transition m = do
   tik <- readForCAS m
@@ -69,10 +70,25 @@ transition m = do
     A cm -> do
       (success, tik') <- casIORef m tik (AB cm)
       when success $ do
+
+        -- Bad version, delete me after measuring:
         CM.freeze cm
-        -- FIXME: converting through a list is TERRIBLE!
         l <- CM.unsafeToList cm
         pm <- PM.fromList l
+
+        -- The basic algorithm:
+        -----------------------
+        -- CM.freeze cm
+        -- pm <- PM.newMap
+        -- CM.unsafeTraverse_ (\ k v -> PM.ins k v pm) cm
+
+        -- A small optimization.  Single-pass version.
+        ------------------------
+        -- pm <- PM.newMap
+        -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+
+        -- FIXME: shouldn't be a spin here.  This make EVERY
+        -- thread retry until *their* version of B is put in:
         FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
     AB _ -> return ()
     B _ -> return ()

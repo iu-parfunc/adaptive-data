@@ -7,6 +7,7 @@ module Control.Concurrent.PureMap
        , ins
        , del
        , fromList
+       , fromMap
        , toList
        , snapshot
        )
@@ -47,6 +48,10 @@ del !k !m = loop =<< readForCAS m
 {-# INLINABLE fromList #-}
 fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (PureMap k v)
 fromList = newIORef . HM.fromList
+
+-- | O(1)
+fromMap :: HM.HashMap k v -> IO (PureMap k v)
+fromMap = newIORef
 
 {-# INLINABLE toList #-}
 toList :: PureMap k v -> IO [(k, v)]
