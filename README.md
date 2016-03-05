@@ -16,8 +16,12 @@ Here's a breakdown of the top-level directories:
  * adaptive-hashmap -- our most recent prototype [2016.03.05] that
    uses CTrie and HashMap from unordered-containers.
   
- * adaptive_map_prototype -- 
- * chen_bag --
+ * adaptive_map_prototype -- an early prototype of an adaptive
+   skiplist, which was abandoned util the skiplist scaling problems
+   can be fixed.
+ 
+ * chen_bag -- Chao-Hong Chen's attempt at updating the pure/scalable
+   bag implementation. 
 
 Plus, experiments from the ICFP'15 paper:
 
