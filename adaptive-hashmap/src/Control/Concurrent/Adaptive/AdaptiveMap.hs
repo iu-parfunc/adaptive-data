@@ -95,11 +95,15 @@ transition m = do
         pm <- PM.newMap
         CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
 
-
+        let poller = do x <- readIORef m
+                        case x of
+                          A _  -> return True
+                          AB _ -> return True
+                          B _  -> return False -- Give up.  Someone else did it.
         -- TODO: pollFreeze version:
         -- if I-am-thread-zero-or-something
         -- then normalFreeze
-        -- else pollFreeze
+        -- else pollFreeze poller
 
         let loop tik =
               do (success,tik') <- casIORef m tik (B pm)
