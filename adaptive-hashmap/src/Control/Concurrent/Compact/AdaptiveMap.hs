@@ -12,6 +12,7 @@ module Control.Concurrent.Compact.AdaptiveMap (
 
 import qualified Control.Concurrent.Adaptive.Ctrie  as CM
 import qualified Control.Concurrent.Compact.PureMap as PM
+import           Control.Concurrent.MVar
 import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad
@@ -22,7 +23,7 @@ import qualified Data.HashMap.Strict                as HM
 import           Data.IORef
 
 data Hybrid k v = A !(CM.Map k v)
-                | AB !(CM.Map k v)
+                | AB !(CM.Map k v) (MVar ())
                 | B !(PM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
@@ -39,7 +40,7 @@ get !k !m = do
   state <- readIORef m
   case state of
     A cm  -> CM.lookup k cm
-    AB cm -> CM.lookup k cm
+    AB cm _ -> CM.lookup k cm
     B pm  -> PM.get k pm
 
 {-# INLINABLE ins #-}
@@ -48,7 +49,8 @@ ins !k !v !m = do
                  state <- readIORef m
                  case state of
                    A cm -> CM.insert k v cm
-                   AB _ -> ins k v m
+                   AB _ mv -> do takeMVar mv
+                                 ins k v m
                    B pm -> PM.ins k v pm
                `catches`
                [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
@@ -59,7 +61,8 @@ del !k !m = do
               state <- readIORef m
               case state of
                 A cm -> CM.delete k cm
-                AB _ -> del k m
+                AB _ mv -> do takeMVar mv
+                              del k m
                 B pm -> PM.del k pm
             `catches`
             [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
@@ -67,14 +70,16 @@ del !k !m = do
 transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
 transition m = do
   tik <- readForCAS m
+  mv <- newEmptyMVar
   case peekTicket tik of
     A cm -> do
-      (success, tik') <- casIORef m tik (AB cm)
+      (success, tik') <- casIORef m tik (AB cm mv)
       when success $ do
         CM.freeze cm
         l <- CM.unsafeToList cm
         -- workaround slow compact append
         pm <- PM.fromMap . HM.fromList $ l
         FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
-    AB _ -> return ()
+        putMVar mv ()
+    AB _ _ -> return ()
     B _ -> return ()

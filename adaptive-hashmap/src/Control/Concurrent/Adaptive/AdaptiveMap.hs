@@ -1,16 +1,14 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Control.Concurrent.Adaptive.AdaptiveMap
-       (
-         AdaptiveMap
-       , newMap
-       , get
-       , ins
-       , del
-       , transition
-       )
-       where
+module Control.Concurrent.Adaptive.AdaptiveMap (
+    AdaptiveMap,
+    newMap,
+    get,
+    ins,
+    del,
+    transition,
+    ) where
 
 import qualified Control.Concurrent.Adaptive.Ctrie as CM
 import qualified Control.Concurrent.PureMap        as PM
