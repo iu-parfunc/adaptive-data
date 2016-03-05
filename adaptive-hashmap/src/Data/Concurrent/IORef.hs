@@ -72,6 +72,12 @@ freezeIORef (IORef !ref) !tik =
     Frozen _ -> return (True, tik)
     Val a    -> A.casIORef ref tik $ Frozen a
 
+-- FIXME: this looks likely to be alloc-free.  A good spinlock
+-- should back off after a little while to do thread yield.
+--
+-- If this is used on a small, constant-time function we should be ok.
+-- But if it's every applied to something more time consuming, then
+-- this can get problematic.
 {-# INLINE spinlock #-}
 spinlock :: (A.Ticket a -> IO (Bool, A.Ticket a))
          -> A.Ticket a -> IO ()

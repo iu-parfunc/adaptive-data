@@ -70,6 +70,7 @@ transition m = do
       (success, tik') <- casIORef m tik (AB cm)
       when success $ do
         CM.freeze cm
+        -- FIXME: converting through a list is TERRIBLE!
         l <- CM.unsafeToList cm
         pm <- PM.fromList l
         FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'

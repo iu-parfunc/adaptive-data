@@ -24,9 +24,14 @@ import qualified Control.Concurrent.Map                  as CM
 import qualified Control.Concurrent.PureMap              as PM
 import qualified Control.Concurrent.PureMapL             as PML
 
+-- RRN: the [ops] list is quite obofuscated!  Why not pass a record of "methods"?
 thread :: Int -> [Int64 -> Int64 -> IO ()] -> [Double] -> Flag -> Barrier Bool -> Word64 -> IO Int
 thread !_ !ops !ratios !option !bar !seedn = do
   !g <- PCG.restore $ PCG.initFrozen seedn
+
+  -- RRN: This is potentially a pretty high-overhead way of issuing ops.
+  -- Why not case directly on the 3-way coin flip?
+  -- (!!) is surely recursive and won't simplify away...
   let loop !i =
         when (i > 0) $ do
           !p <- PCG.uniformRD (0.0, 1.0) g :: IO Double
@@ -69,6 +74,8 @@ thread !_ !ops !ratios !option !bar !seedn = do
       return 0
     else return 0
 
+
+-- Returns time in milleseconds.
 test :: Int -> [Int64 -> Int64 -> IO ()] -> [Double] -> Flag -> PCG.GenIO -> IO Double
 test !threadn !ops !ratios !option !gen = do
   performGC
@@ -122,19 +129,19 @@ run threadn option = do
             !ops <- case bench option of
                       "pure" -> do
                         !m <- PM.newMap
-                        for_ 1 size (\k -> PM.ins k (k + 1) m)
+                        for_ 0 size (\k -> PM.ins k (k + 1) m)
                         test
                           threadn
-                          [\k _ -> do
-                            !r <- PM.get k m
-                            return (), \k v -> PM.ins k v m, \k _ -> PM.del k m, nop]
+                          [ \k _ -> do !r <- PM.get k m; return ()
+                          , \k v -> PM.ins k v m
+                          , \k _ -> PM.del k m, nop]
                           ratios
                           option
                           gen
                       "cpure" -> do
                         !mp <- PM.newMap
                         -- Small fix, build the initial map NOT using the compact version:
-                        for_ 1 size (\k -> PM.ins k (k + 1) mp)
+                        for_ 0 size (\k -> PM.ins k (k + 1) mp)
                         mp2 <- PM.snapshot mp
                         !m <- CPM.fromMap mp2
                         test
@@ -147,7 +154,7 @@ run threadn option = do
                           gen
                       "pureL" -> do
                         !m <- PML.newMap
-                        for_ 1 size (\k -> PML.ins k (k + 1) m)
+                        for_ 0 size (\k -> PML.ins k (k + 1) m)
                         test
                           threadn
                           [\k _ -> do
@@ -158,7 +165,7 @@ run threadn option = do
                           gen
                       "ctrie" -> do
                         !m <- CM.empty
-                        for_ 1 size (\k -> CM.insert k (k + 1) m)
+                        for_ 0 size (\k -> CM.insert k (k + 1) m)
                         test
                           threadn
                           [\k _ -> do
@@ -169,7 +176,7 @@ run threadn option = do
                           gen
                       "adaptive" -> do
                         !m <- AM.newMap
-                        for_ 1 size (\k -> AM.ins k (k + 1) m)
+                        for_ 0 size (\k -> AM.ins k (k + 1) m)
                         test
                           threadn
                           [ \k _ -> do
@@ -213,6 +220,8 @@ main = do
   putStrLn $ "File:          " ++ show (file option)
   putStrLn $ "OPS1:          " ++ show (ops1 option)
   putStrLn $ "OPS2:          " ++ show (ops2 option)
+
+  putStrLn $ "\nEach time printed below is for one fork/join round performing the specified number of ops.\n"
 
   if null (bench option)
     then putStrLn

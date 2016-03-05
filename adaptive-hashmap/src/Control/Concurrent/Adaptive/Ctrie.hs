@@ -22,20 +22,22 @@ module Control.Concurrent.Adaptive.Ctrie
 
       -- * Construction
     , empty
-
+    , fromList
+      
       -- * Modification
     , insert
     , delete
-
+      
       -- * Query
     , lookup
 
-      -- * Lists
-    , fromList
-    , unsafeToList
+    -- * Freezing and iteration
+    , unsafeToList      
+    , freeze, pollFreeze
+    , unsafeTraverse_
+    , freezeAndTraverse_
 
     --, printMap
-    , freeze
     ) where
 
 --import Control.Applicative ((<$>))
@@ -298,6 +300,16 @@ unsafeToList (Map root) = go root
         go2 xs (SNode (S k v)) = return $ (k,v) : xs
 {-# INLINABLE unsafeToList #-}
 
+-- | A procedure that combines freezing and traversal.
+freezeAndTraverse_ :: (k -> v -> IO ()) Map k v -> IO ()
+freezeAndTraverse_ = undefined
+
+-- | A non-allocating way to traverse a frozen structure.
+unsafeTraverse_ :: (k -> v -> IO ()) Map k v -> IO ()
+unsafeTraverse_ (Map root) = undefined
+{-# INLINABLE unsafeTraverse_ #-}
+
+-- | A blocking O(N) freeze operation that proceeds from root to leaves.
 freeze :: Map k v -> IO ()
 freeze (Map root) = go root
   where
@@ -312,6 +324,13 @@ freeze (Map root) = go root
     go2 (SNode (S _ _)) = return ()
     freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINABLE freeze #-}
+
+-- | A version of `freeze` which periodically runs a polling action
+--  to check if it should keep going.  If the polling action returns
+--  `False`, then this procedure returns immediately.
+pollFreeze :: IO Bool -> Map k v -> IO Bool
+pollFreeze = undefined
+{-# INLINE pollFreeze #-}
 
 -----------------------------------------------------------------------
 
