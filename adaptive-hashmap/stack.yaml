@@ -37,8 +37,9 @@ extra-deps:
 
 # This expects to use a specific implementation of GHC with the Compact
 # patches, i.e. ~crest-team/opt/ghc-mutable-cnf-0.2/
-resolver: ghc-7.11.20160226
+#resolver: ghc-7.11.20160226
+# skip-ghc-check: true
 
 # Or you can make it more forgiving, like this:
-# compiler-check: newer-minor
-# resolver: ghc-7.11
+compiler-check: newer-minor
+resolver: ghc-7.11
