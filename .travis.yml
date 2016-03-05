@@ -5,12 +5,20 @@ cache:
   directories:
   - $HOME/.stack/
 
+# Handle git submodules ourselves:
+git:
+    submodules: false
+
+# Use sed to replace the SSH URL with the public URL, then initialize submodules
 before_install:
-- mkdir -p ~/.local/bin
-- export PATH=~/.local/bin:$PATH
-- travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.1.0/stack-0.1.1.0-x86_64-linux.gz | gunzip > ~/.local/bin/stack
-- chmod a+x ~/.local/bin/stack
-- cat /proc/cpuinfo | grep name
+ - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+ - git submodule update --init --recursive
+
+ - mkdir -p ~/.local/bin
+ - export PATH=~/.local/bin:$PATH
+ - travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.1.0/stack-0.1.1.0-x86_64-linux.gz | gunzip > ~/.local/bin/stack
+ - chmod a+x ~/.local/bin/stack
+ - cat /proc/cpuinfo | grep name
 
 install:
   - stack setup --no-terminal +RTS -N1 -RTS
