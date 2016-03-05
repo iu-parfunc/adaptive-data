@@ -8,6 +8,7 @@ module Control.Concurrent.Adaptive.AdaptiveMap (
     ins,
     del,
     transition,
+    fromList
     ) where
 
 import qualified Control.Concurrent.Adaptive.Ctrie as CM
@@ -26,7 +27,7 @@ data Hybrid k v = A !(CM.Map k v)
 type AdaptiveMap k v = IORef (Hybrid k v)
 
 {-# INLINABLE newMap #-}
-newMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
+newMap :: IO (AdaptiveMap k v)
 newMap = do
   !m <- CM.empty
   newIORef $ A m
@@ -97,3 +98,8 @@ transition m = do
         FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
     AB _ -> return ()
     B _ -> return ()
+
+fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
+fromList !l = do
+  !m <- CM.fromList l
+  newIORef $ A m
