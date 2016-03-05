@@ -3,6 +3,8 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | This is a second (modified) version of the benchmark harness by Vikraman
+
 module Main where
 
 import           Control.Concurrent

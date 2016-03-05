@@ -14,11 +14,13 @@ cd "$TOP/adaptive-hashmap/"
 source setup_env.sh
 which -a ghc
 ghc --version
-stack build
+mkdir -p ./bin
+stack install --bench --no-run-benchmarks --local-bin-path=./bin/
 
 set +xe
 echo "Finished with critical part of test."
 echo "Now testing old code but not counting failures..."
+set -x
 
 # Building the top-level repo builds a bunch of the old code.
 # This uses an LTS build so it should ignore the GHC on path.

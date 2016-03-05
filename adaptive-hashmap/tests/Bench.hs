@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | This is the first version of the benchmark harness by Chao-Hong Chen.
+
 module Main where
 
 import           Control.Concurrent
