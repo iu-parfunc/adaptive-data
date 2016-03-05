@@ -23,4 +23,4 @@ echo "Now testing old code but not counting failures..."
 # Building the top-level repo builds a bunch of the old code.
 # This uses an LTS build so it should ignore the GHC on path.
 cd "$TOP/"
-stack --install-ghc --no-system-ghc build
+stack --install-ghc --no-system-ghc build || echo ok
