@@ -16,6 +16,9 @@ which -a ghc
 ghc --version
 mkdir -p ./bin
 stack install --bench --no-run-benchmarks --local-bin-path=./bin/
+# Note that stack won't actually "install" benchmark executables.
+# They still must be run with "stack exec" or "stack bench".
+
 
 set +xe
 echo "Finished with critical part of test."

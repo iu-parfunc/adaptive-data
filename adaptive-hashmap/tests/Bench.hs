@@ -133,6 +133,7 @@ run threadn option = do
                           gen
                       "cpure" -> do
                         !mp <- PM.newMap
+                        -- Small fix, build the initial map NOT using the compact version:
                         for_ 1 size (\k -> PM.ins k (k + 1) mp)
                         mp2 <- PM.snapshot mp
                         !m <- CPM.fromMap mp2
@@ -242,7 +243,8 @@ flag = Flag
   , warmup = 5 &= help "number of warmup run"
   , gratio = 1.0 / 3.0 &= help "Get Ratio"
   , iratio = 1.0 / 3.0 &= help "Insert ratio"
-  , initial = 100000 &= help "Initial size"
+--   , initial = 100000 &= help "Initial size"
+  , initial = 0 &= help "Initial size"
   , range = 10000 &= help "Key range"
   , seed = 4096 &= help "Seed"
   , file = "report" &= help "Report file prefix"

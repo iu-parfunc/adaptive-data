@@ -8,6 +8,7 @@ module Control.Concurrent.PureMap
        , del
        , fromList
        , toList
+       , snapshot
        )
        where
 
@@ -50,3 +51,7 @@ fromList = newIORef . HM.fromList
 {-# INLINABLE toList #-}
 toList :: PureMap k v -> IO [(k, v)]
 toList = (HM.toList `fmap`) . readIORef
+
+-- | O(1) snapshot
+snapshot :: PureMap k v -> IO (HM.HashMap k v)
+snapshot = readIORef

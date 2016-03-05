@@ -9,6 +9,7 @@ module Control.Concurrent.Compact.PureMap
        , del
        , fromList
        , toList
+       , fromMap
        ) where
 
 import           Control.DeepSeq
@@ -54,15 +55,29 @@ del !k !m = loop =<< readForCAS m
                 c' <- appendCompact c $ HM.delete k hm
                 casIORef m tik c')
 
+-- | Approximate byte size of resulting structure based on number of elements.
+--  FIXME: This could easily be tuned by looking at the ACTUAL byte sizes.
+approxSize :: Int -> Word
+approxSize sz =
+  fromIntegral $ round $ 24 * szd + 256 * logBase 16 szd
+  where
+  szd :: Double
+  szd = fromIntegral sz
+
 {-# INLINABLE fromList #-}
 fromList :: (Eq k, Hashable k, NFData k, NFData v) => [(k, v)] -> IO (PureMap k v)
 fromList l = do
   let hm = HM.fromList l
-      sz :: Double = fromIntegral $ HM.size hm
-      bytes :: Word = fromIntegral . round $ 24 * sz + 256 * logBase 16 sz
-  !c <- newCompact bytes hm
+  !c <- newCompact (approxSize (HM.size hm)) hm
   newIORef c
 
 {-# INLINABLE toList #-}
 toList :: PureMap k v -> IO [(k, v)]
 toList = ((HM.toList . getCompact) `fmap`) . readIORef
+
+-- | Create a compacted map from a map in the regular Haskell heap.
+fromMap :: (NFData k, NFData v)
+        => HM.HashMap k v -> IO (PureMap k v)
+fromMap hm =
+  do !c <- newCompact (approxSize (HM.size hm)) hm
+     newIORef c
