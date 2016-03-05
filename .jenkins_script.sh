@@ -11,6 +11,7 @@ TOP=`pwd`
 cd "$TOP/adaptive-hashmap/"
 source setup_env.sh
 which -a ghc
+ghc --version
 stack --install-ghc --no-system-ghc build
 
 # Building the top-level repo builds a bunch of the old code.
