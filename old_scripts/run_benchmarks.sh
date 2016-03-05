@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# OLD -- this ran benchmarks for the Java vs Haskel Bag experiments.
+
 # Benchmark runner for the whole repository.  Dispatch to the right place:
 
 # We expect whoever launched us to set these environment variables:
