@@ -24,7 +24,8 @@ import           GHC.Stats                   (GCStats (..))
 import qualified GHC.Stats                   as Stats
 import           GHC.Word
 import qualified System.Clock                as C
-import           System.Console.CmdArgs
+import qualified System.Console.CmdArgs      as CA
+import           System.Console.CmdArgs      ((&=), help)
 import           System.CPUTime.Rdtsc
 import           System.IO
 import           System.Mem
@@ -149,6 +150,7 @@ coldPhase newMap get insert delete transition ops ratio splits = do
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
+  -- Run the hot phase and then use a barrier/join before measuring the cold phase:
   void $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
@@ -307,7 +309,15 @@ run runs fn = do
 
 {-# INLINE runAll #-}
 runAll :: Int -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
-runAll threads runs fn = fori 1 threads $! run runs . fn
+runAll threads runs fn =
+   fori 1 threads $! \i' ->
+     do let i = threads - i' + 1 -- Go backwards.  When running by hand I want to see the max threads first.
+        putStrLn $ "  Running threads = " ++ show i; hFlush stdout
+        t <- run runs $ fn i
+        putStrLn $ "  Time reported: "++ show (measTime t) ++
+                         ", cycles: " ++ show (measCycles t)
+        hFlush stdout
+        return t        
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
@@ -339,11 +349,11 @@ benchmark "c-adaptive" Flag { bench, runs, ops, threads, ratio }
   | bench == "hotcold" = runAll threads runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
   | bench == "hot" = runAll threads runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
   | bench == "cold" = runAll threads runs $ coldPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
-benchmark _ _ = error "unknown"
+benchmark x y = error$ "benchmark: unknown argumetns: "++show x++" "++show y
 
 main :: IO ()
 main = do
-  args <- cmdArgs flag
+  args <- CA.cmdArgs flag
   caps <- getNumCapabilities
   let !opts = if (threads args) <= 0
                 then args { threads = caps }
@@ -359,8 +369,12 @@ main = do
   putStrLn $ "Threads:       " ++ show (threads opts)
   hFlush stdout
 
-  let vs = variants opts
-  !zs <- forM vs $! \variant -> benchmark variant opts
+  let vs = if allvariants opts
+           then all_variants
+           else variants opts
+  !zs <- forM vs $! \variant -> do putStrLn $ "\n Running variant: "++ variant
+                                   hFlush stdout
+                                   benchmark variant opts
 
   let term = if (output opts) == "svg"
                then terminal $ (SVG.cons $ file opts ++ ".svg")
@@ -388,10 +402,13 @@ data Flag =
          , runs     :: Int
          , bench    :: String
          , variants :: [String]
+         , allvariants :: Bool
          , ratio    :: Int64
          , threads  :: Int
          }
-  deriving (Eq, Show, Data, Typeable)
+  deriving (Eq, Show, CA.Data, CA.Typeable)
+
+all_variants = ["pure", "ctrie", "adaptive", "c-adaptive"]
 
 flag :: Flag
 flag = Flag
@@ -400,7 +417,8 @@ flag = Flag
   , output = "svg" &= help "Output {svg, x11}"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
-  , variants = ["pure", "ctrie", "adaptive", "c-adaptive"] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
+  , variants = [] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
+  , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"
   , threads = 0 &= help "Number of threads"
   }
