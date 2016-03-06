@@ -4,13 +4,14 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE StandaloneDeriving   #-}
+
 {-# LANGUAGE TypeSynonymInstances #-}
 
 -- | This is a second (modified) version of the benchmark harness by Vikraman
 
 module Main where
 
+import           Control.Arrow
 import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Concurrent.Extra
@@ -102,15 +103,15 @@ forkJoin num act = loop num []
 fill :: m -> (Int64 -> Int64 -> m -> IO ()) -> Bench ()
 fill !m insert = do
   !ps <- reader randomPairs
-  liftIO $! VU.forM_ ps $! \(k, v) -> insert k v m
+  liftIO $! VU.forM_ ps (\(k, v) -> insert k v m)
 
 data GenericImpl m =
   GenericImpl
   { newMap     :: IO m
   , get        :: Int64 -> m -> IO (Maybe Int64)
-  , insert     :: (Int64 -> Int64 -> m -> IO ())
-  , delete     :: (Int64 -> m -> IO ())
-  , transition :: (m -> IO ())
+  , insert     :: Int64 -> Int64 -> m -> IO ()
+  , delete     :: Int64 -> m -> IO ()
+  , transition :: m -> IO ()
   , size       :: m -> IO Int
   , state      :: m -> IO String
   }
@@ -151,10 +152,10 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
     do
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
-      for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! (fromIntegral $ i `mod` len)) i m
+      for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
       transition m
       fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-        get (vec VU.! (fromIntegral $ i `mod` len)) m
+        get (vec VU.! fromIntegral (i `mod` len)) m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
@@ -170,7 +171,7 @@ hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
       len = fromIntegral $ VU.length vec
   liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
-    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! (fromIntegral $ i `mod` len)) i m
+    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
 
 {-# INLINE coldPhase #-}
 coldPhase :: GenericImpl m -> Int -> Bench Measured
@@ -191,7 +192,7 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
   liftIO $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! (fromIntegral $ i `mod` len)) i m
+    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
     -- t <- measureOnce $ transition m when (measTime t > 0.001) $
     --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
     -- st0 <- state m case st0 of
@@ -217,7 +218,7 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
         let offset1 = fromIntegral $ chunk * fromIntegral quota
             offset2 = offset1 + phase1 + 1
         fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-          get (vec VU.! (fromIntegral $ i `mod` len)) m
+          get (vec VU.! fromIntegral (i `mod` len)) m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
@@ -240,7 +241,7 @@ fold start end z fld fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $ fld xs x
+          return $! fld xs x
 
 for :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [a]
 for start end _
@@ -252,7 +253,7 @@ for start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $ x : xs
+          return $! x : xs
 
 {-# INLINABLE fori #-}
 fori :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [(n, a)]
@@ -265,7 +266,7 @@ fori start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $ (i, x) : xs
+          return $! (i, x) : xs
 
 data Measured =
        Measured
@@ -337,7 +338,7 @@ measure !iters !f = do
   startTime <- getTime
   startCpuTime <- getCPUTime
   startCycles <- getCycles
-  _ <- for_ 1 iters $ \_ -> f
+  _ <- for_ 1 iters $ const f
   endTime <- getTime
   endCpuTime <- getCPUTime
   endCycles <- getCycles
@@ -363,10 +364,10 @@ nop _ = pure ()
 run :: Int -> IO Measured -> IO Measured
 run runs fn = do
   let rs = if even runs
-             then (runs + 1)
+             then runs + 1
              else runs
       mid = (1 + rs) `quot` 2
-  ms <- for 1 rs $ \_ -> fn
+  ms <- for 1 rs $ const fn
   return $! sort ms !! (mid - 1)
 
 {-# INLINE runAll #-}
@@ -460,9 +461,9 @@ main = do
            hFlush stdout
            runReaderT (benchmark variant) opts
 
-  let term = if (output opts) == "svg"
-               then terminal $ (SVG.cons $ file opts ++ ".svg")
-               else terminal $ (X11.persist $ X11.cons)
+  let term = if output opts == "svg"
+               then terminal (SVG.cons $ file opts ++ ".svg")
+               else terminal (X11.persist X11.cons)
 
   when (doplot opts) $
     GP.plotPathsStyle
@@ -474,7 +475,7 @@ main = do
       , term
       , Custom "style line" ["3", "lc", "3", "lw", "3"]
       ]
-      (map (\(v, z) -> (style v, (\(t, m) -> (fromIntegral t, measTime m)) `fmap` z)) (vs `zip` zs))
+      (map (style *** fmap (fromIntegral *** measTime)) (vs `zip` zs))
 
   where
     style v = defaultStyle { GP.plotType = LinesPoints, GP.lineSpec = CustomStyle [LineTitle v] }
