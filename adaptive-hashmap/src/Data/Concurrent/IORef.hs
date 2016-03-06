@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Data.Concurrent.IORef (
     IORef,

@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Data.Concurrent.Compact.PureMap
        ( PureMap

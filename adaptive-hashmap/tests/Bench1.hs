@@ -4,8 +4,8 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | This is a second (modified) version of the benchmark harness by Vikraman
 
@@ -480,19 +480,19 @@ main = do
 
 data Flag =
        Flag
-         { ops         :: Int
-         , file        :: String
-         , output      :: String
-         , runs        :: Int
-         , bench       :: String
-         , variants    :: [String]
-         , allvariants :: Bool
-         , ratio       :: Int64
-         , minthreads  :: Int
-         , maxthreads  :: Int
-         , doplot      :: Bool
-         , initial     :: Int
-         , range       :: Int64
+         { ops         :: !Int
+         , file        :: !String
+         , output      :: !String
+         , runs        :: !Int
+         , bench       :: !String
+         , variants    :: ![String]
+         , allvariants :: !Bool
+         , ratio       :: !Int64
+         , minthreads  :: !Int
+         , maxthreads  :: !Int
+         , doplot      :: !Bool
+         , initial     :: !Int
+         , range       :: !Int64
          , randomInts  :: VU.Vector Int64
          , randomPairs :: VU.Vector (Int64, Int64)
          }

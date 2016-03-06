@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Data.Concurrent.Adaptive.AdaptiveMap (
     AdaptiveMap,

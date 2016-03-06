@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 module Data.Concurrent.PureMapL
        (
          PureMapL
@@ -9,10 +11,10 @@ module Data.Concurrent.PureMapL
        )
        where
 
-import Data.IORef
-import Data.Hashable
 import qualified Control.Concurrent.Lock as L
-import qualified Data.HashMap.Strict as HM
+import           Data.Hashable
+import qualified Data.HashMap.Strict     as HM
+import           Data.IORef
 
 type PureMapL k v = IORef (HM.HashMap k v, L.Lock)
 
