@@ -147,12 +147,14 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
-  liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
-    let offset1 = fromIntegral $ chunk * fromIntegral quota
-        offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! (fromIntegral $ i `mod` len)) i m
-    transition m
-    for_ offset2 (offset2 + phase2) $ \i -> get (vec VU.! (fromIntegral $ i `mod` len)) m
+  liftIO $ measureOnce $ forkJoin splits $ \chunk ->
+    do
+      let offset1 = fromIntegral $ chunk * fromIntegral quota
+          offset2 = offset1 + phase1 + 1
+      for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! (fromIntegral $ i `mod` len)) i m
+      transition m
+      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+        get (vec VU.! (fromIntegral $ i `mod` len)) m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
@@ -210,10 +212,12 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
     st1 <- state m
     putStr $ "(size " ++ show sz ++ ", stateAfterTrans " ++ st1 ++ ") "
 
-    measureOnce $ forkJoin splits $ \chunk -> do
-      let offset1 = fromIntegral $ chunk * fromIntegral quota
-          offset2 = offset1 + phase1 + 1
-      for_ offset2 (offset2 + phase2) $ \i -> get (vec VU.! (fromIntegral $ i `mod` len)) m
+    measureOnce $ forkJoin splits $ \chunk ->
+      do
+        let offset1 = fromIntegral $ chunk * fromIntegral quota
+            offset2 = offset1 + phase1 + 1
+        fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+          get (vec VU.! (fromIntegral $ i `mod` len)) m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
@@ -224,6 +228,19 @@ for_ start end fn = loop start
     loop !i
       | i > end = return ()
       | otherwise = fn i >> loop (i + 1)
+
+{-# INLINABLE fold #-}
+fold :: (Num n, Ord n, Monad m) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b
+fold start end _ _ _
+  | start > end = error "start greater than end"
+fold start end z fld fn = loop start
+  where
+    loop !i
+      | i > end = return z
+      | otherwise = do
+          !x <- fn i
+          !xs <- loop (i + 1)
+          return $ fld xs x
 
 for :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [a]
 for start end _
