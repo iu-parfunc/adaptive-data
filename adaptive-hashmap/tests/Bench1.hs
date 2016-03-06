@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE NamedFieldPuns       #-}
+{-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -54,7 +55,7 @@ forkNIns GenericImpl { newMap, insert } splits = do
   !m <- liftIO newMap
   !ops <- reader ops
   let quota = fromIntegral $ ops `quot` splits
-  liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
+  measure' $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
     for_ offset (offset + quota) $ \i -> insert i (i + 1) m
 
@@ -64,7 +65,7 @@ forkNInsDel GenericImpl { newMap, insert, delete } splits = do
   !m <- liftIO newMap
   !ops <- reader ops
   let quota = fromIntegral $ ops `quot` splits
-  liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
+  measure' $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
     for_ offset (offset + quota) $ \i -> if even chunk
                                            then delete i m
@@ -77,7 +78,7 @@ fork5050 GenericImpl { newMap, insert, delete } splits = do
   !ops <- reader ops
   !vec <- reader randomInts
   let quota = fromIntegral $ ops `quot` splits
-  liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
+  measure' $ forkJoin splits $ \chunk -> do
     let offset = fromIntegral $ chunk * fromIntegral quota
         shouldDel = (vec VU.! (fromIntegral offset `mod` VU.length vec)) == 0
     for_ offset (offset + quota) $ \i -> if shouldDel
@@ -146,7 +147,7 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
-  liftIO $ measureOnce $ forkJoin splits $ \chunk ->
+  measure' $ forkJoin splits $ \chunk ->
     do
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
@@ -167,7 +168,7 @@ hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       len = fromIntegral $ VU.length vec
-  liftIO $ measureOnce $ forkJoin splits $ \chunk -> do
+  measure' $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
     for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
 
@@ -211,12 +212,12 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
     st1 <- state m
     putStr $ "(size " ++ show sz ++ ", stateAfterTrans " ++ st1 ++ ") "
 
-    measureOnce $ forkJoin splits $ \chunk ->
-      do
-        let offset1 = fromIntegral $ chunk * fromIntegral quota
-            offset2 = offset1 + phase1 + 1
-        fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-          get (vec VU.! fromIntegral (i `mod` len)) m
+  measure' $ forkJoin splits $ \chunk ->
+    do
+      let offset1 = fromIntegral $ chunk * fromIntegral quota
+          offset2 = offset1 + phase1 + 1
+      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+        get (vec VU.! fromIntegral (i `mod` len)) m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
@@ -328,9 +329,10 @@ applyGCStats (Just end) (Just start) m = m
     diff f = f end - f start
 applyGCStats _ _ m = m
 
+-- | measure `iters` times
 {-# INLINE measure #-}
-measure :: Int64 -> IO a -> IO Measured
-measure !iters !f = do
+measure :: MonadIO m => Int64 -> IO a -> m Measured
+measure !iters !f = liftIO $ do
   performGC
   startStats <- getGCStats
   startTime <- getTime
@@ -349,9 +351,43 @@ measure !iters !f = do
         }
   return m
 
+-- | measure once
 {-# INLINE measureOnce #-}
-measureOnce :: IO a -> IO Measured
+measureOnce :: MonadIO m => IO a -> m Measured
 measureOnce = measure 1
+
+-- | measure `iters` times and rescale
+{-# INLINE measure' #-}
+measure' :: IO a -> Bench Measured
+measure' !f = do
+  !iters <- reader iters
+  !m <- measure iters f
+  return $! rescale m
+
+{-# INLINE rescale #-}
+rescale :: Measured -> Measured
+rescale m@Measured { .. } = m
+  { measTime = d measTime
+  , measCpuTime = d measCpuTime
+  , measCycles = i measCycles
+  -- skip measIters
+  , measNumGcs = i measNumGcs
+  , measBytesCopied = i measBytesCopied
+  , measMutatorWallSeconds = d measMutatorWallSeconds
+  , measMutatorCpuSeconds = d measMutatorCpuSeconds
+  , measGcWallSeconds = d measGcWallSeconds
+  , measGcCpuSeconds = d measGcCpuSeconds
+  }
+  where
+    d k = maybe k (/ iters) (fromDouble k)
+    i k = maybe k (round . (/ iters)) (fromIntegral <$> fromInt k)
+    iters = fromIntegral measIters :: Double
+    fromDouble d
+      | isInfinite d || isNaN d = Nothing
+      | otherwise = Just d
+    fromInt i
+      | i == minBound = Nothing
+      | otherwise = Just i
 
 {-# INLINE nop #-}
 nop :: Applicative m => a -> m ()
@@ -484,6 +520,7 @@ data Flag =
          , file        :: !String
          , output      :: !String
          , runs        :: !Int
+         , iters       :: !Int64
          , bench       :: !String
          , variants    :: ![String]
          , allvariants :: !Bool
@@ -507,6 +544,7 @@ flag = Flag
   { ops = 100000 &= help "Total number of operations"
   , file = "report" &= help "Report file prefix"
   , output = "svg" &= help "Output {svg, x11}"
+  , iters = 1 &= help "Number of iterations"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
   , variants = [] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
