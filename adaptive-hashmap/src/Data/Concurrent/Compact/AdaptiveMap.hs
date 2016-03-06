@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
-module Control.Concurrent.Compact.AdaptiveMap (
+module Data.Concurrent.Compact.AdaptiveMap (
     AdaptiveMap,
     newMap,
     get, getState,
@@ -14,8 +14,6 @@ module Control.Concurrent.Compact.AdaptiveMap (
     ) where
 
 -- Backpack should eliminate silliness like this in the future:
-import qualified Control.Concurrent.Compact.PureMap as PM
+import qualified Data.Concurrent.Compact.PureMap as PM
 
 #include "AdaptiveMapCore.hs"
-
-

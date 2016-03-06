@@ -18,11 +18,11 @@ import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
-import qualified Control.Concurrent.Compact.PureMap      as CPM
-import qualified Control.Concurrent.Ctrie                as CM
-import qualified Control.Concurrent.PureMap              as PM
-import qualified Control.Concurrent.PureMapL             as PML
+import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
+import qualified Data.Concurrent.Compact.PureMap      as CPM
+import qualified Data.Concurrent.Ctrie                as CM
+import qualified Data.Concurrent.PureMap              as PM
+import qualified Data.Concurrent.PureMapL             as PML
 
 -- RRN: the [ops] list is quite obofuscated!  Why not pass a record of "methods"?
 thread :: Int -> [Int64 -> Int64 -> IO ()] -> [Double] -> Flag -> Barrier Bool -> Word64 -> IO Int

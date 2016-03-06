@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Control.Concurrent.Compact.PureMap
+module Data.Concurrent.Compact.PureMap
        ( PureMap
        , newMap
        , get

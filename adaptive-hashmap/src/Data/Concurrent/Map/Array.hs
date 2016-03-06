@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 -- | Convenient interface for 'Data.Primitive.Array'.
-module Control.Concurrent.Map.Array
+module Data.Concurrent.Map.Array
     ( Array
     , empty, singleton, pair
     , head, index

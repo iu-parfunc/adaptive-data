@@ -42,11 +42,11 @@ import qualified Graphics.Gnuplot.Simple       as GP
 import qualified Graphics.Gnuplot.Terminal.SVG as SVG
 import qualified Graphics.Gnuplot.Terminal.X11 as X11
 
-import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
-import qualified Control.Concurrent.Compact.AdaptiveMap  as CAM
-import qualified Control.Concurrent.Ctrie                as CM
-import qualified Control.Concurrent.PureMap              as PM
-import qualified Control.Concurrent.PureMapL             as PML
+import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
+import qualified Data.Concurrent.Compact.AdaptiveMap  as CAM
+import qualified Data.Concurrent.Ctrie                as CM
+import qualified Data.Concurrent.PureMap              as PM
+import qualified Data.Concurrent.PureMapL             as PML
 
 {-# INLINABLE forkNIns #-}
 forkNIns :: GenericImpl m -> Int -> Bench Measured

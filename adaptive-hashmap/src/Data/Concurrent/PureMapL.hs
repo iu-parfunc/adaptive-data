@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Control.Concurrent.PureMapL
+module Data.Concurrent.PureMapL
        (
          PureMapL
        , newMap

@@ -2,7 +2,7 @@
 {-# LANGUAGE PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Control.Concurrent.Ctrie
+module Data.Concurrent.Ctrie
     ( Map
 
       -- * Construction
@@ -37,8 +37,8 @@ import           Data.Maybe
 import           Data.Word
 import           Prelude       hiding (lookup)
 
-import qualified Control.Concurrent.Map.Array as A
 import           Data.Concurrent.IORef
+import qualified Data.Concurrent.Map.Array as A
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.

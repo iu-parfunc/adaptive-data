@@ -20,14 +20,14 @@ flag debug
 
 
 library
-  exposed-modules:     Control.Concurrent.PureMap,
-                       Control.Concurrent.PureMapL,
-                       Data.Concurrent.IORef,
-                       Control.Concurrent.Ctrie,
-                       Control.Concurrent.Map.Array,
-                       Control.Concurrent.Adaptive.AdaptiveMap,
-                       Control.Concurrent.Compact.PureMap,
-                       Control.Concurrent.Compact.AdaptiveMap
+  exposed-modules:     Data.Concurrent.IORef,
+                       Data.Concurrent.PureMap,
+                       Data.Concurrent.PureMapL,
+                       Data.Concurrent.Ctrie,
+                       Data.Concurrent.Map.Array,
+                       Data.Concurrent.Adaptive.AdaptiveMap,
+                       Data.Concurrent.Compact.PureMap,
+                       Data.Concurrent.Compact.AdaptiveMap
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
   build-depends:       async >= 2.0.2,
                        atomic-primops >= 0.8,

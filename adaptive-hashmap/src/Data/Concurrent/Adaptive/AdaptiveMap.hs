@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
 
-module Control.Concurrent.Adaptive.AdaptiveMap (
+module Data.Concurrent.Adaptive.AdaptiveMap (
     AdaptiveMap,
     newMap, newBMap,
     get, getState,
@@ -14,6 +14,6 @@ module Control.Concurrent.Adaptive.AdaptiveMap (
     ) where
 
 -- These implementations differ only in the puremap implementation:
-import qualified Control.Concurrent.PureMap        as PM
+import qualified Data.Concurrent.PureMap as PM
 
 #include "AdaptiveMapCore.hs"
