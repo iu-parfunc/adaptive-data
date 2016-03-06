@@ -24,6 +24,7 @@ module Control.Concurrent.Adaptive.Ctrie
     , freeze, pollFreeze
     , unsafeTraverse_
     , freezeAndTraverse_
+    , freezeFold
 
     --, printMap
     ) where
@@ -318,8 +319,26 @@ freezeAndTraverse_ fn (Map root) = go root
         Collision xs -> mapM_ (\ (S k v) -> fn k v) xs
     go2 (INode inode) = go inode
     go2 (SNode (S k v)) = fn k v
-    freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINE freezeAndTraverse_ #-}
+
+freezeloop ref = spinlock $ freezeIORef ref
+
+-- | Freezes, performs a fold, and returns the size of the structure as well.
+-- TODO: Fix so it returns the size.
+freezeFold :: (a -> k -> v -> a) -> a -> Map k v -> IO a -- (Int, a)
+freezeFold fn zer (Map root) = go zer root
+  where
+    go acc inode = do
+      freezeloop inode =<< readForCAS inode
+      main <- readIORef inode
+      case main of
+        CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
+        Tomb (S k v) -> return $! fn acc k v
+        Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+    go2 acc (INode inode)   = go acc inode
+    go2 acc (SNode (S k v)) = return $! fn acc k v
+{-# INLINE freezeFold #-}
+
 
 -- | A non-allocating way to traverse a frozen structure.
 unsafeTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
@@ -348,7 +367,6 @@ freeze (Map root) = go root
         Collision _   -> return ()
     go2 (INode inode) = go inode
     go2 (SNode (S _ _)) = return ()
-    freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINABLE freeze #-}
 
 -- | A version of `freeze` which periodically runs a polling action
@@ -377,7 +395,6 @@ pollFreeze poll (Map root) = go root
         return False
     go2 (INode inode)   = go inode
     go2 (SNode (S _ _)) = return True
-    freezeloop ref = spinlock $ freezeIORef ref
 {-# INLINE pollFreeze #-}
 
 -----------------------------------------------------------------------

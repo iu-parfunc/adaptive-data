@@ -2,6 +2,7 @@
 -- WARNING: This is not a complete module, but a fragment to be #included
 
 import qualified Control.Concurrent.Adaptive.Ctrie as CM
+import qualified Data.HashMap.Strict   as HM
 import           Control.Exception
 import           Control.Monad
 import           Data.Atomics
@@ -127,10 +128,12 @@ transition m = do
       -- A small optimization.  Single-pass version.
       ------------------------
       -- Huh, this one is about the same time.
-      pm <- PM.newMap
       st <- getCurrentTime
       traceMarkerIO "StartFreeze"
-      CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+      -- pm <- PM.newMap
+      -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+      hm <- CM.freezeFold (\h k v -> HM.insert k v h) HM.empty cm
+      pm <- PM.fromMap hm -- TODO: use fromMapSized
       traceMarkerIO "EndFreeze"
       en <- getCurrentTime
       putStr $ "(freezeTravTime "++show (diffUTCTime en st)++") "

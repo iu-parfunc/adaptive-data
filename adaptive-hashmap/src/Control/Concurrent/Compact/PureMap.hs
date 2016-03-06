@@ -9,7 +9,7 @@ module Control.Concurrent.Compact.PureMap
        , del
        , fromList
        , toList
-       , fromMap
+       , fromMap, fromMapSized
        , size
        ) where
 
@@ -108,6 +108,14 @@ toList = ((HM.toList . getCompact) `fmap`) . readIORef
 fromMap :: (NFData k, NFData v)
         => HM.HashMap k v -> IO (PureMap k v)
 fromMap hm =
+  -- FIXME: I doubt it is worth donig an extra traversal here for the size!
   do !c <- newCompact (approxSize (HM.size hm)) hm
+     newIORef c
+
+fromMapSized :: (NFData k, NFData v)
+        => HM.HashMap k v -> Int -> IO (PureMap k v)
+fromMapSized hm sz =
+  -- FIXME: I doubt it is worth donig an extra traversal here for the size!
+  do !c <- newCompact (approxSize sz) hm
      newIORef c
 
