@@ -153,7 +153,9 @@ hotCold d ops ratio splits = do
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
     transition d m
-    for_ offset2 (offset2 + phase2) $ \i -> get d i m
+    for_ offset2 (offset2 + phase2) $ \i ->
+      do !r <- get d (i `mod` 110000) m -- Temp/HACK modulus.
+         return ()
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: IO m
@@ -182,17 +184,30 @@ coldPhase d ops ratio splits = do
       phase2 = (quota * (ratio - 1)) `quot` ratio
   putStrLn $ "(cold:perthread,ops1/ops2 "++ show phase1 ++" "++ show phase2++")"
   -- Run the hot phase and then use a barrier/join before measuring the cold phase:
+  ------------------------------
   forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
-    t <- measureOnce $ transition d m
-    when (measTime t > 0.001) $ 
-      do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
+    -- t <- measureOnce $ transition d m
+    -- when (measTime t > 0.001) $ 
+    --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout    
+    -- st0 <- state d m
+    -- case st0 of
+    --   "AB" -> error $ "coldPhase: transition returned locally on this thread, but state is: "++st0
+    --   "A"  -> error $ "coldPhase: transition returned locally on this thread, but state is: "++st0
+    --   _ -> return ()
     return ()
+
+  putStrLn "coldPhase: mutable phase done, transitioning..." ; hFlush stdout
+  -- Since we're not measuring it anyway, do this transition after the barrier, on the main thread:
+  t <- measureOnce $ transition d m
+  -- when (measTime t > 0.001) $ 
+  putStrLn$  "  (trans "++ show (measTime t)++") "; hFlush stdout    
+
   sz <- size d m
-  state <- state d m
-  putStr$  "(size "++show sz++", stateAfterTrans "++ state ++ ") "
+  st1 <- state d m
+  putStr$  "(size "++show sz++", stateAfterTrans "++ st1 ++ ") "
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
@@ -200,7 +215,9 @@ coldPhase d ops ratio splits = do
     -- FIXME: restrict the keyspace to a smaller range.
     -- Most of these "miss":
     -- for_ offset2 (offset2 + phase2) $ \i -> get d i m
-    for_ offset2 (offset2 + phase2) $ \i -> get d (i `mod` 110000) m -- Temp/Hack
+    for_ offset2 (offset2 + phase2) $ \i ->
+      do !r <- get d (i `mod` 110000) m -- Temp/Hack
+         return ()
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()

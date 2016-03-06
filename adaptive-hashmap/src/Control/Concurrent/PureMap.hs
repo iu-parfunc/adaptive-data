@@ -30,7 +30,7 @@ newMap = newIORef HM.empty
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
 get !k !m = do
   m' <- readIORef m
-  return $ HM.lookup k m'
+  return $! HM.lookup k m'
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> PureMap k v -> IO ()

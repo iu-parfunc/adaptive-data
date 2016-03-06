@@ -21,6 +21,7 @@ import           Data.Hashable
 import qualified Data.HashMap.Strict   as HM
 import           Data.IORef
 import           System.IO
+import           System.IO.Unsafe (unsafePerformIO)
 
 type PureMap k v = IORef (Compact (HM.HashMap k v))
 
@@ -33,7 +34,7 @@ get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
 get !k !m = do
   !c <- readIORef m
   let !hm = getCompact c
-  return $ HM.lookup k hm
+  return $! HM.lookup k hm
 
 size :: PureMap k v -> IO Int
 size r =
@@ -46,21 +47,34 @@ size r =
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> PureMap k v -> IO ()
 ins !k !v !m =
    do t <- readForCAS m
+      error "insert called on a Compact HashMap - defining this as error for now"
       -- putStrLn "WARNING: doing insert on Compact Hashmap!"; hFlush stdout
-      hPutStr stderr "!"
-      loop t
+      -- hPutStr stderr "!"
+
+      -- One alternative here is to delay the compaction.  Point into the Compact,
+      -- but don't append until later.
+
+      -- Here's a temporary version.  It's one way to do a locking version:
+      atomicModifyIORef' m $
+        (\ c -> unsafePerformIO $ 
+                do c' <- appendCompact c $! HM.insert k v $! getCompact c
+                   return (c',()))
+      -- loop t
   where
     -- This is pretty terrible.  Better to make this version just locking.
     loop = spinlock
              (\tik -> do
                 let !c = peekTicket tik
-                    !hm = getCompact c
-                c' <- appendCompact c $ HM.insert k v hm
+                c' <- appendCompact c $! HM.insert k v $! getCompact c
                 casIORef m tik c')
+
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k, NFData k, NFData v) => k -> PureMap k v -> IO ()
-del !k !m = loop =<< readForCAS m
+del !k !m =
+   do t <- readForCAS m
+      error "delete called on a Compact HashMap - defining this as error for now"
+      loop t
   where
     loop = spinlock
              (\tik -> do
