@@ -3,7 +3,7 @@
 
 module Control.Concurrent.Adaptive.AdaptiveMap (
     AdaptiveMap,
-    newMap,
+    newMap, newBMap,
     get,
     ins,
     del,
@@ -34,6 +34,12 @@ newMap :: IO (AdaptiveMap k v)
 newMap = do
   !m <- CM.empty
   newIORef $ A m
+
+-- Temp/Debugging: make it possible to create in the B state.
+newBMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
+newBMap = do
+  !m <- PM.newMap
+  newIORef $ B m
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
