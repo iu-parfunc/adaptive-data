@@ -1,7 +1,7 @@
 
 -- WARNING: This is not a complete module, but a fragment to be #included
 
-import qualified Control.Concurrent.Adaptive.Ctrie as CM
+import qualified Control.Concurrent.Ctrie as CM
 import qualified Data.HashMap.Strict   as HM
 import           Control.Exception
 import           Control.Monad

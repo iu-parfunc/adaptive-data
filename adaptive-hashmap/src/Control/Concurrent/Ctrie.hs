@@ -2,25 +2,23 @@
 {-# LANGUAGE PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | Why is this version here?
-
-module Control.Concurrent.Adaptive.Ctrie
+module Control.Concurrent.Ctrie
     ( Map
 
       -- * Construction
     , empty
     , fromList
-      
+
       -- * Modification
     , insert
     , delete
-      
+
       -- * Query
     , lookup
-    , size 
+    , size
 
     -- * Freezing and iteration
-    , unsafeToList      
+    , unsafeToList
     , freeze, pollFreeze
     , unsafeTraverse_
     , freezeAndTraverse_
@@ -289,7 +287,7 @@ unsafeToList (Map root) = go root
         go2 xs (SNode (S k v)) = return $ (k,v) : xs
 {-# INLINABLE unsafeToList #-}
 
--- | An approximation of the CTries size. 
+-- | An approximation of the CTries size.
 --   Concurrent modifications may keep this method from being serialiable.
 size :: Map k v -> IO Int
 size (Map root) = go root
@@ -385,7 +383,7 @@ pollFreeze poll (Map root) = go root
            main <- readIORef inode
            case main of
              CNode bmp arr ->
-               -- TODO short circuiting mapM_.  Could use maybe monad...               
+               -- TODO short circuiting mapM_.  Could use maybe monad...
                do A.mapM_ go2 (popCount bmp) arr
                   b <- poll -- Assumed to be monotonic.
                   return b

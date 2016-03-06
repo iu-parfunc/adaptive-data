@@ -44,11 +44,9 @@ import qualified Graphics.Gnuplot.Terminal.X11 as X11
 
 import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
 import qualified Control.Concurrent.Compact.AdaptiveMap  as CAM
--- RRN: Uh, why this redundant copy?
--- import qualified Control.Concurrent.Map                  as CM
-import qualified Control.Concurrent.Adaptive.Ctrie as CM
-import qualified Control.Concurrent.PureMap        as PM
-import qualified Control.Concurrent.PureMapL       as PML
+import qualified Control.Concurrent.Ctrie                as CM
+import qualified Control.Concurrent.PureMap              as PM
+import qualified Control.Concurrent.PureMapL             as PML
 
 {-# INLINABLE forkNIns #-}
 forkNIns :: GenericImpl m -> Int -> Bench Measured
