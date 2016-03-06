@@ -79,6 +79,8 @@ del !k !m = do
   `catches`
   [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
 
+
+-- FIXME: this whole file is pretty much a copy paste of the other AdaptiveMap.hs.
 transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
 transition m = do
   tik <- readForCAS m
@@ -94,6 +96,7 @@ transition m = do
         putMVar mv ()
     AB _ _ -> return ()
     B _ -> return ()
+
 
 fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
 fromList !l = do
