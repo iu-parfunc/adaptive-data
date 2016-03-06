@@ -122,36 +122,33 @@ pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size
 
 ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size
 
-adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size
--- Quick hack
--- ----------
+-- adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size
+-- Quick hack below
+-- ----------------
 -- Interestingly this is STILL very different perf wise from pure on
 -- the following command, which seems bogus.
 --     stack bench adaptive-hashmap:bench-adaptive-hashmap-1 '--benchmark-arguments=--ops=10000000 --bench=hotcold --runs=3 --minthreads=1 --maxthreads=12 --ratio=5000 --variants=adaptive +RTS -N12 -A100M -H4G -qa -s -ls'
--- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
-
+adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
+-- ----------------
+               
 cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size
 
 -- | This runs the hot-phase, transition, cold-phase benchmark.
-{-# INLINABLE hotCold #-}
-hotCold :: IO m
-        -> (Int64 -> m -> IO (Maybe Int64))
-        -> (Int64 -> Int64 -> m -> IO ())
-        -> (Int64 -> m -> IO ())
-        -> (m -> IO ())
+{-# INLINE hotCold #-}
+hotCold :: GenericImpl m 
         -> Int -> Int64 -> Int -> IO Measured
-hotCold newMap get insert delete transition ops ratio splits = do
-  !m <- newMap
-  fill m insert
+hotCold d ops ratio splits = do
+  !m <- newMap d
+  fill m (insert d)
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
-    transition m
-    for_ offset2 (offset2 + phase2) $ \i -> get i m
+    for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
+    transition d m
+    for_ offset2 (offset2 + phase2) $ \i -> get d i m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: IO m
@@ -359,30 +356,30 @@ benchmark "pure" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
   | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns PM.newMap PM.ins ops
   | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel PM.newMap PM.ins PM.del ops
   | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 PM.newMap PM.ins PM.del ops randomInts
-  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold PM.newMap PM.get PM.ins PM.del nop ops ratio
-  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop ops ratio
-  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase pureImpl ops ratio
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   pureImpl ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase pureImpl ops ratio
 benchmark "ctrie" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
   | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CM.empty CM.insert ops
   | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CM.empty CM.insert CM.delete ops
   | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CM.empty CM.insert CM.delete ops randomInts
-  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop ops ratio
-  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop ops ratio
-  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase ctrieImpl ops ratio
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   ctrieImpl ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase ctrieImpl ops ratio
 benchmark "adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
   | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns AM.newMap AM.ins ops
   | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel AM.newMap AM.ins AM.del ops
   | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 AM.newMap AM.ins AM.del ops randomInts
-  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold AM.newMap AM.get AM.ins AM.del nop ops ratio
-  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop ops ratio
-  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase adaptiveImpl ops ratio
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   adaptiveImpl ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase adaptiveImpl ops ratio
 benchmark "c-adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
   | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CAM.newMap CAM.ins ops
   | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CAM.newMap CAM.ins CAM.del ops
   | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CAM.newMap CAM.ins CAM.del ops randomInts
-  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
-  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
-  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase cadaptiveImpl ops ratio
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   cadaptiveImpl ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase cadaptiveImpl ops ratio
 benchmark x y = error$ "benchmark: unknown argumetns: "++show x++" "++show y
 
 main :: IO ()

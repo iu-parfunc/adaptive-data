@@ -35,6 +35,7 @@ newMap = do
   !m <- CM.empty
   newIORef $ A m
 
+{-# INLINABLE newBMap #-}
 -- Temp/Debugging: make it possible to create in the B state.
 newBMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
 newBMap = do
