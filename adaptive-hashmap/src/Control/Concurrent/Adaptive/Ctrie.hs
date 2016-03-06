@@ -319,6 +319,7 @@ freezeAndTraverse_ fn (Map root) = go root
     go2 (INode inode) = go inode
     go2 (SNode (S k v)) = fn k v
     freezeloop ref = spinlock $ freezeIORef ref
+{-# INLINE freezeAndTraverse_ #-}
 
 -- | A non-allocating way to traverse a frozen structure.
 unsafeTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()

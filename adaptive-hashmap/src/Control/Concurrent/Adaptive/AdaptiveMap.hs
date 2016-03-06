@@ -20,6 +20,8 @@ import           Data.Atomics
 import qualified Data.Concurrent.IORef             as FIR
 import           Data.Hashable
 import           Data.IORef
+import           Data.Time.Clock
+
 
 data Hybrid k v = A !(CM.Map k v)
                 | AB !(CM.Map k v)
@@ -79,7 +81,7 @@ transition m = do
   tik <- readForCAS m
   case peekTicket tik of
     A cm -> do
-      (success, tik') <- casIORef m tik (AB cm)
+      (success, _tik) <- casIORef m tik (AB cm)
       -- TODO: if not success, should probably verify that someone else has actually got it into the AB state,
       -- if only for debugging/sanity checking.
       when success $ do
@@ -103,7 +105,10 @@ transition m = do
         ------------------------
         -- Huh, this one is about the same time.
         pm <- PM.newMap
+        st <- getCurrentTime
         CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+        en <- getCurrentTime
+        putStr $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
         let poller = do x <- readIORef m
                         case x of
@@ -116,11 +121,12 @@ transition m = do
         -- else pollFreeze poller
 
         let loop tik =
-              do (success,tik') <- casIORef m tik (B pm)
-                 unless success $
-                   case peekTicket tik' of
+              do (b,tik2) <- casIORef m tik (B pm)
+                 unless b $
+                   case peekTicket tik2 of
                      A _  -> error "this is impossible"                          
-                     AB _ -> loop tik' -- This should not actually happen, should it?
+                     AB _ -> error "transition: should not happen"
+                             -- loop tik' -- This should not actually happen, should it?
                      -- Someone else beat us to the punch and that's just fine:
                      B _  -> return ()
         tik <- readForCAS m

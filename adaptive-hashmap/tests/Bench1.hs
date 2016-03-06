@@ -408,16 +408,17 @@ main = do
                then terminal $ (SVG.cons $ file opts ++ ".svg")
                else terminal $ (X11.persist $ X11.cons)
 
-  GP.plotPathsStyle
-    [ XLabel "Threads"
-    , YLabel "Time in seconds"
-    , XTicks $ Just ["1"]
-    , Title (bench opts)
-    , Custom "grid" []
-    , term
-    , Custom "style line" ["3", "lc", "3", "lw", "3"]
-    ]
-    (map (\(v, z) -> (style v, (\(t, m) -> (fromIntegral t, measTime m)) `fmap` z)) (vs `zip` zs))
+  when (doplot opts) $ 
+    GP.plotPathsStyle
+      [ XLabel "Threads"
+      , YLabel "Time in seconds"
+      , XTicks $ Just ["1"]
+      , Title (bench opts)
+      , Custom "grid" []
+      , term
+      , Custom "style line" ["3", "lc", "3", "lw", "3"]
+      ]
+      (map (\(v, z) -> (style v, (\(t, m) -> (fromIntegral t, measTime m)) `fmap` z)) (vs `zip` zs))
 
   where
     style v = defaultStyle { GP.plotType = LinesPoints
@@ -434,6 +435,7 @@ data Flag =
          , allvariants :: Bool
          , ratio    :: Int64
          , threads  :: Int
+         , doplot   :: Bool
          }
   deriving (Eq, Show, CA.Data, CA.Typeable)
 
@@ -450,4 +452,5 @@ flag = Flag
   , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"
   , threads = 0 &= help "Number of threads"
+  , doplot  = False &= help "Plot the output with gnuplot"
   }
