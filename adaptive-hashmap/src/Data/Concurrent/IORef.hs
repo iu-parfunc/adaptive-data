@@ -81,6 +81,8 @@ freezeIORef (IORef !ref) !tik =
 {-# INLINE spinlock #-}
 spinlock :: (A.Ticket a -> IO (Bool, A.Ticket a))
          -> A.Ticket a -> IO ()
-spinlock !f !tik = do
-  (!success, !tik') <- f tik
-  unless success $ spinlock f tik'
+spinlock !f !tik = go tik
+ where
+  go !tik =
+   do (!success, !tik') <- f tik
+      unless success $ go tik'
