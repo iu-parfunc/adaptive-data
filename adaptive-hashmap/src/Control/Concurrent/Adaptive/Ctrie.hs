@@ -1,21 +1,8 @@
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
------------------------------------------------------------------------
--- | A non-blocking concurrent map from hashable keys to values.
---
--- The implementation is based on /lock-free concurrent hash tries/
--- (aka /Ctries/) as described by:
---
---    * Aleksander Prokopec, Phil Bagwell, Martin Odersky,
---      \"/Cache-Aware Lock-Free Concurent Hash Tries/\"
---    * Aleksander Prokopec, Nathan G. Bronson, Phil Bagwell, Martin
---      Odersky \"/Concurrent Tries with Efficient Non-Blocking Snapshots/\"
---
--- Operations have a worst-case complexity of /O(log n)/, with a base
--- equal to the size of the native 'Word'.
---
------------------------------------------------------------------------
+
+-- | Why is this version here?
 
 module Control.Concurrent.Adaptive.Ctrie
     ( Map
@@ -30,6 +17,7 @@ module Control.Concurrent.Adaptive.Ctrie
       
       -- * Query
     , lookup
+    , size 
 
     -- * Freezing and iteration
     , unsafeToList      
@@ -299,6 +287,23 @@ unsafeToList (Map root) = go root
         go2 xs (INode inode) = go inode >>= \ys -> return (ys ++ xs)
         go2 xs (SNode (S k v)) = return $ (k,v) : xs
 {-# INLINABLE unsafeToList #-}
+
+-- | An approximation of the CTries size. 
+--   Concurrent modifications may keep this method from being serialiable.
+size :: Map k v -> IO Int
+size (Map root) = go root
+    where
+        go inode = do
+            main <- readIORef inode
+            case main of
+                CNode bmp arr -> A.foldM' go2 0 (popCount bmp) arr
+                Tomb (S k v) -> return 1
+                Collision xs -> return $! length xs
+
+        go2 xs (INode inode) = do ys <- go inode; return (ys + xs)
+        go2 xs (SNode (S k v)) = return $! 1 + xs
+{-# INLINABLE size #-}
+
 
 -- | A procedure that combines freezing and traversal.
 freezeAndTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()

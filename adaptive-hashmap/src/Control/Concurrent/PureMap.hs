@@ -10,6 +10,7 @@ module Control.Concurrent.PureMap
        , fromMap
        , toList
        , snapshot
+       , size
        )
        where
 
@@ -60,3 +61,6 @@ toList = (HM.toList `fmap`) . readIORef
 -- | O(1) snapshot
 snapshot :: PureMap k v -> IO (HM.HashMap k v)
 snapshot = readIORef
+
+size :: PureMap k v -> IO Int
+size r = HM.size <$> readIORef r

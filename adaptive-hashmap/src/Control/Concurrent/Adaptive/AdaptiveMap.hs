@@ -8,7 +8,8 @@ module Control.Concurrent.Adaptive.AdaptiveMap (
     ins,
     del,
     transition,
-    fromList
+    fromList,
+    size
     ) where
 
 import qualified Control.Concurrent.Adaptive.Ctrie as CM
@@ -40,6 +41,15 @@ get !k !m = do
     A cm  -> CM.lookup k cm
     AB cm -> CM.lookup k cm
     B pm  -> PM.get k pm
+
+{-# INLINABLE size #-}
+size :: AdaptiveMap k v -> IO Int
+size !m = do
+  state <- readIORef m
+  case state of
+    A cm  -> CM.size cm
+    AB cm -> CM.size cm
+    B pm  -> PM.size pm
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> AdaptiveMap k v -> IO ()

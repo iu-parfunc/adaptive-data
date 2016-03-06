@@ -10,6 +10,7 @@ module Control.Concurrent.Compact.PureMap
        , fromList
        , toList
        , fromMap
+       , size
        ) where
 
 import           Control.DeepSeq
@@ -32,6 +33,13 @@ get !k !m = do
   !c <- readIORef m
   let !hm = getCompact c
   return $ HM.lookup k hm
+
+size :: PureMap k v -> IO Int
+size r =
+  do c <- readIORef r
+     let hm = getCompact c
+     return $! HM.size hm
+
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> PureMap k v -> IO ()
@@ -58,9 +66,10 @@ del !k !m = loop =<< readForCAS m
 -- | Approximate byte size of resulting structure based on number of elements.
 --  FIXME: This could easily be tuned by looking at the ACTUAL byte sizes.
 approxSize :: Int -> Word
-approxSize sz =
-  fromIntegral $ round $ 24 * szd + 256 * logBase 16 szd
+approxSize sz = fromIntegral dbl 
   where
+  dbl :: Word
+  dbl = round $ 24 * szd + 256 * logBase 16 szd
   szd :: Double
   szd = fromIntegral sz
 
@@ -81,3 +90,4 @@ fromMap :: (NFData k, NFData v)
 fromMap hm =
   do !c <- newCompact (approxSize (HM.size hm)) hm
      newIORef c
+

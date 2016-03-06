@@ -20,7 +20,9 @@ import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
 import qualified Control.Concurrent.Compact.PureMap      as CPM
-import qualified Control.Concurrent.Map                  as CM
+-- RRN: Uh, why this redundant copy?
+-- import qualified Control.Concurrent.Map                  as CM
+import qualified Control.Concurrent.Adaptive.Ctrie       as CM
 import qualified Control.Concurrent.PureMap              as PM
 import qualified Control.Concurrent.PureMapL             as PML
 
