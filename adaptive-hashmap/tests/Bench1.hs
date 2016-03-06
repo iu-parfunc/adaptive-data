@@ -357,7 +357,9 @@ run runs fn = do
              else runs
       mid = 1 + rs `quot` 2
   ms <- for 1 rs $ \_ -> fn
-  return $! sort ms !! mid
+  case ms of
+    [x] -> return x
+    ls  -> return $! sort ls !! mid
 
 {-# INLINE runAll #-}
 runAll :: (Int,Int) -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
