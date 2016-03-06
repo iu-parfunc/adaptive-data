@@ -31,7 +31,11 @@ import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
+import qualified Graphics.Gnuplot.Simple       as GP
 import           Graphics.Gnuplot.Simple
+                 (defaultStyle, terminal,
+                  LineAttr(LineTitle), LineSpec(CustomStyle),
+                          Attribute(..), PlotType(..))
 import qualified Graphics.Gnuplot.Terminal.SVG as SVG
 import qualified Graphics.Gnuplot.Terminal.X11 as X11
 
@@ -169,13 +173,16 @@ coldPhase d ops ratio splits = do
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
   -- Run the hot phase and then use a barrier/join before measuring the cold phase:
-  void $ forkJoin splits $ \chunk -> do
+  forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
-    transition d m
+    t <- measureOnce $ transition d m
+    when (measTime t > 0.001) $ 
+      do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
+    return ()
   sz <- size d m
-  putStr$  " size "++show sz
+  putStr$  "(size "++show sz++") "
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
@@ -401,7 +408,7 @@ main = do
                then terminal $ (SVG.cons $ file opts ++ ".svg")
                else terminal $ (X11.persist $ X11.cons)
 
-  plotPathsStyle
+  GP.plotPathsStyle
     [ XLabel "Threads"
     , YLabel "Time in seconds"
     , XTicks $ Just ["1"]
@@ -413,7 +420,8 @@ main = do
     (map (\(v, z) -> (style v, (\(t, m) -> (fromIntegral t, measTime m)) `fmap` z)) (vs `zip` zs))
 
   where
-    style v = defaultStyle { plotType = LinesPoints, lineSpec = CustomStyle [LineTitle v] }
+    style v = defaultStyle { GP.plotType = LinesPoints
+                           , GP.lineSpec = CustomStyle [LineTitle v] }
 
 data Flag =
        Flag
