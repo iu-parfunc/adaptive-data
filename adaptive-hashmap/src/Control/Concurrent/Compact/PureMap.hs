@@ -21,20 +21,21 @@ import           Data.Hashable
 import qualified Data.HashMap.Strict   as HM
 import           Data.IORef
 import           System.IO
-import           System.IO.Unsafe (unsafePerformIO)
+import           System.IO.Unsafe      (unsafePerformIO)
 
 type PureMap k v = IORef (Compact (HM.HashMap k v))
 
-{-# INLINABLE newMap #-}
+{-# INLINE newMap #-}
 newMap :: (NFData k, NFData v) => IO (PureMap k v)
 newMap = newCompact 4096 HM.empty >>= newIORef
 
-{-# INLINABLE get #-}
+{-# INLINE get #-}
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
 get !k !m = do
   c <- readIORef m
   return $! HM.lookup k $! getCompact c
 
+{-# INLINE size #-}
 size :: PureMap k v -> IO Int
 size r =
   do c <- readIORef r
@@ -42,7 +43,7 @@ size r =
      return $! HM.size hm
 
 
-{-# INLINABLE ins #-}
+{-# INLINE ins #-}
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> PureMap k v -> IO ()
 ins !k !v !m =
    do t <- readForCAS m
@@ -55,7 +56,7 @@ ins !k !v !m =
 
       -- Here's a temporary version.  It's one way to do a locking version:
       atomicModifyIORef' m $
-        (\ c -> unsafePerformIO $ 
+        (\ c -> unsafePerformIO $
                 do c' <- appendCompact c $! HM.insert k v $! getCompact c
                    return (c',()))
       -- loop t
@@ -68,7 +69,7 @@ ins !k !v !m =
                 casIORef m tik c')
 
 
-{-# INLINABLE del #-}
+{-# INLINE del #-}
 del :: (Eq k, Hashable k, NFData k, NFData v) => k -> PureMap k v -> IO ()
 del !k !m =
    do t <- readForCAS m
@@ -84,26 +85,28 @@ del !k !m =
 
 -- | Approximate byte size of resulting structure based on number of elements.
 --  FIXME: This could easily be tuned by looking at the ACTUAL byte sizes.
+{-# INLINE approxSize #-}
 approxSize :: Int -> Word
-approxSize sz = fromIntegral dbl 
+approxSize sz = fromIntegral dbl
   where
   dbl :: Word
   dbl = round $ 24 * szd + 256 * logBase 16 szd
   szd :: Double
   szd = fromIntegral sz
 
-{-# INLINABLE fromList #-}
+{-# INLINE fromList #-}
 fromList :: (Eq k, Hashable k, NFData k, NFData v) => [(k, v)] -> IO (PureMap k v)
 fromList l = do
   let hm = HM.fromList l
   !c <- newCompact (approxSize (HM.size hm)) hm
   newIORef c
 
-{-# INLINABLE toList #-}
+{-# INLINE toList #-}
 toList :: PureMap k v -> IO [(k, v)]
 toList = ((HM.toList . getCompact) `fmap`) . readIORef
 
 -- | Create a compacted map from a map in the regular Haskell heap.
+{-# INLINE fromMap #-}
 fromMap :: (NFData k, NFData v)
         => HM.HashMap k v -> IO (PureMap k v)
 fromMap hm =
@@ -111,10 +114,10 @@ fromMap hm =
   do !c <- newCompact (approxSize (HM.size hm)) hm
      newIORef c
 
+{-# INLINE fromMapSized #-}
 fromMapSized :: (NFData k, NFData v)
         => HM.HashMap k v -> Int -> IO (PureMap k v)
 fromMapSized hm sz =
   -- FIXME: I doubt it is worth donig an extra traversal here for the size!
   do !c <- newCompact (approxSize sz) hm
      newIORef c
-
