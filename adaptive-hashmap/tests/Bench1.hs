@@ -354,11 +354,9 @@ run runs fn = do
   let rs = if even runs
              then (runs + 1)
              else runs
-      mid = 1 + rs `quot` 2
+      mid = (1 + rs) `quot` 2
   ms <- for 1 rs $ \_ -> fn
-  case ms of
-    [x] -> return x
-    ls  -> return $! sort ls !! mid
+  return $! sort ms !! (mid - 1)
 
 {-# INLINE runAll #-}
 runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
