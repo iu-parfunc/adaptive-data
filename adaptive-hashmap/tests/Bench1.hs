@@ -116,14 +116,15 @@ data GenericImpl m =
   , delete :: (Int64 -> m -> IO ())
   , transition :: (m -> IO ())
   , size   :: m -> IO Int
+  , state  :: m -> IO String
   }
 
 pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
-pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size
+pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
 
-ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size
+ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
 
-adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size
+adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size AM.getState
 -- Quick hack below
 -- ----------------
 -- Interestingly this is STILL very different perf wise from pure on
@@ -132,7 +133,7 @@ adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size
 -- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
 -- ----------------
                
-cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size
+cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState
 
 -- | This runs the hot-phase, transition, cold-phase benchmark.
 {-# INLINE hotCold #-}
@@ -179,6 +180,7 @@ coldPhase d ops ratio splits = do
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
+  putStrLn $ "(cold:perthread,ops1/ops2 "++ show phase1 ++" "++ show phase2++")"
   -- Run the hot phase and then use a barrier/join before measuring the cold phase:
   forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
@@ -189,11 +191,16 @@ coldPhase d ops ratio splits = do
       do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
     return ()
   sz <- size d m
-  putStr$  "(size "++show sz++") "
+  state <- state d m
+  putStr$  "(size "++show sz++", stateAfterTrans "++ state ++ ") "
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset2 (offset2 + phase2) $ \i -> get d i m
+    -- How do we know these reads aren't optimized away?
+    -- FIXME: restrict the keyspace to a smaller range.
+    -- Most of these "miss":
+    -- for_ offset2 (offset2 + phase2) $ \i -> get d i m
+    for_ offset2 (offset2 + phase2) $ \i -> get d (i `mod` 110000) m -- Temp/Hack
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()

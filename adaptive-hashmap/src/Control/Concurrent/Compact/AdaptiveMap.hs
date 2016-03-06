@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 
 module Control.Concurrent.Compact.AdaptiveMap (
     AdaptiveMap,
     newMap,
-    get,
+    get, getState,
     ins,
     del,
     transition,
@@ -12,93 +13,9 @@ module Control.Concurrent.Compact.AdaptiveMap (
     size
     ) where
 
-import qualified Control.Concurrent.Adaptive.Ctrie  as CM
+-- Backpack should eliminate silliness like this in the future:
 import qualified Control.Concurrent.Compact.PureMap as PM
-import           Control.Concurrent.MVar
-import           Control.DeepSeq
-import           Control.Exception
-import           Control.Monad
-import           Data.Atomics
-import qualified Data.Concurrent.IORef              as FIR
-import           Data.Hashable
-import           Data.IORef
 
-data Hybrid k v = A !(CM.Map k v)
-                | AB !(CM.Map k v) (MVar ())
-                | B !(PM.PureMap k v)
-
-type AdaptiveMap k v = IORef (Hybrid k v)
-
-{-# INLINABLE newMap #-}
-newMap :: IO (AdaptiveMap k v)
-newMap = do
-  !m <- CM.empty
-  newIORef $ A m
-
-{-# INLINABLE get #-}
-get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
-get !k !m = do
-  state <- readIORef m
-  case state of
-    A cm  -> CM.lookup k cm
-    AB cm _ -> CM.lookup k cm
-    B pm  -> PM.get k pm
-
-{-# INLINABLE size #-}
-size :: AdaptiveMap k v -> IO Int
-size !m = do
-  state <- readIORef m
-  case state of
-    A cm  -> CM.size cm
-    AB cm _ -> CM.size cm
-    B pm  -> PM.size pm
-
-{-# INLINABLE ins #-}
-ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> AdaptiveMap k v -> IO ()
-ins !k !v !m = do
-  state <- readIORef m
-  case state of
-    A cm -> CM.insert k v cm
-    AB _ mv -> do
-      takeMVar mv
-      ins k v m
-    B pm -> PM.ins k v pm
-  `catches`
-  [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
-
-{-# INLINABLE del #-}
-del :: (Eq k, Hashable k, NFData k, NFData v) => k -> AdaptiveMap k v -> IO ()
-del !k !m = do
-  state <- readIORef m
-  case state of
-    A cm -> CM.delete k cm
-    AB _ mv -> do
-      takeMVar mv
-      del k m
-    B pm -> PM.del k pm
-  `catches`
-  [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
+#include "AdaptiveMapCore.hs"
 
 
--- FIXME: this whole file is pretty much a copy paste of the other AdaptiveMap.hs.
-transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
-transition m = do
-  tik <- readForCAS m
-  mv <- newEmptyMVar
-  case peekTicket tik of
-    A cm -> do
-      (success, tik') <- casIORef m tik (AB cm mv)
-      when success $ do
-        CM.freeze cm
-        l <- CM.unsafeToList cm
-        pm <- PM.fromList l
-        FIR.spinlock (\tik -> casIORef m tik (B pm)) tik'
-        putMVar mv ()
-    AB _ _ -> return ()
-    B _ -> return ()
-
-
-fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
-fromList !l = do
-  !m <- CM.fromList l
-  newIORef $ A m

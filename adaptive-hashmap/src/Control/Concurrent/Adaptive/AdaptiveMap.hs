@@ -5,7 +5,7 @@
 module Control.Concurrent.Adaptive.AdaptiveMap (
     AdaptiveMap,
     newMap, newBMap,
-    get,
+    get, getState,
     ins,
     del,
     transition,
@@ -17,4 +17,3 @@ module Control.Concurrent.Adaptive.AdaptiveMap (
 import qualified Control.Concurrent.PureMap        as PM
 
 #include "AdaptiveMapCore.hs"
-

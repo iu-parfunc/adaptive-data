@@ -20,6 +20,7 @@ import           Data.Concurrent.IORef (spinlock)
 import           Data.Hashable
 import qualified Data.HashMap.Strict   as HM
 import           Data.IORef
+import           System.IO
 
 type PureMap k v = IORef (Compact (HM.HashMap k v))
 
@@ -43,8 +44,13 @@ size r =
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> PureMap k v -> IO ()
-ins !k !v !m = loop =<< readForCAS m
+ins !k !v !m =
+   do t <- readForCAS m
+      -- putStrLn "WARNING: doing insert on Compact Hashmap!"; hFlush stdout
+      hPutStr stderr "!"
+      loop t
   where
+    -- This is pretty terrible.  Better to make this version just locking.
     loop = spinlock
              (\tik -> do
                 let !c = peekTicket tik
