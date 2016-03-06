@@ -87,6 +87,7 @@ benchmark bench-adaptive-hashmap-1
                    cmdargs >= 0.10.13,
                    extra >= 1.4.2,
                    gnuplot >= 0.5.4.1,
+                   mtl >= 2.2.1,
                    pcg-random >= 0.1.3.2,
                    rdtsc >= 1.3.0.1,
                    thread-local-storage >= 0.1.0.3,
