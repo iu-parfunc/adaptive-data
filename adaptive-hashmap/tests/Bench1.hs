@@ -336,10 +336,10 @@ run runs fn = do
   return $! sort ms !! mid
 
 {-# INLINE runAll #-}
-runAll :: Int -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
-runAll threads runs fn =
-   fori 1 threads $! \i' ->
-     do let i = threads - i' + 1 -- Go backwards.  When running by hand I want to see the max threads first.
+runAll :: (Int,Int) -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
+runAll (minthreads,maxthreads) runs fn =
+   fori minthreads maxthreads $! \i ->
+     do 
         putStrLn $ "  Running threads = " ++ show i; hFlush stdout
         t <- run runs $ fn i
         putStrLn $ "\n  Time reported: "++ show (measTime t) ++
@@ -349,42 +349,42 @@ runAll threads runs fn =
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
-benchmark "pure" Flag { bench, runs, ops, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns PM.newMap PM.ins ops
-  | bench == "insdel" = runAll threads runs $ forkNInsDel PM.newMap PM.ins PM.del ops
-  | bench == "random" = runAll threads runs $ fork5050 PM.newMap PM.ins PM.del ops randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold PM.newMap PM.get PM.ins PM.del nop ops ratio
-  | bench == "hot" = runAll threads runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop ops ratio
-  | bench == "cold" = runAll threads runs $ coldPhase pureImpl ops ratio
-benchmark "ctrie" Flag { bench, runs, ops, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns CM.empty CM.insert ops
-  | bench == "insdel" = runAll threads runs $ forkNInsDel CM.empty CM.insert CM.delete ops
-  | bench == "random" = runAll threads runs $ fork5050 CM.empty CM.insert CM.delete ops randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop ops ratio
-  | bench == "hot" = runAll threads runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop ops ratio
-  | bench == "cold" = runAll threads runs $ coldPhase ctrieImpl ops ratio
-benchmark "adaptive" Flag { bench, runs, ops, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns AM.newMap AM.ins ops
-  | bench == "insdel" = runAll threads runs $ forkNInsDel AM.newMap AM.ins AM.del ops
-  | bench == "random" = runAll threads runs $ fork5050 AM.newMap AM.ins AM.del ops randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold AM.newMap AM.get AM.ins AM.del nop ops ratio
-  | bench == "hot" = runAll threads runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop ops ratio
-  | bench == "cold" = runAll threads runs $ coldPhase adaptiveImpl ops ratio
-benchmark "c-adaptive" Flag { bench, runs, ops, threads, ratio }
-  | bench == "ins" = runAll threads runs $ forkNIns CAM.newMap CAM.ins ops
-  | bench == "insdel" = runAll threads runs $ forkNInsDel CAM.newMap CAM.ins CAM.del ops
-  | bench == "random" = runAll threads runs $ fork5050 CAM.newMap CAM.ins CAM.del ops randomInts
-  | bench == "hotcold" = runAll threads runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
-  | bench == "hot" = runAll threads runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
-  | bench == "cold" = runAll threads runs $ coldPhase cadaptiveImpl ops ratio
+benchmark "pure" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns PM.newMap PM.ins ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel PM.newMap PM.ins PM.del ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 PM.newMap PM.ins PM.del ops randomInts
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase pureImpl ops ratio
+benchmark "ctrie" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CM.empty CM.insert ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CM.empty CM.insert CM.delete ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CM.empty CM.insert CM.delete ops randomInts
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase ctrieImpl ops ratio
+benchmark "adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns AM.newMap AM.ins ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel AM.newMap AM.ins AM.del ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 AM.newMap AM.ins AM.del ops randomInts
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase adaptiveImpl ops ratio
+benchmark "c-adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CAM.newMap CAM.ins ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CAM.newMap CAM.ins CAM.del ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CAM.newMap CAM.ins CAM.del ops randomInts
+  | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "hot" = runAll (minthreads,maxthreads) runs $ hotPhase CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "cold" = runAll (minthreads,maxthreads) runs $ coldPhase cadaptiveImpl ops ratio
 benchmark x y = error$ "benchmark: unknown argumetns: "++show x++" "++show y
 
 main :: IO ()
 main = do
   args <- CA.cmdArgs flag
   caps <- getNumCapabilities
-  let !opts = if (threads args) <= 0
-                then args { threads = caps }
+  let !opts = if (maxthreads args) <= 0
+                then args { maxthreads = caps }
                 else args
 
   putStrLn $ "Operations:    " ++ show (ops opts)
@@ -394,7 +394,8 @@ main = do
   putStrLn $ "Benchmark:     " ++ show (bench opts)
   putStrLn $ "Variants:      " ++ show (variants opts)
   putStrLn $ "Ratio:         " ++ show (ratio opts)
-  putStrLn $ "Threads:       " ++ show (threads opts)
+  putStrLn $ "MinThreads:       " ++ show (minthreads opts)
+  putStrLn $ "MaxThreads:       " ++ show (maxthreads opts)           
   hFlush stdout
 
   let vs = if allvariants opts
@@ -434,7 +435,8 @@ data Flag =
          , variants :: [String]
          , allvariants :: Bool
          , ratio    :: Int64
-         , threads  :: Int
+         , minthreads  :: Int
+         , maxthreads  :: Int
          , doplot   :: Bool
          }
   deriving (Eq, Show, CA.Data, CA.Typeable)
@@ -451,6 +453,7 @@ flag = Flag
   , variants = [] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
   , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"
-  , threads = 0 &= help "Number of threads"
+  , maxthreads = 0 &= help "Max number of threads"
+  , minthreads = 1 &= help "Min number of threads"              
   , doplot  = False &= help "Plot the output with gnuplot"
   }

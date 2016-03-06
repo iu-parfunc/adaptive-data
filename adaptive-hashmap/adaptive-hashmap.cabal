@@ -75,6 +75,8 @@ benchmark bench-adaptive-hashmap-1
     type: exitcode-stdio-1.0
     main-is: Bench1.hs
     ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N
+    -- TEMP:
+    ghc-options: -eventlog    
     hs-source-dirs: tests/
     build-depends: adaptive-hashmap,
                    async >= 2.0,

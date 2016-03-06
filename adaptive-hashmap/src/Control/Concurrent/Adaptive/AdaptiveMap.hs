@@ -21,7 +21,7 @@ import qualified Data.Concurrent.IORef             as FIR
 import           Data.Hashable
 import           Data.IORef
 import           Data.Time.Clock
-
+import           Debug.Trace (traceEventIO, traceMarkerIO)
 
 data Hybrid k v = A !(CM.Map k v)
                 | AB !(CM.Map k v)
@@ -106,7 +106,9 @@ transition m = do
         -- Huh, this one is about the same time.
         pm <- PM.newMap
         st <- getCurrentTime
+        traceMarkerIO "StartFreeze"
         CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+        traceMarkerIO "EndFreeze"
         en <- getCurrentTime
         putStr $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
