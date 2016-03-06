@@ -17,25 +17,26 @@ import           Control.Concurrent.Extra
 import qualified Control.Exception           as E
 import           Control.Monad
 import           Data.Int
-import           Data.List hiding (insert)
+import           Data.List                   (sort)
 import           Data.Monoid
 import qualified Data.Vector.Unboxed         as VU
 import           GHC.Stats                   (GCStats (..))
 import qualified GHC.Stats                   as Stats
 import           GHC.Word
 import qualified System.Clock                as C
+import           System.Console.CmdArgs      (help, (&=))
 import qualified System.Console.CmdArgs      as CA
-import           System.Console.CmdArgs      ((&=), help)
 import           System.CPUTime.Rdtsc
 import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
+import           Graphics.Gnuplot.Simple       (Attribute (..),
+                                                LineAttr (LineTitle),
+                                                LineSpec (CustomStyle),
+                                                PlotType (..), defaultStyle,
+                                                terminal)
 import qualified Graphics.Gnuplot.Simple       as GP
-import           Graphics.Gnuplot.Simple
-                 (defaultStyle, terminal,
-                  LineAttr(LineTitle), LineSpec(CustomStyle),
-                          Attribute(..), PlotType(..))
 import qualified Graphics.Gnuplot.Terminal.SVG as SVG
 import qualified Graphics.Gnuplot.Terminal.X11 as X11
 
@@ -43,15 +44,14 @@ import qualified Control.Concurrent.Adaptive.AdaptiveMap as AM
 import qualified Control.Concurrent.Compact.AdaptiveMap  as CAM
 -- RRN: Uh, why this redundant copy?
 -- import qualified Control.Concurrent.Map                  as CM
-import qualified Control.Concurrent.Adaptive.Ctrie       as CM
-import qualified Control.Concurrent.PureMap              as PM
-import qualified Control.Concurrent.PureMapL             as PML
+import qualified Control.Concurrent.Adaptive.Ctrie as CM
+import qualified Control.Concurrent.PureMap        as PM
+import qualified Control.Concurrent.PureMapL       as PML
 
 {-# INLINABLE forkNIns #-}
-forkNIns :: IO m
-         -> (Int64 -> Int64 -> m -> IO ())
+forkNIns :: GenericImpl m
          -> Int -> Int -> IO Measured
-forkNIns newMap insert ops splits = do
+forkNIns GenericImpl { newMap, insert } ops splits = do
   !m <- newMap
   let quota = fromIntegral $ ops `quot` splits
   measureOnce $ forkJoin splits $ \chunk -> do
@@ -59,11 +59,9 @@ forkNIns newMap insert ops splits = do
     for_ offset (offset + quota) $ \i -> insert i (i + 1) m
 
 {-# INLINABLE forkNInsDel #-}
-forkNInsDel :: IO m
-            -> (Int64 -> Int64 -> m -> IO ())
-            -> (Int64 -> m -> IO ())
+forkNInsDel :: GenericImpl m
             -> Int -> Int -> IO Measured
-forkNInsDel newMap insert delete ops splits = do
+forkNInsDel GenericImpl { newMap, insert, delete } ops splits = do
   !m <- newMap
   let quota = fromIntegral $ ops `quot` splits
   measureOnce $ forkJoin splits $ \chunk -> do
@@ -73,11 +71,9 @@ forkNInsDel newMap insert delete ops splits = do
                                            else insert i (i + 1) m
 
 {-# INLINABLE fork5050 #-}
-fork5050 :: IO m
-         -> (Int64 -> Int64 -> m -> IO ())
-         -> (Int64 -> m -> IO ())
+fork5050 :: GenericImpl m
          -> Int -> IO (VU.Vector Int) -> Int -> IO Measured
-fork5050 newMap insert delete ops newVec splits = do
+fork5050 GenericImpl { newMap, insert, delete } ops newVec splits = do
   !m <- newMap
   !vec <- newVec
   let quota = fromIntegral $ ops `quot` splits
@@ -110,13 +106,13 @@ fill !m insert = do
 
 data GenericImpl m =
   GenericImpl
-  { newMap :: IO m
-  , get    :: Int64 -> m -> IO (Maybe Int64)
-  , insert :: (Int64 -> Int64 -> m -> IO ())
-  , delete :: (Int64 -> m -> IO ())
+  { newMap     :: IO m
+  , get        :: Int64 -> m -> IO (Maybe Int64)
+  , insert     :: (Int64 -> Int64 -> m -> IO ())
+  , delete     :: (Int64 -> m -> IO ())
   , transition :: (m -> IO ())
-  , size   :: m -> IO Int
-  , state  :: m -> IO String
+  , size       :: m -> IO Int
+  , state      :: m -> IO String
   }
 
 pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
@@ -132,39 +128,35 @@ adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size 
 --     stack bench adaptive-hashmap:bench-adaptive-hashmap-1 '--benchmark-arguments=--ops=10000000 --bench=hotcold --runs=3 --minthreads=1 --maxthreads=12 --ratio=5000 --variants=adaptive +RTS -N12 -A100M -H4G -qa -s -ls'
 -- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
 -- ----------------
-               
+
 cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState
 
 -- | This runs the hot-phase, transition, cold-phase benchmark.
 {-# INLINE hotCold #-}
-hotCold :: GenericImpl m 
+hotCold :: GenericImpl m
         -> Int -> Int64 -> Int -> IO Measured
-hotCold d ops ratio splits = do
-  !m <- newMap d
-  fill m (insert d)
+hotCold GenericImpl { newMap, get, insert, delete, transition } ops ratio splits = do
+  !m <- newMap
+  fill m insert
 
   -- transition d m -- TEMP!  Transition before measuring.  This makes it much faster on 1 thread.
-       
+
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
-    transition d m
+    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
+    transition m
     for_ offset2 (offset2 + phase2) $ \i ->
-      do !r <- get d (i `mod` 110000) m -- Temp/HACK modulus.
+      do !r <- get (i `mod` 110000) m -- Temp/HACK modulus.
          return ()
 
 {-# INLINABLE hotPhase #-}
-hotPhase :: IO m
-         -> (Int64 -> m -> IO (Maybe Int64))
-         -> (Int64 -> Int64 -> m -> IO ())
-         -> (Int64 -> m -> IO ())
-         -> (m -> IO ())
+hotPhase :: GenericImpl m
          -> Int -> Int64 -> Int -> IO Measured
-hotPhase newMap get insert delete transition ops ratio splits = do
+hotPhase GenericImpl { newMap, get, insert, delete, transition } ops ratio splits = do
   !m <- newMap
   fill m insert
   let quota = fromIntegral $ ops `quot` splits
@@ -174,11 +166,11 @@ hotPhase newMap get insert delete transition ops ratio splits = do
     for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
 
 {-# INLINE coldPhase #-}
-coldPhase :: GenericImpl m 
+coldPhase :: GenericImpl m
           -> Int -> Int64 -> Int -> IO Measured
-coldPhase d ops ratio splits = do
-  !m <- newMap d
-  fill m (insert d)
+coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } ops ratio splits = do
+  !m <- newMap
+  fill m insert
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
@@ -188,11 +180,11 @@ coldPhase d ops ratio splits = do
   forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert d i (i + 1) m
-    -- t <- measureOnce $ transition d m
-    -- when (measTime t > 0.001) $ 
-    --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout    
-    -- st0 <- state d m
+    for_ offset1 (offset1 + phase1) $ \i -> insert i (i + 1) m
+    -- t <- measureOnce $ transition m
+    -- when (measTime t > 0.001) $
+    --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
+    -- st0 <- state m
     -- case st0 of
     --   "AB" -> error $ "coldPhase: transition returned locally on this thread, but state is: "++st0
     --   "A"  -> error $ "coldPhase: transition returned locally on this thread, but state is: "++st0
@@ -201,12 +193,12 @@ coldPhase d ops ratio splits = do
 
   putStrLn "coldPhase: mutable phase done, transitioning..." ; hFlush stdout
   -- Since we're not measuring it anyway, do this transition after the barrier, on the main thread:
-  t <- measureOnce $ transition d m
-  -- when (measTime t > 0.001) $ 
-  putStrLn$  "  (trans "++ show (measTime t)++") "; hFlush stdout    
+  t <- measureOnce $ transition m
+  -- when (measTime t > 0.001) $
+  putStrLn$  "  (trans "++ show (measTime t)++") "; hFlush stdout
 
-  sz <- size d m
-  st1 <- state d m
+  sz <- size m
+  st1 <- state m
   putStr$  "(size "++show sz++", stateAfterTrans "++ st1 ++ ") "
   measureOnce $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
@@ -214,9 +206,9 @@ coldPhase d ops ratio splits = do
     -- How do we know these reads aren't optimized away?
     -- FIXME: restrict the keyspace to a smaller range.
     -- Most of these "miss":
-    -- for_ offset2 (offset2 + phase2) $ \i -> get d i m
+    -- for_ offset2 (offset2 + phase2) $ \i -> get i m
     for_ offset2 (offset2 + phase2) $ \i ->
-      do !r <- get d (i `mod` 110000) m -- Temp/Hack
+      do !r <- get (i `mod` 110000) m -- Temp/Hack
          return ()
 
 {-# INLINABLE for_ #-}
@@ -371,43 +363,43 @@ run runs fn = do
 runAll :: (Int,Int) -> Int -> (Int -> IO Measured) -> IO [(Int, Measured)]
 runAll (minthreads,maxthreads) runs fn =
    fori minthreads maxthreads $! \i ->
-     do 
+     do
         putStrLn $ "  Running threads = " ++ show i; hFlush stdout
         t <- run runs $ fn i
         putStrLn $ "\n  Time reported: "++ show (measTime t) ++
                          ", cycles: " ++ show (measCycles t)
         hFlush stdout
-        return t        
+        return t
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Flag -> IO [(Int, Measured)]
 benchmark "pure" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
-  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns PM.newMap PM.ins ops
-  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel PM.newMap PM.ins PM.del ops
-  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 PM.newMap PM.ins PM.del ops randomInts
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns pureImpl ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel pureImpl ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 pureImpl ops randomInts
   | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   pureImpl ops ratio
-  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  PM.newMap PM.get PM.ins PM.del nop ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  pureImpl ops ratio
   | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase pureImpl ops ratio
 benchmark "ctrie" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
-  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CM.empty CM.insert ops
-  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CM.empty CM.insert CM.delete ops
-  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CM.empty CM.insert CM.delete ops randomInts
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns ctrieImpl ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel ctrieImpl ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 ctrieImpl ops randomInts
   | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   ctrieImpl ops ratio
-  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  CM.empty CM.lookup CM.insert CM.delete nop ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  ctrieImpl ops ratio
   | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase ctrieImpl ops ratio
 benchmark "adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
-  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns AM.newMap AM.ins ops
-  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel AM.newMap AM.ins AM.del ops
-  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 AM.newMap AM.ins AM.del ops randomInts
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns adaptiveImpl ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel adaptiveImpl ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 adaptiveImpl ops randomInts
   | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   adaptiveImpl ops ratio
-  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  AM.newMap AM.get AM.ins AM.del nop ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  adaptiveImpl ops ratio
   | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase adaptiveImpl ops ratio
 benchmark "c-adaptive" Flag { bench, runs, ops, minthreads, maxthreads, ratio }
-  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns CAM.newMap CAM.ins ops
-  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel CAM.newMap CAM.ins CAM.del ops
-  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 CAM.newMap CAM.ins CAM.del ops randomInts
+  | bench == "ins" = runAll (minthreads,maxthreads) runs $ forkNIns cadaptiveImpl ops
+  | bench == "insdel" = runAll (minthreads,maxthreads) runs $ forkNInsDel cadaptiveImpl ops
+  | bench == "random" = runAll (minthreads,maxthreads) runs $ fork5050 cadaptiveImpl ops randomInts
   | bench == "hotcold" = runAll (minthreads,maxthreads) runs $ hotCold   cadaptiveImpl ops ratio
-  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  CAM.newMap CAM.get CAM.ins CAM.del nop ops ratio
+  | bench == "hot"     = runAll (minthreads,maxthreads) runs $ hotPhase  cadaptiveImpl ops ratio
   | bench == "cold"    = runAll (minthreads,maxthreads) runs $ coldPhase cadaptiveImpl ops ratio
 benchmark x y = error$ "benchmark: unknown argumetns: "++show x++" "++show y
 
@@ -427,7 +419,7 @@ main = do
   putStrLn $ "Variants:      " ++ show (variants opts)
   putStrLn $ "Ratio:         " ++ show (ratio opts)
   putStrLn $ "MinThreads:       " ++ show (minthreads opts)
-  putStrLn $ "MaxThreads:       " ++ show (maxthreads opts)           
+  putStrLn $ "MaxThreads:       " ++ show (maxthreads opts)
   hFlush stdout
 
   let vs = if allvariants opts
@@ -441,7 +433,7 @@ main = do
                then terminal $ (SVG.cons $ file opts ++ ".svg")
                else terminal $ (X11.persist $ X11.cons)
 
-  when (doplot opts) $ 
+  when (doplot opts) $
     GP.plotPathsStyle
       [ XLabel "Threads"
       , YLabel "Time in seconds"
@@ -459,17 +451,17 @@ main = do
 
 data Flag =
        Flag
-         { ops      :: Int
-         , file     :: String
-         , output   :: String
-         , runs     :: Int
-         , bench    :: String
-         , variants :: [String]
+         { ops         :: Int
+         , file        :: String
+         , output      :: String
+         , runs        :: Int
+         , bench       :: String
+         , variants    :: [String]
          , allvariants :: Bool
-         , ratio    :: Int64
+         , ratio       :: Int64
          , minthreads  :: Int
          , maxthreads  :: Int
-         , doplot   :: Bool
+         , doplot      :: Bool
          }
   deriving (Eq, Show, CA.Data, CA.Typeable)
 
@@ -486,6 +478,6 @@ flag = Flag
   , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"
   , maxthreads = 0 &= help "Max number of threads"
-  , minthreads = 1 &= help "Min number of threads"              
+  , minthreads = 1 &= help "Min number of threads"
   , doplot  = False &= help "Plot the output with gnuplot"
   }
