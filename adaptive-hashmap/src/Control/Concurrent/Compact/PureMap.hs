@@ -32,9 +32,8 @@ newMap = newCompact 4096 HM.empty >>= newIORef
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
 get !k !m = do
-  !c <- readIORef m
-  let !hm = getCompact c
-  return $! HM.lookup k hm
+  c <- readIORef m
+  return $! HM.lookup k $! getCompact c
 
 size :: PureMap k v -> IO Int
 size r =

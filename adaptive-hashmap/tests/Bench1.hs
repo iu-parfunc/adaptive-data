@@ -121,13 +121,13 @@ pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return 
 ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
 
 adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size AM.getState
--- Quick hack below
--- ----------------
+-- Quick hack below, start in B state
+-- ----------------------------------
 -- Interestingly this is STILL very different perf wise from pure on
 -- the following command, which seems bogus.
 --     stack bench adaptive-hashmap:bench-adaptive-hashmap-1 '--benchmark-arguments=--ops=10000000 --bench=hotcold --runs=3 --minthreads=1 --maxthreads=12 --ratio=5000 --variants=adaptive +RTS -N12 -A100M -H4G -qa -s -ls'
 -- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
--- ----------------
+-- ----------------------------------
 
 cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState
 
@@ -208,7 +208,7 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } o
     -- Most of these "miss":
     -- for_ offset2 (offset2 + phase2) $ \i -> get i m
     for_ offset2 (offset2 + phase2) $ \i ->
-      do !r <- get (i `mod` 110000) m -- Temp/Hack
+      do !r <- get (i `mod` 110000) m -- Temp/Hack modulus
          return ()
 
 {-# INLINABLE for_ #-}
