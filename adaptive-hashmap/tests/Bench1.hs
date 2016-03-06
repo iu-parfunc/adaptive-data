@@ -213,13 +213,7 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
     measureOnce $ forkJoin splits $ \chunk -> do
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
-      -- How do we know these reads aren't optimized away?
-      -- FIXME: restrict the keyspace to a smaller range.
-      -- Most of these "miss":
-      -- for_ offset2 (offset2 + phase2) $ \i -> get i m
-      for_ offset2 (offset2 + phase2) $ \i -> do
-        !r <- get (i `mod` 110000) m -- Temp/Hack
-        return ()
+      for_ offset2 (offset2 + phase2) $ \i -> get (vec VU.! (fromIntegral $ i `mod` len)) m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
