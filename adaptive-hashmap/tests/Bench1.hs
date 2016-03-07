@@ -28,7 +28,7 @@ import           GHC.Stats                   (GCStats (..))
 import qualified GHC.Stats                   as Stats
 import           GHC.Word
 import qualified System.Clock                as C
-import           System.Console.CmdArgs      (help, ignore, (&=))
+import           System.Console.CmdArgs      (def, help, ignore, (&=))
 import qualified System.Console.CmdArgs      as CA
 import           System.CPUTime.Rdtsc
 import           System.IO
@@ -495,12 +495,16 @@ main = do
         , randomPairs = randomPairs
         }
 
+  let vs = if allvariants opts
+             then all_variants
+             else variants opts
+
   putStrLn $ "Operations:    " ++ show (ops opts)
   putStrLn $ "Number of runs:" ++ show (runs opts)
   putStrLn $ "File:          " ++ show (file opts)
   putStrLn $ "Output:        " ++ show (output opts)
   putStrLn $ "Benchmark:     " ++ show (bench opts)
-  putStrLn $ "Variants:      " ++ show (variants opts)
+  putStrLn $ "Variants:      " ++ show vs
   putStrLn $ "Ratio:         " ++ show (ratio opts)
   putStrLn $ "MinThreads:    " ++ show (minthreads opts)
   putStrLn $ "MaxThreads:    " ++ show (maxthreads opts)
@@ -508,9 +512,6 @@ main = do
   putStrLn $ "Precompute:    " ++ show (precompute opts)
   hFlush stdout
 
-  let vs = if allvariants opts
-             then all_variants
-             else variants opts
   !zs <- forM vs $! \variant -> do
            putStrLn $ "\n Running variant: " ++ variant
            hFlush stdout
@@ -569,7 +570,7 @@ flag = Flag
   , iters = 1 &= help "Number of iterations"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
-  , variants = [] &= help "Variants {nop, pure, cpure, ctrie, adaptive, c-adaptive}"
+  , variants = def &= help "Variants {pure, ctrie, adaptive, c-adaptive}"
   , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"
   , maxthreads = 0 &= help "Max number of threads"
