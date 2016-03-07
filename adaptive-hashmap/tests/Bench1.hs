@@ -5,6 +5,7 @@
 {-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -139,10 +140,11 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
   !ops <- reader ops
   !ratio <- reader ratio
   !vec <- reader randomInts
+  !range <- reader range
+  !precompute <- reader precompute
   fill m insert
 
   -- transition d m -- TEMP!  Transition before measuring.  This makes it much faster on 1 thread.
-
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
@@ -151,10 +153,14 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
     do
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
-      for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
+      for_ offset1 (offset1 + phase1) $ \i -> if precompute
+                                                then insert (vec VU.! fromIntegral (i `mod` len)) i m
+                                                else rand range >>= \k -> insert k i m
       transition m
       fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-        get (vec VU.! fromIntegral (i `mod` len)) m
+        if precompute
+          then get (vec VU.! fromIntegral (i `mod` len)) m
+          else rand range >>= \k -> get k m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
@@ -163,6 +169,8 @@ hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
   !ops <- reader ops
   !ratio <- reader ratio
   !vec <- reader randomInts
+  !range <- reader range
+  !precompute <- reader precompute
   fill m insert
 
   let quota = fromIntegral $ ops `quot` splits
@@ -170,7 +178,9 @@ hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
       len = fromIntegral $ VU.length vec
   measure' $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
-    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
+    for_ offset1 (offset1 + phase1) $ \i -> if precompute
+                                              then insert (vec VU.! fromIntegral (i `mod` len)) i m
+                                              else rand range >>= \k -> insert k i m
 
 {-# INLINE coldPhase #-}
 coldPhase :: GenericImpl m -> Int -> Bench Measured
@@ -179,6 +189,8 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
   !ops <- reader ops
   !ratio <- reader ratio
   !vec <- reader randomInts
+  !range <- reader range
+  !precompute <- reader precompute
   fill m insert
 
   let quota = fromIntegral $ ops `quot` splits
@@ -191,7 +203,9 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
   liftIO $ forkJoin splits $ \chunk -> do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
-    for_ offset1 (offset1 + phase1) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
+    for_ offset1 (offset1 + phase1) $ \i -> if precompute
+                                              then insert (vec VU.! fromIntegral (i `mod` len)) i m
+                                              else rand range >>= \k -> insert k i m
     -- t <- measureOnce $ transition m when (measTime t > 0.001) $
     --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
     -- st0 <- state m case st0 of
@@ -217,7 +231,9 @@ coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } s
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
       fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-        get (vec VU.! fromIntegral (i `mod` len)) m
+        if precompute
+          then get (vec VU.! fromIntegral (i `mod` len)) m
+          else rand range >>= \k -> get k m
 
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
@@ -457,12 +473,16 @@ benchmark "c-adaptive" =
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 
+{-# INLINE rand #-}
+rand :: Int64 -> IO Int64
+rand !n = PCG.withSystemRandom $ PCG.uniformR (0, n)
+
 main :: IO ()
 main = do
   args <- CA.cmdArgs flag
   caps <- getNumCapabilities
 
-  gen <- PCG.createSystemRandom
+  !gen <- PCG.createSystemRandom
   !randomInts <- VU.replicateM 100000 (PCG.uniformR (0, range args) gen :: IO Int64)
   !randomPairs <- VU.replicateM (initial args)
                     (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
@@ -485,6 +505,7 @@ main = do
   putStrLn $ "MinThreads:    " ++ show (minthreads opts)
   putStrLn $ "MaxThreads:    " ++ show (maxthreads opts)
   putStrLn $ "Key range:     " ++ show (range opts)
+  putStrLn $ "Precompute:    " ++ show (precompute opts)
   hFlush stdout
 
   let vs = if allvariants opts
@@ -530,6 +551,7 @@ data Flag =
          , doplot      :: !Bool
          , initial     :: !Int
          , range       :: !Int64
+         , precompute  :: !Bool
          , randomInts  :: VU.Vector Int64
          , randomPairs :: VU.Vector (Int64, Int64)
          }
@@ -555,6 +577,7 @@ flag = Flag
   , doplot = False &= help "Plot the output with gnuplot"
   , initial = 10000 &= help "Initial size"
   , range = 1000000 &= help "Range for random values"
+  , precompute = True &= help "Precompute random values"
   , randomInts = VU.empty &= ignore
   , randomPairs = VU.empty &= ignore
   }
