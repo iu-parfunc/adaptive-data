@@ -13,7 +13,6 @@
 
 module Main where
 
-import           Control.Arrow
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Reader
@@ -23,14 +22,14 @@ import qualified System.Console.CmdArgs      as CA
 import           System.IO
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import           Graphics.Gnuplot.Simple       (Attribute (..),
-                                                LineAttr (LineTitle),
-                                                LineSpec (CustomStyle),
-                                                PlotType (..), defaultStyle,
-                                                terminal)
-import qualified Graphics.Gnuplot.Simple       as GP
-import qualified Graphics.Gnuplot.Terminal.SVG as SVG
-import qualified Graphics.Gnuplot.Terminal.X11 as X11
+import           Graphics.Gnuplot.Advanced
+import qualified Graphics.Gnuplot.Frame                as Frame
+import qualified Graphics.Gnuplot.Frame.Option         as Opt
+import qualified Graphics.Gnuplot.Frame.OptionSet      as Opts
+import qualified Graphics.Gnuplot.Graph.TwoDimensional as Graph2D
+import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
+import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
+import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
 import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
 import qualified Data.Concurrent.Compact.AdaptiveMap  as CAM
@@ -125,7 +124,7 @@ cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CA
 -- | This runs the hot-phase, transition, cold-phase benchmark.
 {-# INLINE hotCold #-}
 hotCold :: GenericImpl m -> Int -> Bench Measured
-hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
+hotCold GenericImpl { newMap, get, insert, transition } splits = do
   !m <- liftIO newMap
   !ops <- reader ops
   !ratio <- reader ratio
@@ -154,7 +153,7 @@ hotCold GenericImpl { newMap, get, insert, delete, transition } splits = do
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
-hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
+hotPhase GenericImpl { newMap, get, insert, transition } splits = do
   !m <- liftIO newMap
   !ops <- reader ops
   !ratio <- reader ratio
@@ -174,7 +173,7 @@ hotPhase GenericImpl { newMap, get, insert, delete, transition } splits = do
 
 {-# INLINE coldPhase #-}
 coldPhase :: GenericImpl m -> Int -> Bench Measured
-coldPhase GenericImpl { newMap, get, insert, delete, transition, state, size } splits = do
+coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = do
   !m <- liftIO newMap
   !ops <- reader ops
   !ratio <- reader ratio
@@ -291,7 +290,6 @@ main = do
   putStrLn $ "Operations:    " ++ show (ops opts)
   putStrLn $ "Number of runs:" ++ show (runs opts)
   putStrLn $ "File:          " ++ show (file opts)
-  putStrLn $ "Output:        " ++ show (output opts)
   putStrLn $ "Benchmark:     " ++ show (bench opts)
   putStrLn $ "Variants:      " ++ show vs
   putStrLn $ "Ratio:         " ++ show (ratio opts)
@@ -306,21 +304,18 @@ main = do
            hFlush stdout
            runReaderT (benchmark variant) opts
 
-  let term = if output opts == "svg"
-               then terminal (SVG.cons $ file opts ++ ".svg")
-               else terminal (X11.persist X11.cons)
+  let points = map (map (\(t, m) -> (t, measTime m))) zs
+      term = SVG.cons $ file opts ++ ".svg"
+      frameOpts = Opts.xLabel "Threads" $ Opts.yLabel "Time in seconds" $
+        Opts.title (bench opts) $ Opts.grid True $ Opts.add (Opt.xTicks "") ["1"] $
+          Opts.yFormat "%g" $ Opts.deflt
+      frame = Frame.cons frameOpts $
+        foldMap
+          (\(v, ps) -> (Graph2D.lineSpec $ LineSpec.title v $
+                          LineSpec.lineWidth 1.5 $ LineSpec.pointSize 1 LineSpec.deflt)
+                       `fmap`
+                       Plot2D.list Graph2D.errorLines ps) $
+          vs `zip` points
 
   when (doplot opts) $
-    GP.plotPathsStyle
-      [ XLabel "Threads"
-      , YLabel "Time in seconds"
-      , XTicks $ Just ["1"]
-      , Title (bench opts)
-      , Custom "grid" []
-      , term
-      , Custom "style line" ["3", "lc", "3", "lw", "3"]
-      ]
-      (map (style *** fmap (fromIntegral *** measTime)) (vs `zip` zs))
-
-  where
-    style v = defaultStyle { GP.plotType = LinesPoints, GP.lineSpec = CustomStyle [LineTitle v] }
+    void $ plot term frame

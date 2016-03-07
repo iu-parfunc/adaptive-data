@@ -31,7 +31,6 @@ data Flag =
        Flag
          { ops         :: !Int
          , file        :: !String
-         , output      :: !String
          , runs        :: !Int
          , iters       :: !Int64
          , bench       :: !String
@@ -57,7 +56,6 @@ flag :: Flag
 flag = Flag
   { ops = 100000 &= help "Total number of operations"
   , file = "report" &= help "Report file prefix"
-  , output = "svg" &= help "Output {svg, x11}"
   , iters = 1 &= help "Number of iterations"
   , runs = 50 &= help "Number of runs"
   , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
