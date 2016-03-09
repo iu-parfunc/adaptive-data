@@ -23,6 +23,7 @@ import           System.IO
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import           Graphics.Gnuplot.Advanced
+import qualified Graphics.Gnuplot.File                 as File
 import qualified Graphics.Gnuplot.Frame                as Frame
 import qualified Graphics.Gnuplot.Frame.Option         as Opt
 import qualified Graphics.Gnuplot.Frame.OptionSet      as Opts
@@ -317,6 +318,11 @@ main = do
                            `fmap`
                            Plot2D.list Graph2D.errorLines ps) $
           zip3 vs points lineSpecs
+
+
+  when (export opts) $
+    let (script, files) = fileContents (file opts) term frame
+    in writeFile (file opts ++ ".plt") script >> mapM_ File.write files
 
   when (doplot opts) $
     void $ plot term frame

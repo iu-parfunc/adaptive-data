@@ -32,6 +32,7 @@ data Flag =
          { ops         :: !Int
          , file        :: !String
          , runs        :: !Int
+         , warmup      :: !Int
          , iters       :: !Int64
          , bench       :: !String
          , variants    :: ![String]
@@ -43,6 +44,7 @@ data Flag =
          , initial     :: !Int
          , range       :: !Int64
          , precompute  :: !Bool
+         , export      :: !Bool
          , randomInts  :: VU.Vector Int64
          , randomPairs :: VU.Vector (Int64, Int64)
          }
@@ -55,6 +57,7 @@ all_variants = ["pure", "ctrie", "adaptive", "c-adaptive"]
 flag :: Flag
 flag = Flag
   { ops = 100000 &= help "Total number of operations"
+  , warmup = 5 &= help "Number of warmup runs"
   , file = "report" &= help "Report file prefix"
   , iters = 1 &= help "Number of iterations"
   , runs = 50 &= help "Number of runs"
@@ -70,6 +73,7 @@ flag = Flag
   , precompute = True &= help "Precompute random values"
   , randomInts = VU.empty &= ignore
   , randomPairs = VU.empty &= ignore
+  , export = True &= help "Whether to export csv files"
   }
 
 {-# INLINE rand #-}
