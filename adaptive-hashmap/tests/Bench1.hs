@@ -309,13 +309,14 @@ main = do
       frameOpts = Opts.xLabel "Threads" $ Opts.yLabel "Time in seconds" $
         Opts.title (bench opts) $ Opts.grid True $ Opts.add (Opt.xTicks "") ["1"] $
           Opts.yFormat "%g" $ Opts.deflt
+      lineSpecs = (\s -> LineSpec.lineWidth 1.5 $ LineSpec.pointSize 1 $
+                     LineSpec.pointType s LineSpec.deflt) `map` ([4, 7, 8, 5, 1, 1] ++ [1,1 ..])
       frame = Frame.cons frameOpts $
         foldMap
-          (\(v, ps) -> (Graph2D.lineSpec $ LineSpec.title v $
-                          LineSpec.lineWidth 1.5 $ LineSpec.pointSize 1 LineSpec.deflt)
-                       `fmap`
-                       Plot2D.list Graph2D.errorLines ps) $
-          vs `zip` points
+          (\(v, ps, ls) -> (Graph2D.lineSpec $ LineSpec.title v ls)
+                           `fmap`
+                           Plot2D.list Graph2D.errorLines ps) $
+          zip3 vs points lineSpecs
 
   when (doplot opts) $
     void $ plot term frame
