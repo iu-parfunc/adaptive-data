@@ -83,6 +83,7 @@ benchmark bench-adaptive-hashmap-1
                    base >= 4.6,
                    clock >= 0.6.0.1,
                    cmdargs >= 0.10.13,
+                   directory >= 1.2.2,
                    extra >= 1.4.2,
                    gnuplot >= 0.5.4.1,
                    mtl >= 2.2.1,

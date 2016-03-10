@@ -19,6 +19,7 @@ import           Control.Monad.Reader
 import           Data.Int
 import qualified Data.Vector.Unboxed         as VU
 import qualified System.Console.CmdArgs      as CA
+import           System.Directory
 import           System.IO
 import qualified System.Random.PCG.Fast.Pure as PCG
 
@@ -320,9 +321,11 @@ main = do
           zip3 vs points lineSpecs
 
 
-  when (export opts) $
+  when (export opts) $ do
     let (script, files) = fileContents (file opts) term frame
-    in writeFile (file opts ++ ".plt") script >> mapM_ File.write files
+    createDirectoryIfMissing True (file opts)
+    writeFile (file opts ++ ".plt") script
+    mapM_ File.write files
 
   when (doplot opts) $
     void $ plot term frame
