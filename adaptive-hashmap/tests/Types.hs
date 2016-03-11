@@ -61,7 +61,7 @@ flag = Flag
   , file = "report" &= help "Report file prefix"
   , iters = 1 &= help "Number of iterations"
   , runs = 50 &= help "Number of runs"
-  , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold}"
+  , bench = "hotcold" &= help "Benchmark {ins, insdel, random, hotcold, hot, cold, transition}"
   , variants = def &= help "Variants {pure, ctrie, adaptive, c-adaptive}"
   , allvariants = False &= help "Use all builtin variants"
   , ratio = 200 &= help "Cold-to-hot ops ratio"

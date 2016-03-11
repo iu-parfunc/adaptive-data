@@ -226,6 +226,29 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
           then get (vec VU.! fromIntegral (i `mod` len)) m
           else rand range >>= \k -> get k m
 
+{-# INLINE transitionPhase #-}
+transitionPhase :: GenericImpl m -> Int -> Bench Measured
+transitionPhase GenericImpl { newMap, get, insert, transition } splits = do
+  !m <- liftIO newMap
+  !ops <- reader ops
+  !ratio <- reader ratio
+  !vec <- reader randomInts
+  !range <- reader range
+  !precompute <- reader precompute
+  fill m insert
+
+  let quota = fromIntegral $ ops `quot` splits
+      phase1 = quota `quot` ratio
+      phase2 = (quota * (ratio - 1)) `quot` ratio
+      len = fromIntegral $ VU.length vec
+  liftIO $ forkJoin splits $ \chunk -> do
+    let offset1 = fromIntegral $ chunk * fromIntegral quota
+        offset2 = offset1 + phase1 + 1
+    for_ offset1 (offset1 + phase1) $ \i -> if precompute
+                                              then insert (vec VU.! fromIntegral (i `mod` len)) i m
+                                              else rand range >>= \k -> insert k i m
+  measure' $ forkJoin splits $ \chunk -> transition m
+
 {-# INLINE nop #-}
 nop :: Applicative m => a -> m ()
 nop _ = pure ()
@@ -234,36 +257,40 @@ nop _ = pure ()
 benchmark :: String -> Bench [(Int, Measured)]
 benchmark "pure" =
   reader bench >>= \bench -> case bench of
-    "ins"     -> runAll $ forkNIns pureImpl
-    "insdel"  -> runAll $ forkNInsDel pureImpl
-    "random"  -> runAll $ fork5050 pureImpl
-    "hotcold" -> runAll $ hotCold pureImpl
-    "hot"     -> runAll $ hotPhase pureImpl
-    "cold"    -> runAll $ coldPhase pureImpl
+    "ins"        -> runAll $ forkNIns pureImpl
+    "insdel"     -> runAll $ forkNInsDel pureImpl
+    "random"     -> runAll $ fork5050 pureImpl
+    "hotcold"    -> runAll $ hotCold pureImpl
+    "hot"        -> runAll $ hotPhase pureImpl
+    "cold"       -> runAll $ coldPhase pureImpl
+    "transition" -> runAll $ transitionPhase pureImpl
 benchmark "ctrie" =
   reader bench >>= \bench -> case bench of
-    "ins"     -> runAll $ forkNIns ctrieImpl
-    "insdel"  -> runAll $ forkNInsDel ctrieImpl
-    "random"  -> runAll $ fork5050 ctrieImpl
-    "hotcold" -> runAll $ hotCold ctrieImpl
-    "hot"     -> runAll $ hotPhase ctrieImpl
-    "cold"    -> runAll $ coldPhase ctrieImpl
+    "ins"        -> runAll $ forkNIns ctrieImpl
+    "insdel"     -> runAll $ forkNInsDel ctrieImpl
+    "random"     -> runAll $ fork5050 ctrieImpl
+    "hotcold"    -> runAll $ hotCold ctrieImpl
+    "hot"        -> runAll $ hotPhase ctrieImpl
+    "cold"       -> runAll $ coldPhase ctrieImpl
+    "transition" -> runAll $ transitionPhase ctrieImpl
 benchmark "adaptive" =
   reader bench >>= \bench -> case bench of
-    "ins"     -> runAll $ forkNIns adaptiveImpl
-    "insdel"  -> runAll $ forkNInsDel adaptiveImpl
-    "random"  -> runAll $ fork5050 adaptiveImpl
-    "hotcold" -> runAll $ hotCold adaptiveImpl
-    "hot"     -> runAll $ hotPhase adaptiveImpl
-    "cold"    -> runAll $ coldPhase adaptiveImpl
+    "ins"        -> runAll $ forkNIns adaptiveImpl
+    "insdel"     -> runAll $ forkNInsDel adaptiveImpl
+    "random"     -> runAll $ fork5050 adaptiveImpl
+    "hotcold"    -> runAll $ hotCold adaptiveImpl
+    "hot"        -> runAll $ hotPhase adaptiveImpl
+    "cold"       -> runAll $ coldPhase adaptiveImpl
+    "transition" -> runAll $ transitionPhase adaptiveImpl
 benchmark "c-adaptive" =
   reader bench >>= \bench -> case bench of
-    "ins"     -> runAll $ forkNIns cadaptiveImpl
-    "insdel"  -> runAll $ forkNInsDel cadaptiveImpl
-    "random"  -> runAll $ fork5050 cadaptiveImpl
-    "hotcold" -> runAll $ hotCold cadaptiveImpl
-    "hot"     -> runAll $ hotPhase cadaptiveImpl
-    "cold"    -> runAll $ coldPhase cadaptiveImpl
+    "ins"        -> runAll $ forkNIns cadaptiveImpl
+    "insdel"     -> runAll $ forkNInsDel cadaptiveImpl
+    "random"     -> runAll $ fork5050 cadaptiveImpl
+    "hotcold"    -> runAll $ hotCold cadaptiveImpl
+    "hot"        -> runAll $ hotPhase cadaptiveImpl
+    "cold"       -> runAll $ coldPhase cadaptiveImpl
+    "transition" -> runAll $ transitionPhase cadaptiveImpl
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 
