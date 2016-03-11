@@ -11,6 +11,7 @@
 
 module Types where
 
+import           Control.Concurrent
 import qualified Control.Exception           as E
 import           Control.Monad.Reader
 import           Data.Int
@@ -26,6 +27,12 @@ import           System.CPUTime.Rdtsc
 import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
+
+import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
+import qualified Data.Concurrent.Compact.AdaptiveMap  as CAM
+import qualified Data.Concurrent.Ctrie                as CM
+import qualified Data.Concurrent.PureMap              as PM
+import qualified Data.Concurrent.PureMapL             as PML
 
 data Flag =
        Flag
@@ -47,6 +54,8 @@ data Flag =
          , export      :: !Bool
          , randomInts  :: VU.Vector Int64
          , randomPairs :: VU.Vector (Int64, Int64)
+         , maxsize     :: !Int
+         , stepsize    :: !Int
          }
   deriving (Eq, Show, CA.Data, CA.Typeable)
 
@@ -74,6 +83,8 @@ flag = Flag
   , randomInts = VU.empty &= ignore
   , randomPairs = VU.empty &= ignore
   , export = True &= help "Whether to export csv files"
+  , maxsize = 1000000 &= help "Maximum size (used for the transition benchmark)"
+  , stepsize = 100000 &= help "Step size (used for the transition benchmark)"
   }
 
 {-# INLINE rand #-}
@@ -90,22 +101,6 @@ run runs fn = do
       mid = (1 + rs) `quot` 2
   ms <- for 1 rs $ const fn
   return $! sort ms !! (mid - 1)
-
-{-# INLINE runAll #-}
-runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
-runAll !fn = do
-  !minthreads <- reader minthreads
-  !maxthreads <- reader maxthreads
-  !runs <- reader runs
-  !flag <- ask
-  liftIO $! fori minthreads maxthreads $! \i -> do
-    putStrLn $ "  Running threads = " ++ show i
-    hFlush stdout
-    t <- run runs $! runReaderT (fn i) flag
-    putStrLn $ "\n  Time reported: " ++ show (measTime t) ++
-                                        ", cycles: " ++ show (measCycles t)
-    hFlush stdout
-    return t
 
 data Measured =
        Measured
@@ -229,6 +224,18 @@ rescale m@Measured { .. } = m
       | i == minBound = Nothing
       | otherwise = Just i
 
+{-# INLINABLE forkJoin #-}
+forkJoin :: Int -> (Int -> IO a) -> IO [a]
+forkJoin num act = loop num []
+  where
+    loop 0 !ls = mapM takeMVar ls
+    loop n !ls = do
+      mv <- newEmptyMVar
+      _ <- forkOn (n - 1) $ do
+             !v <- act (n - 1)
+             putMVar mv v
+      loop (n - 1) (mv : ls)
+
 {-# INLINABLE for_ #-}
 for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
 for_ start end _
@@ -276,3 +283,47 @@ fori start end fn = loop start
           !x <- fn i
           !xs <- loop (i + 1)
           return $! (i, x) : xs
+
+{-# INLINABLE fori' #-}
+fori' :: (Num n, Ord n, Monad m) => n -> n -> n -> (n -> m a) -> m [(n, a)]
+fori' start end _ _
+  | start > end = error "start greater than end"
+fori' start end step fn = loop start
+  where
+    loop !i
+      | i > end = return []
+      | otherwise = do
+          !x <- fn i
+          !xs <- loop (i + step)
+          return $! (i, x) : xs
+
+data GenericImpl m =
+  GenericImpl
+  { newMap     :: IO m
+  , get        :: Int64 -> m -> IO (Maybe Int64)
+  , insert     :: Int64 -> Int64 -> m -> IO ()
+  , delete     :: Int64 -> m -> IO ()
+  , transition :: m -> IO ()
+  , size       :: m -> IO Int
+  , state      :: m -> IO String
+  }
+
+{-# INLINE nop #-}
+nop :: Applicative m => a -> m ()
+nop _ = pure ()
+
+pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
+pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
+
+ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
+
+adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size AM.getState
+-- Quick hack below, start in B state
+-- ----------------------------------
+-- Interestingly this is STILL very different perf wise from pure on
+-- the following command, which seems bogus.
+--     stack bench adaptive-hashmap:bench-adaptive-hashmap-1 '--benchmark-arguments=--ops=10000000 --bench=hotcold --runs=3 --minthreads=1 --maxthreads=12 --ratio=5000 --variants=adaptive +RTS -N12 -A100M -H4G -qa -s -ls'
+-- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
+-- ----------------------------------
+
+cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState

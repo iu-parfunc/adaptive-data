@@ -33,12 +33,6 @@ import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
 import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
 import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
-import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
-import qualified Data.Concurrent.Compact.AdaptiveMap  as CAM
-import qualified Data.Concurrent.Ctrie                as CM
-import qualified Data.Concurrent.PureMap              as PM
-import qualified Data.Concurrent.PureMapL             as PML
-
 import Types
 
 {-# INLINABLE forkNIns #-}
@@ -77,51 +71,12 @@ fork5050 GenericImpl { newMap, insert, delete } splits = do
                                            then delete i m
                                            else insert i (i + 1) m
 
-{-# INLINABLE forkJoin #-}
-forkJoin :: Int -> (Int -> IO a) -> IO [a]
-forkJoin num act = loop num []
-  where
-    loop 0 !ls = mapM takeMVar ls
-    loop n !ls = do
-      mv <- newEmptyMVar
-      _ <- forkOn (n - 1) $ do
-             !v <- act (n - 1)
-             putMVar mv v
-      loop (n - 1) (mv : ls)
-
 -- Fill with random data:
 {-# INLINE fill #-}
 fill :: m -> (Int64 -> Int64 -> m -> IO ()) -> Bench ()
 fill !m insert = do
   !ps <- reader randomPairs
   liftIO $! VU.forM_ ps (\(k, v) -> insert k v m)
-
-data GenericImpl m =
-  GenericImpl
-  { newMap     :: IO m
-  , get        :: Int64 -> m -> IO (Maybe Int64)
-  , insert     :: Int64 -> Int64 -> m -> IO ()
-  , delete     :: Int64 -> m -> IO ()
-  , transition :: m -> IO ()
-  , size       :: m -> IO Int
-  , state      :: m -> IO String
-  }
-
-pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
-pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
-
-ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
-
-adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size AM.getState
--- Quick hack below, start in B state
--- ----------------------------------
--- Interestingly this is STILL very different perf wise from pure on
--- the following command, which seems bogus.
---     stack bench adaptive-hashmap:bench-adaptive-hashmap-1 '--benchmark-arguments=--ops=10000000 --bench=hotcold --runs=3 --minthreads=1 --maxthreads=12 --ratio=5000 --variants=adaptive +RTS -N12 -A100M -H4G -qa -s -ls'
--- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
--- ----------------------------------
-
-cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState
 
 -- | This runs the hot-phase, transition, cold-phase benchmark.
 {-# INLINE hotCold #-}
@@ -249,9 +204,21 @@ transitionPhase GenericImpl { newMap, get, insert, transition } splits = do
                                               else rand range >>= \k -> insert k i m
   measure' $ forkJoin splits $ \chunk -> transition m
 
-{-# INLINE nop #-}
-nop :: Applicative m => a -> m ()
-nop _ = pure ()
+{-# INLINE runAll #-}
+runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
+runAll !fn = do
+  !minthreads <- reader minthreads
+  !maxthreads <- reader maxthreads
+  !runs <- reader runs
+  !flag <- ask
+  liftIO $! fori minthreads maxthreads $! \i -> do
+    putStrLn $ "  Running threads = " ++ show i
+    hFlush stdout
+    t <- run runs $! runReaderT (fn i) flag
+    putStrLn $ "\n  Time reported: " ++ show (measTime t) ++
+                                        ", cycles: " ++ show (measCycles t)
+    hFlush stdout
+    return t
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Bench [(Int, Measured)]
