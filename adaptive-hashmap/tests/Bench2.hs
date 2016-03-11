@@ -85,7 +85,7 @@ main = do
   caps <- getNumCapabilities
 
   !gen <- PCG.createSystemRandom
-  !randomInts <- VU.replicateM 100000 (PCG.uniformR (0, range args) gen :: IO Int64)
+  !randomInts <- VU.replicateM (maxsize args) (PCG.uniformR (0, range args) gen :: IO Int64)
   !randomPairs <- VU.replicateM (initial args)
                     (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
 

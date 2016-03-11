@@ -83,7 +83,7 @@ flag = Flag
   , randomInts = VU.empty &= ignore
   , randomPairs = VU.empty &= ignore
   , export = True &= help "Whether to export csv files"
-  , maxsize = 1000000 &= help "Maximum size (used for the transition benchmark)"
+  , maxsize = 1000000000 &= help "Maximum size (used for the transition benchmark)"
   , stepsize = 100000 &= help "Step size (used for the transition benchmark)"
   }
 
