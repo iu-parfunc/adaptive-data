@@ -45,6 +45,33 @@ transitionPhase GenericImpl { newMap, insert, transition } size = do
     for_ offset (offset + quota) $ \i -> insert (vec VU.! fromIntegral (i `mod` len)) i m
   measure' $ transition m
 
+{-# INLINE hotCold #-}
+hotCold :: GenericImpl m -> Int -> Bench Measured
+hotCold GenericImpl { newMap, get, insert, transition } ops = do
+  !m <- liftIO newMap
+  !ratio <- reader ratio
+  !vec <- reader randomInts
+  !range <- reader range
+  !precompute <- reader precompute
+  !splits <- reader maxthreads
+
+  let quota = fromIntegral $ ops `quot` splits
+      phase1 = quota `quot` ratio
+      phase2 = (quota * (ratio - 1)) `quot` ratio
+      len = fromIntegral $ VU.length vec
+  measure' $ forkJoin splits $ \chunk ->
+    do
+      let offset1 = fromIntegral $ chunk * fromIntegral quota
+          offset2 = offset1 + phase1 + 1
+      for_ offset1 (offset1 + phase1) $ \i -> if precompute
+                                                then insert (vec VU.! fromIntegral (i `mod` len)) i m
+                                                else rand range >>= \k -> insert k i m
+      transition m
+      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+        if precompute
+          then get (vec VU.! fromIntegral (i `mod` len)) m
+          else rand range >>= \k -> get k m
+
 {-# INLINE runAll #-}
 runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
 runAll !fn = do
@@ -67,15 +94,19 @@ benchmark :: String -> Bench [(Int, Measured)]
 benchmark "pure" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase pureImpl
+    "hotcold" -> runAll $ hotCold pureImpl
 benchmark "ctrie" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase ctrieImpl
+    "hotcold" -> runAll $ hotCold ctrieImpl
 benchmark "adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase adaptiveImpl
+    "hotcold" -> runAll $ hotCold adaptiveImpl
 benchmark "c-adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase cadaptiveImpl
+    "hotcold" -> runAll $ hotCold cadaptiveImpl
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 
@@ -133,7 +164,6 @@ main = do
                            `fmap`
                            Plot2D.list Graph2D.errorLines ps) $
           zip3 vs points lineSpecs
-
 
   when (export opts) $ do
     let (script, files) = fileContents (file opts) term frame
