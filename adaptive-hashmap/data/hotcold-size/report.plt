@@ -1,10 +1,9 @@
-set terminal svg
-set output "report.svg"
+set terminal postscript eps enhanced color font 'Helvetica,20'
+set output "report.eps"
 set format y "%g"
 set grid xtics
 set grid ytics
 set grid ztics
-set title "hotcold"
 set xlabel "Operations"
 set ylabel "Time in seconds"
 set yrange [0:4]

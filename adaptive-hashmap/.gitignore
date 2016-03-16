@@ -1,3 +1,5 @@
 /report.plt
 /report
 *.svg
+*.eps
+*.png
