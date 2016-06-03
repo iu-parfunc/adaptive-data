@@ -76,7 +76,8 @@ stddev xs = sqrt $ (sum (map (\x -> (x - avg) * (x - avg)) xs)) / len
 
 run :: Int -> Flag -> IO()
 run threadn option = do
-  outh <- openFile ((file option) ++ "_" ++ (bench option) ++ ".csv") AppendMode
+  let fileName = (file option) ++ "_" ++ (bench option)
+  outh <- openFile (fileName ++ ".csv") AppendMode
 --  hPutStrLn outh "threadn,Mean,Stddev"
 --  setStdGen $ mkStdGen $ seed option
   !gen <- PCG.restore $ PCG.initFrozen $ seed option
@@ -100,7 +101,7 @@ run threadn option = do
                                    (\k v -> CM.insert k v m),
                                    (\k _ -> CM.delete k m)] ratios option gen
                    "adaptive" -> do
-                     !m <- AM.newMap
+                     !m <- AM.newMap fileName threadn
                      test threadn [(\k _ -> do !r <- AM.get k m ; return ()),
                                    (\k v -> AM.ins k v m),
                                    (\k _ -> AM.del k m)] ratios option gen
