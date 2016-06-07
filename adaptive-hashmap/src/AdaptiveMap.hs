@@ -83,12 +83,13 @@ transition :: (Eq k, Hashable k) => AdaptiveMap k v -> Ticket (Hybrid k v) -> IO
 transition m tick = do
   case peekTicket tick of
     A pm fileName thn -> do
-      outh <- openFile fileName AppendMode
-      !start <- getCurrentTime
       cm <- CM.empty
       (success, tick') <- casIORef m tick (AB pm cm)
       if success
-        then do let loop tik = do
+        then do outh <- openFile fileName AppendMode
+                !start <- getCurrentTime
+                
+                let loop tik = do
                       (s, tik') <- casIORef m tik (B cm)
                       if s
                         then return ()
@@ -97,9 +98,11 @@ transition m tick = do
                 l <- PM.toList pm
                 mapM_ (\(k, v) -> CM.insert k v cm) l
                 loop tick'
+                
+                !end <- getCurrentTime
+                hPutStrLn outh $ (show thn) ++ "," ++ (show ((realToFrac $ diffUTCTime end start) * 1000.0 ::Double))
+                hClose outh
         else return ()
-      !end <- getCurrentTime
-      hPutStrLn outh $ (show thn) ++ "," ++ (show ((realToFrac $ diffUTCTime end start) * 1000.0 ::Double))
     AB _ _ -> return ()
     B _ ->  return ()
 
