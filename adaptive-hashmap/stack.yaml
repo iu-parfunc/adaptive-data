@@ -1,4 +1,3 @@
-
 flags: {}
 
 packages:
@@ -7,19 +6,20 @@ packages:
 - ../haskell-lockfree/atomic-primops
 
 extra-deps:
-- async-2.0.2
-- clock-0.6.0.1
-- cmdargs-0.10.13
+- async-2.1.0
+- base-compat-0.9.1
+- clock-0.7.2
+- cmdargs-0.10.14
 - concurrent-extra-0.7.0.10
 - data-accessor-0.2.2.7
 - data-accessor-transformers-0.2.1.7
-- doctest-0.10.1
+- doctest-0.11.0
 - entropy-0.3.7
 - exceptions-0.8.2.1
-- extra-1.4.2
+- extra-1.4.9
 - ghc-paths-0.1.0.9
 - gnuplot-0.5.4.1
-- hashable-1.2.3.3
+- hashable-1.2.4.0
 - mtl-2.2.1
 - primitive-0.6.1.0
 - random-1.1
@@ -27,11 +27,11 @@ extra-deps:
 - stm-2.4.4.1
 - syb-0.6
 - temporary-1.2.0.4
-- text-1.2.2.0
-- thread-local-storage-0.1.0.3
+- text-1.2.2.1
+- thread-local-storage-0.1.0.4
 - transformers-compat-0.5.1.4
 - unbounded-delays-0.1.0.9
-- unordered-containers-0.2.5.1
+- unordered-containers-0.2.7.0
 - utility-ht-0.0.11
 - vector-0.11.0.0
 
@@ -42,4 +42,4 @@ extra-deps:
 
 # Or you can make it more forgiving, like this:
 compiler-check: newer-minor
-resolver: ghc-7.11
+resolver: ghc-8.1

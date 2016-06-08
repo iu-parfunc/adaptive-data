@@ -31,7 +31,7 @@ library
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
   build-depends:       async >= 2.0.2,
                        atomic-primops >= 0.8,
-                       base >=4.7 && <4.9,
+                       base >=4.7 && <5,
                        cmdargs >= 0.10.13,
                        concurrent-extra >= 0.7.0.9,
                        extra >= 1.4.2,
