@@ -11,28 +11,26 @@ module Data.Concurrent.IORef (
     peekTicket,
     freezeIORef,
     spinlock,
-    CASIORefException(CASIORefException),
-    TransitionException(TransitionException),
+    CASIORefException,
     ) where
 
-import           Control.Exception
 import           Control.Monad
-import qualified Data.Atomics      as A
-import qualified Data.IORef        as IR
-import           Data.Typeable
+import           Control.Monad.Except
+import           Control.Monad.Trans
+import qualified Data.Atomics         as A
+import qualified Data.IORef           as IR
 
 newtype IORef t = IORef (IR.IORef (IOVal t))
-  deriving (Eq, Typeable)
+  deriving (Eq)
 
 data IOVal t = Val !t
              | Frozen !t
-  deriving (Show, Typeable)
+  deriving (Show)
 
-data CASIORefException = CASIORefException deriving (Show, Typeable)
-instance Exception CASIORefException
+data CASIORefException = CASIORefException
+  deriving (Eq, Show)
 
-data TransitionException = TransitionException deriving (Show, Typeable)
-instance Exception TransitionException
+type EIO a = ExceptT CASIORefException IO a
 
 {-# INLINABLE newIORef #-}
 newIORef :: a -> IO (IORef a)
@@ -60,11 +58,11 @@ peekTicket !tik =
     Frozen t -> t
 
 {-# INLINABLE casIORef #-}
-casIORef :: IORef a -> A.Ticket (IOVal a) -> a -> IO(Bool, A.Ticket (IOVal a))
+casIORef :: IORef a -> A.Ticket (IOVal a) -> a -> EIO (Bool, A.Ticket (IOVal a))
 casIORef (IORef !ref) !tik !a =
   case A.peekTicket tik of
-    Frozen _ -> throwIO CASIORefException
-    Val _    -> A.casIORef ref tik $ Val a
+    Frozen _ -> throwError CASIORefException
+    Val _    -> lift $ A.casIORef ref tik $ Val a
 
 {-# INLINABLE freezeIORef #-}
 freezeIORef :: IORef a -> A.Ticket (IOVal a) -> IO(Bool, A.Ticket (IOVal a))
