@@ -29,13 +29,14 @@ module Data.Concurrent.Ctrie
 
 --import Control.Applicative ((<$>))
 import           Control.Monad
+import           Control.Monad.Trans
 import           Data.Bits
-import           Data.Hashable (Hashable)
-import qualified Data.Hashable as H
-import qualified Data.List     as List
+import           Data.Hashable       (Hashable)
+import qualified Data.Hashable       as H
+import qualified Data.List           as List
 import           Data.Maybe
 import           Data.Word
-import           Prelude       hiding (lookup)
+import           Prelude             hiding (lookup)
 
 import           Data.Concurrent.IORef
 import qualified Data.Concurrent.Map.Array as A
@@ -81,13 +82,13 @@ empty = Map <$> newIORef (CNode 0 A.empty)
 
 -- | /O(log n)/. Associate the given value with the given key.
 -- If the key is already present in the map, the old value is replaced.
-insert :: (Eq k, Hashable k) => k -> v -> Map k v -> IO ()
+insert :: (Eq k, Hashable k) => k -> v -> Map k v -> EIO ()
 insert k v (Map root) = go0
     where
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            ticket <- readForCAS inode
+            ticket <- lift $ readForCAS inode
             case peekTicket ticket of
                 CNode bmp arr -> do
                     let m = mask h lev
@@ -108,7 +109,7 @@ insert k v (Map root) = go0
 
                                 | otherwise -> do
                                     let h2 = hash k2
-                                    inode2 <- newINode h k v h2 k2 v2 (nextLevel lev)
+                                    inode2 <- lift $ newINode h k v h2 k2 v2 (nextLevel lev)
                                     let arr' = A.update (INode inode2) i n arr
                                         cn'  = CNode bmp arr'
                                     unlessM (fst <$> casIORef inode ticket cn') go0
@@ -140,13 +141,13 @@ newINode h1 k1 v1 h2 k2 v2 lev
 
 -- | /O(log n)/. Remove the given key and its associated value from the map,
 -- if present.
-delete :: (Eq k, Hashable k) => k -> Map k v -> IO ()
+delete :: (Eq k, Hashable k) => k -> Map k v -> EIO ()
 delete k (Map root) = go0
     where
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            ticket <- readForCAS inode
+            ticket <- lift $ readForCAS inode
             case peekTicket ticket of
                 CNode bmp arr -> do
                     let m = mask h lev
@@ -160,7 +161,7 @@ delete k (Map root) = go0
                                         cn'  = CNode (bmp `xor` m) arr'
                                         cn'' = contract lev cn'
                                     unlessM (fst <$> casIORef inode ticket cn'') go0
-                                    whenM (isTomb <$> readIORef inode) $
+                                    whenM (isTomb <$> lift (readIORef inode)) $
                                         cleanParent parent inode h (prevLevel lev)
 
                                 | otherwise -> return ()  -- not found
@@ -181,13 +182,13 @@ delete k (Map root) = go0
 -- * Query
 
 -- | /O(log n)/. Return the value associated with the given key, or 'Nothing'.
-lookup :: (Eq k, Hashable k) => k -> Map k v -> IO (Maybe v)
+lookup :: (Eq k, Hashable k) => k -> Map k v -> EIO (Maybe v)
 lookup k (Map root) = go0
     where
         h = hash k
         go0 = go 0 undefined root
         go lev parent inode = do
-            main <- readIORef inode
+            main <- lift $ readIORef inode
             case main of
                 CNode bmp arr -> do
                     let m = mask h lev
@@ -211,19 +212,19 @@ lookup k (Map root) = go0
 -----------------------------------------------------------------------
 -- * Internal compression operations
 
-clean :: INode k v -> Level -> IO ()
+clean :: INode k v -> Level -> EIO ()
 clean inode lev = do
-    ticket <- readForCAS inode
+    ticket <- lift $ readForCAS inode
     case peekTicket ticket of
         cn@(CNode _ _) -> do
-            cn' <- compress lev cn
+            cn' <- lift $ compress lev cn
             void $ casIORef inode ticket cn'
         _ -> return ()
 {-# INLINE clean #-}
 
-cleanParent :: INode k v -> INode k v -> Hash -> Level -> IO ()
+cleanParent :: INode k v -> INode k v -> Hash -> Level -> EIO ()
 cleanParent parent inode h lev = do
-    ticket <- readForCAS parent
+    ticket <- lift $ readForCAS parent
     case peekTicket ticket of
         cn@(CNode bmp arr) -> do
             let m = mask h lev
@@ -231,8 +232,8 @@ cleanParent parent inode h lev = do
             unless (bmp .&. m == 0) $
                 case A.index arr i of
                     INode inode2 | inode2 == inode ->
-                        whenM (isTomb <$> readIORef inode) $ do
-                            cn' <- compress lev cn
+                        whenM (isTomb <$> lift (readIORef inode)) $ do
+                            cn' <- lift $ compress lev cn
                             unlessM (fst <$> casIORef parent ticket cn') $
                                 cleanParent parent inode h lev
                     _ -> return ()
@@ -265,8 +266,8 @@ contract _ x = x
 -- * Lists
 
 -- | /O(n * log n)/. Construct a map from a list of key/value pairs.
-fromList :: (Eq k, Hashable k) => [(k,v)] -> IO (Map k v)
-fromList xs = empty >>= \m -> mapM_ (\(k,v) -> insert k v m) xs >> return m
+fromList :: (Eq k, Hashable k) => [(k,v)] -> EIO (Map k v)
+fromList xs = lift empty >>= \m -> mapM_ (\(k,v) -> insert k v m) xs >> return m
 {-# INLINABLE fromList #-}
 
 -- | /O(n)/. Unsafely convert the map to a list of key/value pairs.

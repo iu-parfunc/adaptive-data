@@ -1,10 +1,10 @@
-
 -- WARNING: This is not a complete module, but a fragment to be #included
 
 import qualified Data.Concurrent.Ctrie as CM
 import qualified Data.HashMap.Strict   as HM
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Except
 import           Data.Atomics
 import qualified Data.Concurrent.IORef             as FIR
 import           Data.Hashable
@@ -26,7 +26,7 @@ getState r =
      case m of
        A _  -> return "A"
        AB _ -> return "AB"
-       B _  -> return "B"  
+       B _  -> return "B"
 
 {-# INLINE newMap #-}
 newMap :: IO (AdaptiveMap k v)
@@ -46,9 +46,15 @@ get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
 get !k !m = do
   state <- readIORef m
   case state of
-    A cm  -> CM.lookup k cm
-    AB cm -> CM.lookup k cm
+    A cm  -> handler $ CM.lookup k cm
+    AB cm -> handler $ CM.lookup k cm
     B pm  -> PM.get k pm
+
+  where
+    handler f =
+      runExceptT f >>= \c -> case c of
+        Left e  -> get k m
+        Right a -> return a
 
 {-# INLINE size #-}
 size :: AdaptiveMap k v -> IO Int
@@ -64,22 +70,30 @@ ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> AdaptiveMap k v -> IO
 ins !k !v !m = do
   state <- readIORef m
   case state of
-    A cm -> CM.insert k v cm
-    AB _ -> do transition m; ins k v m
+    A cm -> handler $ CM.insert k v cm
+    AB _ -> do transition m ; ins k v m
     B pm -> PM.ins k v pm
-  `catches`
-  [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
+
+  where
+    handler f =
+      runExceptT f >>= \c -> case c of
+        Left e  -> ins k v m
+        Right a -> return a
 
 {-# INLINE del #-}
 del :: (Eq k, Hashable k, NFData k, NFData v) => k -> AdaptiveMap k v -> IO ()
 del !k !m = do
   state <- readIORef m
   case state of
-    A cm -> CM.delete k cm
-    AB _ -> do transition m; del k m
+    A cm -> handler $ CM.delete k cm
+    AB _ -> do transition m ; del k m
     B pm -> PM.del k pm
-  `catches`
-  [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
+
+  where
+    handler f =
+      runExceptT f >>= \c -> case c of
+        Left e  -> del k m
+        Right a -> return a
 
 {-# INLINABLE transition #-}
 transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
@@ -100,7 +114,7 @@ transition m = do
   -- Option (0) just let transition return even if we're not in B state:
   -- wait = return ()
   -- Option (1), spin until we reach the B state.
-  wait = sleepWait 
+  wait = sleepWait
 
   sleepWait =
    do t <- readIORef m
@@ -153,7 +167,7 @@ transition m = do
             do (b,tik2) <- casIORef m tik (B pm)
                unless b $
                  case peekTicket tik2 of
-                   A _  -> error "this is impossible"                          
+                   A _  -> error "this is impossible"
                    AB _ -> error "transition: should not happen"
                            -- install tik' -- This should not actually happen, should it?
                    -- Someone else beat us to the punch and that's just fine:
@@ -164,6 +178,11 @@ transition m = do
 
 {-# INLINE fromList #-}
 fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
-fromList !l = do
+fromList !l = handler $ do
   !m <- CM.fromList l
-  newIORef $ A m
+  lift $ newIORef $ A m
+  where
+    handler f =
+      runExceptT f >>= \c -> case c of
+        Left e  -> fromList l
+        Right a -> return a

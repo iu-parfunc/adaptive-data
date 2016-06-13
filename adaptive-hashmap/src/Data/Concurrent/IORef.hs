@@ -12,11 +12,11 @@ module Data.Concurrent.IORef (
     freezeIORef,
     spinlock,
     CASIORefException,
+    EIO,
     ) where
 
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.Trans
 import qualified Data.Atomics         as A
 import qualified Data.IORef           as IR
 
@@ -62,7 +62,7 @@ casIORef :: IORef a -> A.Ticket (IOVal a) -> a -> EIO (Bool, A.Ticket (IOVal a))
 casIORef (IORef !ref) !tik !a =
   case A.peekTicket tik of
     Frozen _ -> throwError CASIORefException
-    Val _    -> lift $ A.casIORef ref tik $ Val a
+    Val _    -> lift . A.casIORef ref tik $ Val a
 
 {-# INLINABLE freezeIORef #-}
 freezeIORef :: IORef a -> A.Ticket (IOVal a) -> IO(Bool, A.Ticket (IOVal a))
