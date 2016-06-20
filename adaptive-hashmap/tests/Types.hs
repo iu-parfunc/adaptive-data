@@ -61,7 +61,7 @@ data Flag =
 
 type Bench a = ReaderT Flag IO a
 
-all_variants = ["pure", "ctrie", "adaptive", "c-adaptive"]
+all_variants = ["pure", "ctrie", "adaptive", "cc-adaptive", "pc-adaptive"]
 
 flag :: Flag
 flag = Flag
