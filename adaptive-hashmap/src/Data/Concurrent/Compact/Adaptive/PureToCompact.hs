@@ -6,6 +6,7 @@ module Data.Concurrent.Compact.Adaptive.PureToCompact where
 
 import           Control.DeepSeq
 import           Control.Exception
+import           Control.Monad
 import           Data.Atomics
 import qualified Data.Concurrent.Compact.PureMap as CM
 import qualified Data.Concurrent.IORef           as FIR
@@ -81,13 +82,11 @@ transition m = do
   case peekTicket tik of
     A pm -> do
       (success, tik') <- casIORef m tik (AB pm)
-      if success
-        then do
-          hm <- PM.snapshot pm
-          cm <- CM.fromMap hm
-          _ <- casIORef m tik' (B cm)
-          return ()
-        else wait
+      when success $ do
+        hm <- PM.snapshot pm
+        cm <- CM.fromMap hm
+        _ <- casIORef m tik' (B cm)
+        return ()
     AB _ -> wait
     B _ -> return ()
 
