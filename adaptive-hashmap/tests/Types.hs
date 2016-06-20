@@ -136,10 +136,10 @@ measured = Measured
     bad = -1 / 0
 
 getTime :: IO Double
-getTime = ((1.0e-9 *) . fromInteger . C.timeSpecAsNanoSecs) `fmap` C.getTime C.Monotonic
+getTime = ((1.0e-9 *) . fromInteger . C.toNanoSecs) `fmap` C.getTime C.Monotonic
 
 getCPUTime :: IO Double
-getCPUTime = ((1.0e-9 *) . fromInteger . C.timeSpecAsNanoSecs) `fmap` C.getTime C.ProcessCPUTime
+getCPUTime = ((1.0e-9 *) . fromInteger . C.toNanoSecs) `fmap` C.getTime C.ProcessCPUTime
 
 getCycles :: IO Word64
 getCycles = rdtsc
