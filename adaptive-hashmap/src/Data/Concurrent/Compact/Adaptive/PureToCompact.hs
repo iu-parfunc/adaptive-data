@@ -6,13 +6,11 @@ module Data.Concurrent.Compact.Adaptive.PureToCompact where
 
 import           Control.DeepSeq
 import           Control.Exception
-import           Control.Monad
 import           Data.Atomics
 import qualified Data.Concurrent.Compact.PureMap as CM
 import qualified Data.Concurrent.IORef           as FIR
 import qualified Data.Concurrent.PureMap         as PM
 import           Data.Hashable
-import qualified Data.HashMap.Strict             as HM
 import           Data.IORef
 import           GHC.Conc                        (yield)
 
@@ -21,6 +19,14 @@ data Hybrid k v = A (PM.PureMap k v)
                 | B (CM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
+
+getState :: AdaptiveMap k v -> IO String
+getState r = do
+  m <- readIORef r
+  case m of
+    A _  -> return "A"
+    AB _ -> return "AB"
+    B _  -> return "B"
 
 {-# INLINE newMap #-}
 newMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
@@ -69,7 +75,7 @@ del k m = do
   [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
 
 {-# INLINABLE transition #-}
-transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
+transition :: (NFData k, NFData v) => AdaptiveMap k v -> IO ()
 transition m = do
   tik <- readForCAS m
   case peekTicket tik of

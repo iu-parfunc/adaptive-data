@@ -24,7 +24,6 @@ import qualified System.Random.PCG.Fast.Pure as PCG
 import           Graphics.Gnuplot.Advanced
 import qualified Graphics.Gnuplot.File                 as File
 import qualified Graphics.Gnuplot.Frame                as Frame
-import qualified Graphics.Gnuplot.Frame.Option         as Opt
 import qualified Graphics.Gnuplot.Frame.OptionSet      as Opts
 import qualified Graphics.Gnuplot.Graph.TwoDimensional as Graph2D
 import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
@@ -103,10 +102,14 @@ benchmark "adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase adaptiveImpl
     "hotcold" -> runAll $ hotCold adaptiveImpl
-benchmark "c-adaptive" =
+benchmark "cc-adaptive" =
   reader bench >>= \bench -> case bench of
-    "transition" -> runAll $ transitionPhase cadaptiveImpl
-    "hotcold" -> runAll $ hotCold cadaptiveImpl
+    "transition" -> runAll $ transitionPhase ccadaptiveImpl
+    "hotcold" -> runAll $ hotCold ccadaptiveImpl
+benchmark "pc-adaptive" =
+  reader bench >>= \bench -> case bench of
+    "transition" -> runAll $ transitionPhase pcadaptiveImpl
+    "hotcold" -> runAll $ hotCold pcadaptiveImpl
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 

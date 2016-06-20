@@ -24,12 +24,12 @@ import qualified System.Clock                as C
 import           System.Console.CmdArgs      (def, help, ignore, (&=))
 import qualified System.Console.CmdArgs      as CA
 import           System.CPUTime.Rdtsc
-import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified Data.Concurrent.Adaptive.AdaptiveMap            as AM
-import qualified Data.Concurrent.Compact.Adaptive.CtrieToCompact as CAM
+import qualified Data.Concurrent.Compact.Adaptive.CtrieToCompact as CCM
+import qualified Data.Concurrent.Compact.Adaptive.PureToCompact  as PCM
 import qualified Data.Concurrent.Ctrie                           as CM
 import qualified Data.Concurrent.PureMap                         as PM
 import qualified Data.Concurrent.PureMapL                        as PML
@@ -326,4 +326,6 @@ adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size 
 -- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
 -- ----------------------------------
 
-cadaptiveImpl = GenericImpl CAM.newMap CAM.get CAM.ins CAM.del CAM.transition CAM.size CAM.getState
+ccadaptiveImpl = GenericImpl CCM.newMap CCM.get CCM.ins CCM.del CCM.transition CCM.size CCM.getState
+
+pcadaptiveImpl = GenericImpl PCM.newMap PCM.get PCM.ins PCM.del PCM.transition PCM.size PCM.getState
