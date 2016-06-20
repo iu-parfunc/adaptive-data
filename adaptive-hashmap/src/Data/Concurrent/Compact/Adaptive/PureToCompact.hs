@@ -13,6 +13,7 @@ import qualified Data.Concurrent.IORef           as FIR
 import qualified Data.Concurrent.PureMap         as PM
 import           Data.Hashable
 import           Data.IORef
+import           Debug.Trace
 import           GHC.Conc                        (yield)
 
 data Hybrid k v = A (PM.PureMap k v)
@@ -60,7 +61,7 @@ ins k v m = do
   case state of
     A pm -> PM.ins k v pm
     AB _ -> do transition m; ins k v m
-    B cm -> CM.ins k v cm
+    B cm -> traceMarkerIO "insert not allowed in this state"
   `catches`
   [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
 
