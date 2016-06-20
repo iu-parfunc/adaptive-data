@@ -3,9 +3,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Data.Concurrent.Compact.AdaptiveMap (
+module Data.Concurrent.Compact.Adaptive.CtrieToCompact (
     AdaptiveMap,
-    newMap,
+    newMap, newBMap,
     get, getState,
     ins,
     del,
@@ -14,7 +14,7 @@ module Data.Concurrent.Compact.AdaptiveMap (
     size
     ) where
 
--- Backpack should eliminate silliness like this in the future:
-import qualified Data.Concurrent.Compact.PureMap as PM
+-- These implementations differ only in the puremap implementation:
+import qualified Data.Concurrent.PureMap as PM
 
 #include "AdaptiveMapCore.hs"

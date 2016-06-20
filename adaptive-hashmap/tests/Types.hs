@@ -28,11 +28,11 @@ import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
-import qualified Data.Concurrent.Adaptive.AdaptiveMap as AM
-import qualified Data.Concurrent.Compact.AdaptiveMap  as CAM
-import qualified Data.Concurrent.Ctrie                as CM
-import qualified Data.Concurrent.PureMap              as PM
-import qualified Data.Concurrent.PureMapL             as PML
+import qualified Data.Concurrent.Adaptive.AdaptiveMap            as AM
+import qualified Data.Concurrent.Compact.Adaptive.CtrieToCompact as CAM
+import qualified Data.Concurrent.Ctrie                           as CM
+import qualified Data.Concurrent.PureMap                         as PM
+import qualified Data.Concurrent.PureMapL                        as PML
 
 data Flag =
        Flag

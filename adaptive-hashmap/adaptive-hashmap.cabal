@@ -27,7 +27,7 @@ library
                        Data.Concurrent.Map.Array,
                        Data.Concurrent.Adaptive.AdaptiveMap,
                        Data.Concurrent.Compact.PureMap,
-                       Data.Concurrent.Compact.AdaptiveMap
+                       Data.Concurrent.Compact.Adaptive.CtrieToCompact,
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
   build-depends:       async >= 2.0.2,
                        atomic-primops >= 0.8,
