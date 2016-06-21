@@ -215,8 +215,9 @@ runAll !fn = do
     putStrLn $ "  Running threads = " ++ show i
     hFlush stdout
     t <- run runs $! runReaderT (fn i) flag
-    putStrLn $ "\n  Time reported: " ++ show (measTime t) ++
-                                        ", cycles: " ++ show (measCycles t)
+    putStrLn $ "\n  Time reported: " ++ show (measTime t)
+      ++ ", cycles: " ++ show (measCycles t) ++ ", numGcs: " ++ show (measNumGcs t)
+      ++ ", allocated: " ++ show (measAllocated t) ++ ", gcCpuSeconds: " ++ show (measGcCpuSeconds t)
     hFlush stdout
     return t
 
