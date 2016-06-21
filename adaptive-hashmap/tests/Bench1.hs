@@ -222,6 +222,15 @@ runAll !fn = do
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Bench [(Int, Measured)]
+benchmark "nop" =
+  reader bench >>= \bench -> case bench of
+    "ins"        -> runAll $ forkNIns nopImpl
+    "insdel"     -> runAll $ forkNInsDel nopImpl
+    "random"     -> runAll $ fork5050 nopImpl
+    "hotcold"    -> runAll $ hotCold nopImpl
+    "hot"        -> runAll $ hotPhase nopImpl
+    "cold"       -> runAll $ coldPhase nopImpl
+    "transition" -> runAll $ transitionPhase nopImpl
 benchmark "pure" =
   reader bench >>= \bench -> case bench of
     "ins"        -> runAll $ forkNIns pureImpl
@@ -249,15 +258,24 @@ benchmark "adaptive" =
     "hot"        -> runAll $ hotPhase adaptiveImpl
     "cold"       -> runAll $ coldPhase adaptiveImpl
     "transition" -> runAll $ transitionPhase adaptiveImpl
-benchmark "c-adaptive" =
+benchmark "cc-adaptive" =
   reader bench >>= \bench -> case bench of
-    "ins"        -> runAll $ forkNIns cadaptiveImpl
-    "insdel"     -> runAll $ forkNInsDel cadaptiveImpl
-    "random"     -> runAll $ fork5050 cadaptiveImpl
-    "hotcold"    -> runAll $ hotCold cadaptiveImpl
-    "hot"        -> runAll $ hotPhase cadaptiveImpl
-    "cold"       -> runAll $ coldPhase cadaptiveImpl
-    "transition" -> runAll $ transitionPhase cadaptiveImpl
+    "ins"        -> runAll $ forkNIns ccadaptiveImpl
+    "insdel"     -> runAll $ forkNInsDel ccadaptiveImpl
+    "random"     -> runAll $ fork5050 ccadaptiveImpl
+    "hotcold"    -> runAll $ hotCold ccadaptiveImpl
+    "hot"        -> runAll $ hotPhase ccadaptiveImpl
+    "cold"       -> runAll $ coldPhase ccadaptiveImpl
+    "transition" -> runAll $ transitionPhase ccadaptiveImpl
+benchmark "pc-adaptive" =
+  reader bench >>= \bench -> case bench of
+    "ins"        -> runAll $ forkNIns pcadaptiveImpl
+    "insdel"     -> runAll $ forkNInsDel pcadaptiveImpl
+    "random"     -> runAll $ fork5050 pcadaptiveImpl
+    "hotcold"    -> runAll $ hotCold pcadaptiveImpl
+    "hot"        -> runAll $ hotPhase pcadaptiveImpl
+    "cold"       -> runAll $ coldPhase pcadaptiveImpl
+    "transition" -> runAll $ transitionPhase pcadaptiveImpl
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 

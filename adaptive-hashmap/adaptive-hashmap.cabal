@@ -78,6 +78,7 @@ benchmark bench-adaptive-hashmap-1
     -- TEMP:
     ghc-options: -eventlog
     hs-source-dirs: tests/
+    other-modules: Types
     build-depends: adaptive-hashmap,
                    async >= 2.0,
                    atomic-primops >= 0.8,
@@ -108,6 +109,7 @@ benchmark bench-adaptive-hashmap-2
     -- TEMP:
     ghc-options: -eventlog
     hs-source-dirs: tests/
+    other-modules: Types
     build-depends: adaptive-hashmap,
                    async >= 2.0,
                    atomic-primops >= 0.8,
