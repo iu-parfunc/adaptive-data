@@ -90,6 +90,10 @@ runAll !fn = do
 
 {-# INLINE benchmark #-}
 benchmark :: String -> Bench [(Int, Measured)]
+benchmark "nop" =
+  reader bench >>= \bench -> case bench of
+    "transition" -> runAll $ transitionPhase nopImpl
+    "hotcold" -> runAll $ hotCold nopImpl
 benchmark "pure" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase pureImpl

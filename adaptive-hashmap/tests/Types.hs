@@ -312,6 +312,15 @@ data GenericImpl m =
 nop :: Applicative m => a -> m ()
 nop _ = pure ()
 
+nopImpl = GenericImpl
+            (return ())
+            (\_ _ -> return Nothing)
+            (\_ _ _ -> return ())
+            (\_ _ -> return ())
+            nop
+            (\_ -> return 0)
+            (\_ -> return "_")
+
 pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
 pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
 
