@@ -35,14 +35,19 @@ extra-deps:
 - utility-ht-0.0.11
 - vector-0.11.0.0
 
-# This expects to use a specific implementation of GHC with the Compact
-# patches, i.e. ~crest-team/opt/ghc-mutable-cnf-0.5/
-#resolver: ghc-7.11.20160226
+# This expects to use an implementation of GHC with the Compact
+# patches. We often use locally installed versions,
+# e.g. ~crest-team/opt/ghc-mutable-cnf-0.5/
+
+# compiler-check: newer-minor
 # skip-ghc-check: true
 
-# Or you can make it more forgiving, like this:
-compiler-check: newer-minor
-resolver: ghc-8.1
+# Here we demand ghc-mutable-cnf:0.5:
+compiler: ghc-8.1.20160531
+
+# We can try to make our package-resolution deterministic, even though
+# we are using a custom version of GHC:
+resolver: nightly-2016-06-21
 
 # [2016.06.24] Currently running with ghc-mutable-cnf-0.5.
 # You can optionally build with `stack build --docker`:
