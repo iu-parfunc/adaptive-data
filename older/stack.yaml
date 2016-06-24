@@ -1,0 +1,20 @@
+flags: {}
+
+packages:
+ # This is out of date.  Needs putOverwrite...
+ - ./adaptive_map_prototype
+ - ./old_peter_bag_test
+ - ./concurrent-skiplist/
+ - ./haskell-lockfree/atomic-primops-vector
+ - ./chen_bag
+
+extra-deps:
+ - atomic-primops-0.8
+ - chaselev-deque-0.5.0.5
+ - thread-local-storage-0.1.0.3
+ - lockfree-queue-0.2.3.1
+
+# FIXME: released version requires atomic-primops-0.8:
+# - atomic-primops-vector-0.1.0.1
+
+resolver: lts-2.22
