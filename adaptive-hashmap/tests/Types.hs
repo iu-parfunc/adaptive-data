@@ -250,7 +250,7 @@ for_ start end fn = loop start
 fold :: (Num n, Ord n, Monad m) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b
 fold start end _ _ _
   | start > end = error "start greater than end"
-fold start end z fld fn = loop start
+fold start end !z fld fn = loop start
   where
     loop !i
       | i > end = return z

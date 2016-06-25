@@ -33,6 +33,8 @@ import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
 import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
 import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
+import GHC.Stats (getGCStats)
+
 import Types
 
 {-# INLINABLE forkNIns #-}
@@ -176,10 +178,22 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
     do
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
-      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
-        if precompute
-          then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand range >>= \k -> get k m
+
+      if precompute -- Lend the compiler a hand; lift this branch out of the loop.
+      then for_ offset2 (offset2 + phase2) $ \i ->
+            do let ix = (vec VU.! fromIntegral (i `mod` len))
+               get ix m
+
+      -- TODO: Fix rand so that it is scalable/thread-local:
+      else for_ offset2 (offset2 + phase2) $ \_ ->
+            do ix <- rand range
+               get ix m
+
+-- [2016.06.25] This is non-tail-recursive:
+      -- fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+      --   if precompute
+      --     then get (vec VU.! fromIntegral (i `mod` len)) m
+      --     else rand range >>= \k -> get k m
 
 {-# INLINE transitionPhase #-}
 transitionPhase :: GenericImpl m -> Int -> Bench Measured
@@ -285,10 +299,20 @@ main = do
   args <- CA.cmdArgs flag
   caps <- getNumCapabilities
 
+  putStrLn $ "Creating random Ints of size: "++show (maxsize args)
+
   !gen <- PCG.createSystemRandom
-  !randomInts <- VU.replicateM (maxsize args) (PCG.uniformR (0, range args) gen :: IO Int64)
-  !randomPairs <- VU.replicateM (initial args)
+  -- !randomInts <- VU.replicateM (maxsize args) (PCG.uniformR (0, range args) gen :: IO Int64)
+  -- !randomPairs <- VU.replicateM (initial args)
+  --                   (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
+  let howMuchRandomness = 10000
+
+  !randomInts <- VU.replicateM howMuchRandomness (PCG.uniformR (0, range args) gen :: IO Int64)
+  !randomPairs <- VU.replicateM howMuchRandomness
                     (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
+
+  -- let randomInts = error "don't use randomInts"
+  --     randomPairs = error "don't use randomPairs"
 
   let !opts = args
         { maxthreads = if maxthreads args <= 0
