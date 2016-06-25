@@ -1,0 +1,61 @@
+
+
+[2016.06.25] {Trouble reproducing a build from earlier}
+-------------------------------------------------------
+
+Commit d2ef259e696c4c8c83be4085dd22f43946b9ecc8 was building before
+without a glitch.  But now a simple `stack build` yields:
+
+    adaptive-data/adaptive-data/deps/haskell-lockfree/atomic-primops/Data/Atomics.hs:49:1: error:
+        Failed to load interface for ‘Data.Primitive.Array’
+        There are files missing in the ‘primitive-0.6.1.0’ package,
+        try running 'ghc-pkg check'.
+        Use -v to see a list of the files searched for.
+
+Let's see if wiping out the .stack-work directories does the trick.
+
+
+[2016.06.25] {Portability problem for CNF / Mac OS}
+---------------------------------------------------
+
+It looks like CNF branch of GHC in fact will not build on mac ATM:
+
+    rts/sm/CNF.c:33:10: fatal error: 'endian.h' file not found
+    #include <endian.h>
+
+
+[2016.06.25] {Portability problem for Docker / Mac OS}
+------------------------------------------------------
+
+Building with docker works on a linux host.  But on Mac it seems to
+erroneously try to go to the global config:
+
+    $ stack build --docker
+    Run from outside a project, using implicit global project config
+    Using resolver: lts-6.4 from implicit global project's config file: ...
+
+If I manually specify the same resolver as resides in ./stack.yaml:
+
+    stack build --docker --resolver nightly-2016-06-21
+
+then it still makes reference to the global config and fails:
+
+    Compiler version mismatched, found ghc-8.1.20160531 (x86_64), but
+    expected minor version match with ghc-8.0.1 (x86_64) (based on
+    resolver setting in /Users/rrnewton/.stack/global/stack.yaml).
+
+Even adding `skip-ghc-check: true` to the yaml doesn't make this go
+away, because it seems no to be successfully reading the local stack.yaml.
+
+This confirms that there's a silent working dir mounting failure:
+
+    $ stack --docker --resolver nightly-2016-06-21 --skip-ghc-check exec find
+    Run from outside a project, using implicit global project config
+    Using resolver: nightly-2016-06-21 specified on command line
+    .
+    ./.stack-work
+    ./.stack-work/docker
+    ./.stack-work/docker/_home
+
+The same command on linux lists everything in the working dir.
+
