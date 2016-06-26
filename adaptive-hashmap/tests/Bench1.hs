@@ -90,6 +90,8 @@ hotCold GenericImpl { newMap, get, insert, transition } splits = do
   !vec <- reader randomInts
   !range <- reader range
   !precompute <- reader precompute
+  !seed <- reader seed
+  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
   -- transition d m -- TEMP!  Transition before measuring.  This makes it much faster on 1 thread.
@@ -103,12 +105,12 @@ hotCold GenericImpl { newMap, get, insert, transition } splits = do
           offset2 = offset1 + phase1 + 1
       for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                                 then insert (vec VU.! fromIntegral (i `mod` len)) i m
-                                                else rand range >>= \k -> insert k i m
+                                                else rand g range >>= \k -> insert k i m
       transition m
       fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
         if precompute
           then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand range >>= \k -> get k m
+          else rand g range >>= \k -> get k m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
@@ -119,6 +121,8 @@ hotPhase GenericImpl { newMap, get, insert, transition } splits = do
   !vec <- reader randomInts
   !range <- reader range
   !precompute <- reader precompute
+  !seed <- reader seed
+  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
   let quota = fromIntegral $ ops `quot` splits
@@ -128,7 +132,7 @@ hotPhase GenericImpl { newMap, get, insert, transition } splits = do
     let offset1 = fromIntegral $ chunk * fromIntegral quota
     for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                               then insert (vec VU.! fromIntegral (i `mod` len)) i m
-                                              else rand range >>= \k -> insert k i m
+                                              else rand g range >>= \k -> insert k i m
 
 {-# INLINE coldPhase #-}
 coldPhase :: GenericImpl m -> Int -> Bench Measured
@@ -139,6 +143,8 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
   !vec <- reader randomInts
   !range <- reader range
   !precompute <- reader precompute
+  !seed <- reader seed
+  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
   let quota = fromIntegral $ ops `quot` splits
@@ -153,7 +159,7 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                               then insert (vec VU.! fromIntegral (i `mod` len)) i m
-                                              else rand range >>= \k -> insert k i m
+                                              else rand g range >>= \k -> insert k i m
     -- t <- measureOnce $ transition m when (measTime t > 0.001) $
     --   do putStr$  "(trans "++ show (measTime t)++") "; hFlush stdout
     -- st0 <- state m case st0 of
@@ -184,16 +190,15 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
             do let ix = (vec VU.! fromIntegral (i `mod` len))
                get ix m
 
-      -- TODO: Fix rand so that it is scalable/thread-local:
       else for_ offset2 (offset2 + phase2) $ \_ ->
-            do ix <- rand range
+            do ix <- rand g range
                get ix m
 
 -- [2016.06.25] This is non-tail-recursive:
       -- fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
       --   if precompute
       --     then get (vec VU.! fromIntegral (i `mod` len)) m
-      --     else rand range >>= \k -> get k m
+      --     else rand g range >>= \k -> get k m
 
 {-# INLINE transitionPhase #-}
 transitionPhase :: GenericImpl m -> Int -> Bench Measured
@@ -204,6 +209,8 @@ transitionPhase GenericImpl { newMap, get, insert, transition } splits = do
   !vec <- reader randomInts
   !range <- reader range
   !precompute <- reader precompute
+  !seed <- reader seed
+  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
   let quota = fromIntegral $ ops `quot` splits
@@ -215,7 +222,7 @@ transitionPhase GenericImpl { newMap, get, insert, transition } splits = do
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                               then insert (vec VU.! fromIntegral (i `mod` len)) i m
-                                              else rand range >>= \k -> insert k i m
+                                              else rand g range >>= \k -> insert k i m
   measure' $ forkJoin splits $ \chunk -> transition m
 
 {-# INLINE runAll #-}

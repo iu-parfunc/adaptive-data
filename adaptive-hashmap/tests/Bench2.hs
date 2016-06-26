@@ -53,6 +53,8 @@ hotCold GenericImpl { newMap, get, insert, transition } ops = do
   !range <- reader range
   !precompute <- reader precompute
   !splits <- reader maxthreads
+  !seed <- reader seed
+  !g <- PCG.restore $ PCG.initFrozen seed
 
   let quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
@@ -64,12 +66,12 @@ hotCold GenericImpl { newMap, get, insert, transition } ops = do
           offset2 = offset1 + phase1 + 1
       for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                                 then insert (vec VU.! fromIntegral (i `mod` len)) i m
-                                                else rand range >>= \k -> insert k i m
+                                                else rand g range >>= \k -> insert k i m
       transition m
       fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
         if precompute
           then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand range >>= \k -> get k m
+          else rand g range >>= \k -> get k m
 
 {-# INLINE runAll #-}
 runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]

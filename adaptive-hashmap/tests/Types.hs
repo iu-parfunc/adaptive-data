@@ -56,6 +56,7 @@ data Flag =
          , randomPairs :: VU.Vector (Int64, Int64)
          , maxsize     :: !Int
          , stepsize    :: !Int
+         , seed        :: !Word64
          }
   deriving (Eq, Show, CA.Data, CA.Typeable)
 
@@ -85,11 +86,12 @@ flag = Flag
   , export = True &= help "Whether to export csv files"
   , maxsize = 1000000000 &= help "Maximum size (used for the transition benchmark)"
   , stepsize = 100000 &= help "Step size (used for the transition benchmark)"
+  , seed = 4096 &= help "Seed for RNG"
   }
 
 {-# INLINE rand #-}
-rand :: Int64 -> IO Int64
-rand !n = PCG.withSystemRandom $ PCG.uniformR (0, n)
+rand :: PCG.GenIO -> Int64 -> IO Int64
+rand !g !n = PCG.uniformR (0, n) g
 
 -- | Run a function several times and take the median time.
 {-# INLINE run #-}
