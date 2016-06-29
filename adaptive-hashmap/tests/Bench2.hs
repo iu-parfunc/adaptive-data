@@ -89,6 +89,7 @@ runAll !fn = do
     putStrLn $ "\n  Time reported: " ++ show (measTime t)
       ++ ", cycles: " ++ show (measCycles t) ++ ", numGcs: " ++ show (measNumGcs t)
       ++ ", allocated: " ++ show (measAllocated t) ++ ", gcCpuSeconds: " ++ show (measGcCpuSeconds t)
+      ++ ", copied: " ++ show (measBytesCopied t)
     hFlush stdout
     return t
 
