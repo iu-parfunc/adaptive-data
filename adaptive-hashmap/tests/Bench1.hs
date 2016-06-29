@@ -91,16 +91,17 @@ hotCold GenericImpl { newMap, get, insert, transition } splits = do
   !range <- reader range
   !precompute <- reader precompute
   !seed <- reader seed
-  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
   -- transition d m -- TEMP!  Transition before measuring.  This makes it much faster on 1 thread.
-  let quota = fromIntegral $ ops `quot` splits
+  let fg = PCG.initFrozen seed
+      quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
   measure' $ forkJoin splits $ \chunk ->
     do
+      !g <- PCG.restore fg
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
       for_ offset1 (offset1 + phase1) $ \i -> if precompute
@@ -122,13 +123,14 @@ hotPhase GenericImpl { newMap, get, insert, transition } splits = do
   !range <- reader range
   !precompute <- reader precompute
   !seed <- reader seed
-  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
-  let quota = fromIntegral $ ops `quot` splits
+  let fg = PCG.initFrozen seed
+      quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       len = fromIntegral $ VU.length vec
   measure' $ forkJoin splits $ \chunk -> do
+    !g <- PCG.restore fg
     let offset1 = fromIntegral $ chunk * fromIntegral quota
     for_ offset1 (offset1 + phase1) $ \i -> if precompute
                                               then insert (vec VU.! fromIntegral (i `mod` len)) i m
@@ -144,10 +146,10 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
   !range <- reader range
   !precompute <- reader precompute
   !seed <- reader seed
-  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
-  let quota = fromIntegral $ ops `quot` splits
+  let fg = PCG.initFrozen seed
+      quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
@@ -155,6 +157,7 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
   -- Run the hot phase and then use a barrier/join before measuring the cold phase:
   -- ----------------------------
   liftIO $ forkJoin splits $ \chunk -> do
+    !g <- PCG.restore fg
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> if precompute
@@ -182,6 +185,7 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
 
   measure' $ forkJoin splits $ \chunk ->
     do
+      !g <- PCG.restore fg
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
 
@@ -210,14 +214,15 @@ transitionPhase GenericImpl { newMap, get, insert, transition } splits = do
   !range <- reader range
   !precompute <- reader precompute
   !seed <- reader seed
-  !g <- PCG.restore $ PCG.initFrozen seed
   fill m insert
 
-  let quota = fromIntegral $ ops `quot` splits
+  let fg = PCG.initFrozen seed
+      quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
   liftIO $ forkJoin splits $ \chunk -> do
+    !g <- PCG.restore fg
     let offset1 = fromIntegral $ chunk * fromIntegral quota
         offset2 = offset1 + phase1 + 1
     for_ offset1 (offset1 + phase1) $ \i -> if precompute

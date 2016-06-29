@@ -54,14 +54,15 @@ hotCold GenericImpl { newMap, get, insert, transition } ops = do
   !precompute <- reader precompute
   !splits <- reader maxthreads
   !seed <- reader seed
-  !g <- PCG.restore $ PCG.initFrozen seed
 
-  let quota = fromIntegral $ ops `quot` splits
+  let fg = PCG.initFrozen seed
+      quota = fromIntegral $ ops `quot` splits
       phase1 = quota `quot` ratio
       phase2 = (quota * (ratio - 1)) `quot` ratio
       len = fromIntegral $ VU.length vec
   measure' $ forkJoin splits $ \chunk ->
     do
+      !g <- PCG.restore fg
       let offset1 = fromIntegral $ chunk * fromIntegral quota
           offset2 = offset1 + phase1 + 1
       for_ offset1 (offset1 + phase1) $ \i -> if precompute
