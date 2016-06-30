@@ -132,3 +132,36 @@ benchmark bench-adaptive-hashmap-2
                    -ddump-to-file -ddump-core-stats -ddump-simpl-stats -dcore-lint
                    -dcmm-lint -ddump-ds -ddump-simpl -ddump-stg -ddump-asm
                    -ddump-bcos -ddump-cmm -ddump-opt-cmm -ddump-inlinings
+
+benchmark bench-adaptive-hashmap-3
+    type: exitcode-stdio-1.0
+    main-is: Bench3.hs
+    ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N
+    -- TEMP:
+    ghc-options: -eventlog
+    hs-source-dirs: tests/
+    other-modules: Types
+    build-depends: adaptive-hashmap,
+                   async >= 2.0,
+                   atomic-primops >= 0.8,
+                   base >= 4.6,
+                   clock >= 0.6.0.1,
+                   criterion >=1.1.1.0,
+                   cmdargs >= 0.10.13,
+                   deepseq >=1.4,
+                   directory >= 1.2.2,
+                   extra >= 1.4.2,
+                   gnuplot >= 0.5.4.1,
+                   mtl >= 2.2.1,
+                   pcg-random >= 0.1.3.2,
+                   rdtsc >= 1.3.0.1,
+                   thread-local-storage >= 0.1.0.3,
+                   time >= 1.5.0,
+                   vector >= 0.11.0.0
+    default-language: Haskell2010
+    if flag(debug)
+      ghc-options: -eventlog
+      ghc-options: -keep-tmp-files -dsuppress-module-prefixes
+                   -ddump-to-file -ddump-core-stats -ddump-simpl-stats -dcore-lint
+                   -dcmm-lint -ddump-ds -ddump-simpl -ddump-stg -ddump-asm
+                   -ddump-bcos -ddump-cmm -ddump-opt-cmm -ddump-inlinings
