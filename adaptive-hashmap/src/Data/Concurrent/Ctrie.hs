@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE PatternGuards #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE StrictData    #-}
 
 module Data.Concurrent.Ctrie
     ( Map
@@ -46,14 +46,14 @@ newtype Map k v = Map (INode k v)
 
 type INode k v = IORef (MainNode k v)
 
-data MainNode k v = CNode !Bitmap !(A.Array (Branch k v))
-                  | Tomb !(SNode k v)
-                  | Collision ![SNode k v]
+data MainNode k v = CNode Bitmap (A.Array (Branch k v))
+                  | Tomb (SNode k v)
+                  | Collision [SNode k v]
 
-data Branch k v = INode !(INode k v)
-                | SNode !(SNode k v)
+data Branch k v = INode (INode k v)
+                | SNode (SNode k v)
 
-data SNode k v = S !k v
+data SNode k v = S k v
     deriving (Eq, Show)
 
 isTomb :: MainNode k v -> Bool

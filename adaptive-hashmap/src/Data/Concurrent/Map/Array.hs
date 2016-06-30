@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Strict     #-}
+{-# LANGUAGE StrictData #-}
 
 -- | Convenient interface for 'Data.Primitive.Array'.
 module Data.Concurrent.Map.Array
@@ -12,7 +13,7 @@ module Data.Concurrent.Map.Array
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Primitive.Array
-import Prelude hiding (head, mapM, mapM_)
+import Prelude                 hiding (head, mapM, mapM_)
 
 -----------------------------------------------------------------------
 
@@ -101,7 +102,7 @@ mapM_ f = \n arr -> go n arr 0
 foldM' :: PrimMonad m => (b -> a -> m b) -> b -> Int -> Array a -> m b
 foldM' f z0 = \n arr -> go n arr 0 z0
     where
-        go n arr i !z
+        go n arr i z
             | i >= n = return z
             | otherwise = do
                 x <- indexArrayM arr i

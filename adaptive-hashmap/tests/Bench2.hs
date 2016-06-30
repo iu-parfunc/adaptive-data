@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE Strict               #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 

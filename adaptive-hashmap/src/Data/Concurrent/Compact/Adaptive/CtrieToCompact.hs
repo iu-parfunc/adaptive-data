@@ -1,7 +1,7 @@
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE Strict              #-}
+{-# LANGUAGE StrictData          #-}
 
 module Data.Concurrent.Compact.Adaptive.CtrieToCompact (
     AdaptiveMap,

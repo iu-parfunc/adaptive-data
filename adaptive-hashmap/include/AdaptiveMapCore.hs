@@ -1,4 +1,3 @@
-
 -- WARNING: This is not a complete module, but a fragment to be #included
 
 import qualified Data.Concurrent.Ctrie as CM
@@ -14,9 +13,9 @@ import           Debug.Trace (traceEventIO, traceMarkerIO)
 import           Control.DeepSeq
 import           GHC.Conc (yield)
 
-data Hybrid k v = A !(CM.Map k v)
-                | AB !(CM.Map k v)
-                | B !(PM.PureMap k v)
+data Hybrid k v = A (CM.Map k v)
+                | AB (CM.Map k v)
+                | B (PM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
 
@@ -26,24 +25,24 @@ getState r =
      case m of
        A _  -> return "A"
        AB _ -> return "AB"
-       B _  -> return "B"  
+       B _  -> return "B"
 
 {-# INLINE newMap #-}
 newMap :: IO (AdaptiveMap k v)
 newMap = do
-  !m <- CM.empty
+  m <- CM.empty
   newIORef $ A m
 
 {-# INLINE newBMap #-}
 -- Temp/Debugging: make it possible to create in the B state.
 newBMap :: (Eq k, Hashable k, NFData k, NFData v) => IO (AdaptiveMap k v)
 newBMap = do
-  !m <- PM.newMap
+  m <- PM.newMap
   newIORef $ B m
 
 {-# INLINE get #-}
 get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
-get !k !m = do
+get k m = do
   state <- readIORef m
   case state of
     A cm  -> CM.lookup k cm
@@ -52,7 +51,7 @@ get !k !m = do
 
 {-# INLINE size #-}
 size :: AdaptiveMap k v -> IO Int
-size !m = do
+size m = do
   state <- readIORef m
   case state of
     A cm  -> CM.size cm
@@ -61,7 +60,7 @@ size !m = do
 
 {-# INLINE ins #-}
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> AdaptiveMap k v -> IO ()
-ins !k !v !m = do
+ins k v m = do
   state <- readIORef m
   case state of
     A cm -> CM.insert k v cm
@@ -72,7 +71,7 @@ ins !k !v !m = do
 
 {-# INLINE del #-}
 del :: (Eq k, Hashable k, NFData k, NFData v) => k -> AdaptiveMap k v -> IO ()
-del !k !m = do
+del k m = do
   state <- readIORef m
   case state of
     A cm -> CM.delete k cm
@@ -100,7 +99,7 @@ transition m = do
   -- Option (0) just let transition return even if we're not in B state:
   -- wait = return ()
   -- Option (1), spin until we reach the B state.
-  wait = sleepWait 
+  wait = sleepWait
 
   sleepWait =
    do t <- readIORef m
@@ -153,7 +152,7 @@ transition m = do
             do (b,tik2) <- casIORef m tik (B pm)
                unless b $
                  case peekTicket tik2 of
-                   A _  -> error "this is impossible"                          
+                   A _  -> error "this is impossible"
                    AB _ -> error "transition: should not happen"
                            -- install tik' -- This should not actually happen, should it?
                    -- Someone else beat us to the punch and that's just fine:
@@ -164,6 +163,6 @@ transition m = do
 
 {-# INLINE fromList #-}
 fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
-fromList !l = do
-  !m <- CM.fromList l
+fromList l = do
+  m <- CM.fromList l
   newIORef $ A m

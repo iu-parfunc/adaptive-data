@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Strict     #-}
+{-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Data.Concurrent.PureMapL
@@ -21,20 +22,20 @@ type PureMapL k v = IORef (HM.HashMap k v, L.Lock)
 {-# INLINABLE newMap #-}
 newMap :: (Eq k, Hashable k) => IO (PureMapL k v)
 newMap = do
-  let !m = HM.empty
-  !l <- L.new
+  let m = HM.empty
+  l <- L.new
   newIORef (m, l)
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> PureMapL k v -> IO (Maybe v)
-get !k !r = do
+get k r = do
   (m, _) <- readIORef r
-  let !res = HM.lookup k m
+  let res = HM.lookup k m
   return res
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> PureMapL k v -> IO ()
-ins !k !v !r =  do
+ins k v r =  do
   (m, l) <- readIORef r
   L.acquire l
   writeIORef r (HM.insert k v m, l)
@@ -43,7 +44,7 @@ ins !k !v !r =  do
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> PureMapL k v -> IO ()
-del !k !r = do
+del k r = do
   (m, l) <- readIORef r
   L.acquire l
   writeIORef r (HM.delete k m, l)
