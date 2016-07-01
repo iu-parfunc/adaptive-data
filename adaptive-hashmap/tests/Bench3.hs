@@ -66,6 +66,7 @@ setupEnv :: IO Env
 setupEnv = do
   pm <- setupPure
   pcm <- setupCNFPure
+  PCM.transition pcm
   return $! Env pm pcm
 
 nopBench :: Env -> Benchmarkable
