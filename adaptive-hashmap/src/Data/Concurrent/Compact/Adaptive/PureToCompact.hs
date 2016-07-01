@@ -12,6 +12,7 @@ import qualified Data.Concurrent.Compact.PureMap as CM
 import qualified Data.Concurrent.IORef           as FIR
 import qualified Data.Concurrent.PureMap         as PM
 import           Data.Hashable
+import qualified Data.HashMap.Strict             as HM
 import           Data.IORef
 import           Debug.Trace
 import           GHC.Conc                        (yield)
@@ -103,3 +104,13 @@ transition m = do
           yield
           sleepWait
         B _ -> return ()
+
+{-# INLINE fromMap #-}
+fromMap :: HM.HashMap k v -> IO (AdaptiveMap k v)
+fromMap hm = do
+  m <- PM.fromMap hm
+  newIORef $ A m
+
+{-# INLINE fromPureMap #-}
+fromPureMap :: PM.PureMap k v -> IO (AdaptiveMap k v)
+fromPureMap = newIORef . A
