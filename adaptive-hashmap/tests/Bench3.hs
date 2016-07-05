@@ -4,6 +4,8 @@
 {-# LANGUAGE Strict         #-}
 {-# LANGUAGE StrictData     #-}
 
+-- | Criterionized version of Bench1.
+
 module Main where
 
 import           Control.DeepSeq

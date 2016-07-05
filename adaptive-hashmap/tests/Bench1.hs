@@ -11,6 +11,7 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | This is a second (modified) version of the benchmark harness by Vikraman
+--   It measures time to perform a certain number of read/write operations.
 
 module Main where
 
