@@ -2,6 +2,9 @@
 {-# LANGUAGE Strict              #-}
 {-# LANGUAGE StrictData          #-}
 
+-- | Duplicates the code of Data.Concurrent.PureMap but inserts a Compact
+--   type constructor under the IORef.
+
 module Data.Concurrent.Compact.PureMap
        ( PureMap
        , newMap
@@ -34,7 +37,7 @@ newMap = newCompact 4096 HM.empty >>= newIORef
 get :: (Eq k, Hashable k) => k -> PureMap k v -> IO (Maybe v)
 get k m = do
   c <- readIORef m
-  return $ HM.lookup k (getCompact c)
+  return $! HM.lookup k $! getCompact c
 
 {-# INLINE size #-}
 size :: PureMap k v -> IO Int

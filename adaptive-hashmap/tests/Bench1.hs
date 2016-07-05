@@ -14,6 +14,9 @@
 
 module Main where
 
+import           Control.Exception
+import qualified Data.Sequence as Seq 
+
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Reader
@@ -304,10 +307,29 @@ benchmark "pc-adaptive" =
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 
+-- Run any typical Haskell workload to generate normal work for the GC.
+gcWorkMaker :: IO ()
+gcWorkMaker = loop [1 .. 10^6]
+--  loop $ Seq.fromList [1 .. 10^6]
+ where
+  loop !ls = do l2 <- evaluate (reverse ls)
+                loop l2
+{-   
+  loop :: Seq.Seq Int -> IO ()
+  loop !s =
+    do let (s1,s2) = Seq.splitAt 1 s
+           s3 = (Seq.><) s2 s1
+       evaluate s3
+       loop s3
+-}
+
+                
 main :: IO ()
 main = do
   args <- CA.cmdArgs flag
   caps <- getNumCapabilities
+
+  _ <- forkIO gcWorkMaker
 
   putStrLn $ "Creating random Ints of size: "++show (maxsize args)
 

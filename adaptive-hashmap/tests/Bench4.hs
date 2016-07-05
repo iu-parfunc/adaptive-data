@@ -104,7 +104,7 @@ main = do
   let vs = ["nop", "pure", "cnfpure"]
   zs <- forM vs benchmark
 
-  let points = map (map (\(s, m) -> (s, measGcCpuSeconds m))) zs
+  let points = map (map (\(s, m) -> (s, measBytesCopied m))) zs
       term = SVG.cons "report.svg"
       frameOpts = Opts.xLabel "Size" $ Opts.yLabel "GC time in seconds" $
         Opts.title "cold GC" $ Opts.grid True $ Opts.yFormat "%g" Opts.deflt
