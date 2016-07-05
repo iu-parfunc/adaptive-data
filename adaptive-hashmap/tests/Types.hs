@@ -12,6 +12,7 @@
 module Types where
 
 import           Control.Concurrent
+import           Control.DeepSeq
 import qualified Control.Exception           as E
 import           Control.Monad.Reader
 import           Data.Int
@@ -168,7 +169,7 @@ applyGCStats _ _ m = m
 
 -- | measure `iters` times
 {-# INLINE measure #-}
-measure :: MonadIO m => Int64 -> IO a -> m Measured
+measure :: (MonadIO m, NFData a) => Int64 -> IO a -> m Measured
 measure !iters !f = liftIO $ do
   performGC
   startStats <- getGCStats
@@ -190,12 +191,12 @@ measure !iters !f = liftIO $ do
 
 -- | measure once
 {-# INLINE measureOnce #-}
-measureOnce :: MonadIO m => IO a -> m Measured
+measureOnce :: (MonadIO m, NFData a) => IO a -> m Measured
 measureOnce = measure 1
 
 -- | measure `iters` times and rescale
 {-# INLINE measure' #-}
-measure' :: IO a -> Bench Measured
+measure' :: NFData a => IO a -> Bench Measured
 measure' !f = do
   !iters <- reader iters
   !m <- measure iters f
@@ -239,14 +240,14 @@ forkJoin num act = loop num []
       loop (n - 1) (mv : ls)
 
 {-# INLINABLE for_ #-}
-for_ :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m ()
+for_ :: (Num n, Ord n, MonadIO m, NFData a) => n -> n -> (n -> m a) -> m ()
 for_ start end _
   | start > end = error "start greater than end"
 for_ start end fn = loop start
   where
     loop !i
       | i > end = return ()
-      | otherwise = fn i >> loop (i + 1)
+      | otherwise = fn i >>= liftIO . E.evaluate . rnf >> loop (i + 1)
 
 {-# INLINABLE fold #-}
 fold :: (Num n, Ord n, Monad m) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b

@@ -75,7 +75,7 @@ nopBench :: Env -> Benchmarkable
 nopBench _ = Benchmarkable $
   \n -> void . forkJoin threads $ \chunk -> do
     g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
-    for_ 0 (n `quot` threads) $ \_ -> do
+    for_ 0 (n `quot` fromIntegral threads) $ \_ -> do
       _ <- rand g range
       return ()
 
@@ -83,7 +83,7 @@ pureBench :: Env -> Benchmarkable
 pureBench Env { pm } = Benchmarkable $
   \n -> void . forkJoin threads $ \chunk -> do
     g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
-    for_ 0 (n `quot` threads) $ \_ -> do
+    for_ 0 (n `quot` fromIntegral threads) $ \_ -> do
       ix <- rand g range
       PM.get ix pm
 
@@ -91,7 +91,7 @@ cnfpureBench :: Env -> Benchmarkable
 cnfpureBench Env { pcm } = Benchmarkable $
   \n -> void . forkJoin threads $ \chunk -> do
     g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
-    for_ 0 (n `quot` threads) $ \_ -> do
+    for_ 0 (n `quot` fromIntegral threads) $ \_ -> do
       ix <- rand g range
       PCM.get ix pcm
 
