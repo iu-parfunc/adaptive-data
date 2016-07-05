@@ -1,5 +1,8 @@
 {-# LANGUAGE Strict #-}
 
+-- | coldPhase only.  Fix the number of threads, perform exactly N
+-- reads on an N-size data structure.  Vary the size N.
+
 module Main where
 
 import           Control.Monad
