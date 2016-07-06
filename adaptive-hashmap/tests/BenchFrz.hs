@@ -11,7 +11,9 @@ import           Criterion.Types
 import           Data.Int
 import           Data.Word
 import           GHC.Generics
+import           GHC.Conc
 import           System.Environment
+import           System.IO
 import           System.IO.Unsafe
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
@@ -106,5 +108,9 @@ benchConvert =
 
 
 main :: IO ()
-main = do -- benchFreeze
+main = do setNumCapabilities threads
+          putStrLn $ "Set numCap to "++show threads
+          hFlush stdout
+          benchFreeze
+          hFlush stdout
           benchConvert
