@@ -5,6 +5,7 @@ module Main where
 
 import           Control.DeepSeq
 import           Control.Monad
+import           Control.Exception
 import           Criterion.Main
 import           Criterion.Types
 import           Data.Int
@@ -16,6 +17,7 @@ import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 import           Types                       (for_, forkJoin, rand, timeit)
 
+import qualified Data.Vector as V
 import qualified Data.Concurrent.Compact.Adaptive.PureToCompact as PCM
 import qualified Data.Concurrent.Ctrie                          as CM
 
@@ -52,14 +54,27 @@ setupMap = do
       CM.insert k v pm
   return pm
 
+
+-- | Take a vector of perms and fork that many threads to do the
+-- freeze.
+parFreeze :: V.Vector CM.Perms -> CM.Map k v -> IO ()
+parFreeze vec mp = do
+  _ <- forkJoin (V.length vec) $ \ix -> do
+         CM.freezeRandBottom (vec V.! ix) mp
+  return ()
+
 main = do
-  -- TODO: Make this one per thread:
-  perms <- CM.makePerms
+  perms <- V.generateM threads (\_ -> CM.makePerms)
+  evaluate (rnf perms)
   do mp  <- timeit "Fill map" setupMap
      timeit "Freeze" (CM.freeze mp)
 
   performGC; performGC
-  do mp  <- timeit "Fill map" setupMap
-     timeit "FreezeRandBottom" (CM.freezeRandBottom perms mp)
+  do mp  <- timeit "" setupMap
+     timeit "One FreezeRandBottom" (CM.freezeRandBottom (perms V.! 0) mp)
+
+  performGC; performGC
+  do mp  <- timeit "" setupMap
+     timeit "Par FreezeRandBottom" (parFreeze perms mp)
 
   putStrLn "Done."

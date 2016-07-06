@@ -146,7 +146,8 @@ timeit msg act = do
   st <- getTime
   x  <- act
   en <- getTime
-  putStrLn $ msg ++ ", time: " ++ show (en-st)
+  when (msg /= "") $ 
+    putStrLn $ msg ++ ", time: " ++ show (en-st)
   return x
 
 getCPUTime :: IO Double
