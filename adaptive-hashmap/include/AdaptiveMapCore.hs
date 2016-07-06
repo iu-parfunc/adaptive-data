@@ -12,6 +12,10 @@ import           Data.Time.Clock
 import           Debug.Trace (traceEventIO, traceMarkerIO)
 import           Control.DeepSeq
 import           GHC.Conc (yield)
+import           System.IO.Unsafe (unsafePerformIO)
+
+-- import qualified Data.Map as M
+import Data.TLS.PThread
 
 data Hybrid k v = A (CM.Map k v)
                 | AB (CM.Map k v)
@@ -87,19 +91,22 @@ transition m = do
   case peekTicket tik of
     A cm -> do
       (success, _tik) <- casIORef m tik (AB cm)
-      -- TODO: if not success, should probably verify that someone else has actually got it into the AB state,
-      -- if only for debugging/sanity checking.
-      if success then gofreeze cm
-                 else wait
+      -- TODO: if not success, should probably verify that someone else has actually got
+      -- it into the AB state, if only for debugging/sanity checking.
+      if success then gofreeze True cm
+                 else wait cm
 
     -- Warning, the full lock-free version needs to call freeze/conversion here:
-    AB _ -> wait
-    B  _ -> return ()
+    AB cm -> wait cm
+    B  _  -> return ()
  where
   -- Option (0) just let transition return even if we're not in B state:
-  -- wait = return ()
-  -- Option (1), spin until we reach the B state.
-  wait = sleepWait
+  -- wait _ = return ()
+  -- Option (1), spin until we reach the B state.  NOT LOCK FREE!  
+  wait _ = sleepWait
+  -- Option (2): block on an MVar.  TODO!
+  -- Option (3): Help by also calling freeze!
+  -- wait = gofreeze False
 
   sleepWait =
    do t <- readIORef m
@@ -108,16 +115,19 @@ transition m = do
         AB _ -> do yield; sleepWait
         B  _ -> return ()
 
-  gofreeze cm =
-   do
-      -- Bad version, delete me after measuring:
-      ------------------------------------------
-      -- Actually, this one seems like it's hanging with this command [2016.03.05]:
-      -- stack bench adaptive-hashmap:bench-adaptive-hashmap --benchmark-arguments="-b adaptive --ops1=12 --ops2=12 --initial=10000 +RTS -s -N12"
-      -- CM.freeze cm
-      -- l <- CM.unsafeToList cm
-      -- pm <- PM.fromList l
+  -- We only measure time on the first thread to initiate:
+  gofreeze False cm = helper cm
+  gofreeze True cm = do
+      st <- getCurrentTime
+      traceMarkerIO "StartFreeze"
+      helper cm
+      traceMarkerIO "EndFreeze"
+      en <- getCurrentTime
+      -- This would be better as an event trace or something that doesn't mangle parallel output:
+      putStrLn $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
+  helper cm = 
+   do
       -- The basic algorithm:
       -----------------------
       -- This is about 115ms on 12 thread magramal, with the same command as above.
@@ -127,17 +137,14 @@ transition m = do
 
       -- A small optimization.  Single-pass version.
       ------------------------
-      -- Huh, this one is about the same time.
-      st <- getCurrentTime
-      traceMarkerIO "StartFreeze"
-      -- pm <- PM.newMap
-      -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
-      hm <- CM.freezeFold (\h k v -> HM.insert k v h) HM.empty cm
-      pm <- PM.fromMap hm -- TODO: use fromMapSized
-      traceMarkerIO "EndFreeze"
-      en <- getCurrentTime
-      putStr $ "(freezeTravTime "++show (diffUTCTime en st)++") "
+      -- -- Huh, this one is about the same time.
+      -- -- pm <- PM.newMap
+      -- -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+      -- hm <- CM.freezeFold (\h k v -> HM.insert k v h) HM.empty cm
+      -- pm <- PM.fromMap hm -- TODO: use fromMapSized
 
+      -- Unfinished: polling, assymetric version:
+      -------------------------
       let poller = do x <- readIORef m
                       case x of
                         A _  -> return True
@@ -148,6 +155,16 @@ transition m = do
       -- then normalFreeze
       -- else pollFreeze poller
 
+      -- [2016.07.06] A new, helping-based lock-free version:
+      -------------------------------------------------------
+      
+      perms <- getTLS myPerms
+      acc   <- newIORef HM.empty
+      CM.freezeRandConvert perms cm acc
+      hm <- readIORef acc
+      pm <- PM.fromMap hm -- TODO: use fromMapSized
+
+      --------------------------
       let install tik =
             do (b,tik2) <- casIORef m tik (B pm)
                unless b $
@@ -166,3 +183,23 @@ fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
 fromList l = do
   m <- CM.fromList l
   newIORef $ A m
+
+-- Thread-local permutations:
+{-# NOINLINE myPerms #-}
+myPerms :: TLS CM.Perms
+myPerms = unsafePerformIO $
+          mkTLS (do putStrLn "YAY, making perms!"
+                    CM.makePerms)
+
+-- permTable :: IORef (M.Map ThreadId CM.Perms)
+
+{-
+type AllPerms = V.Vector CM.Perms
+
+-- | Build the perms used by all threads.
+mkAllPerms :: IO AllPerms
+mkAllPerms = do 
+  perms <- V.generateM threads (\_ -> CM.makePerms)
+  evaluate (rnf perms)
+  return perms
+-}

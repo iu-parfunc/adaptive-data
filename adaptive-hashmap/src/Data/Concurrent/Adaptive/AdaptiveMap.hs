@@ -12,7 +12,8 @@ module Data.Concurrent.Adaptive.AdaptiveMap (
     del,
     transition,
     fromList,
-    size
+    size,
+    myPerms
     ) where
 
 -- These implementations differ only in the puremap implementation:
