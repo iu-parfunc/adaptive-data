@@ -338,12 +338,36 @@ This doesn't damage the time much and should make it ready for parallelism:
 Now we're ready to try parallelizing it.
 --------------------------------------------------------------------------------
 
-1M, 1 thread:
+Wow, I've been running with -N4 till now and I think it was getting
+some parallel GC speedup even with single threaded operations.
 
+1M, 1 thread:
+    Sequential freezeFold convert, time: 0.468330965959467
+    One-thread Freeze+Convert bottom-up, time: 0.460888407076709
+    Parallel Freeze+Convert bottom-up, time: 0.49554094299674034
 
 1M, 2 threads:
+    Sequential freezeFold convert, time: 0.23693331400863826
+    One-thread Freeze+Convert bottom-up, time: 0.23825362301431596
+    Parallel Freeze+Convert bottom-up, time: 0.1591487240511924
+
+1M, 3 threads:
+    Sequential freezeFold convert, time: 0.31619791698176414
+    One-thread Freeze+Convert bottom-up, time: 0.31473778502549976
+    Parallel Freeze+Convert bottom-up, time: 0.16966514999512583
 
 1M, 4 threads:
-    One-thread Freeze+Convert bottom-up, time: 0.2512275710469112
-    Parallel Freeze+Convert bottom-up, time: 0.12573220604099333
+    Sequential freezeFold convert, time: 0.24210163799580187
+    One-thread Freeze+Convert bottom-up, time: 0.2428661520825699
+    Parallel Freeze+Convert bottom-up, time: 0.12390537594910711
 
+There you have it.  I'm not sure what's happening at 2 vs 3 threads.
+It is a randomized algorithm of course.
+
+Just for fun, here's a 2X oversubscribed version, 8 threads:
+
+    Sequential freezeFold convert, time: 0.3017393338959664
+    One-thread Freeze+Convert bottom-up, time: 0.2780981119722128
+    Parallel Freeze+Convert bottom-up, time: 0.17751108191441745
+
+It doesn't go crazy.
