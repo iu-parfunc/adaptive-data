@@ -83,7 +83,10 @@ runAll !fn = do
   !runs <- reader runs
   !flag <- ask
   liftIO $! fori' size maxsize stepsize $! \i -> do
+    setNumCapabilities i
+    putStrLn $ "  Running threads = " ++ show i ++".  NumCapabilities set."
     putStrLn $ "  Running size = " ++ show i
+    performGC
     hFlush stdout
     t <- run runs $! runReaderT (fn i) flag
     putStrLn $ "\n  Time reported: " ++ show (measTime t)
