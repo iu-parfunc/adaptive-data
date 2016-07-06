@@ -3,7 +3,7 @@
 {-# LANGUAGE StrictData    #-}
 
 module Data.Concurrent.Ctrie
-    ( Map
+{-    ( Map
 
       -- * Construction
     , empty
@@ -25,7 +25,7 @@ module Data.Concurrent.Ctrie
     , freezeFold
 
     --, printMap
-    ) where
+    )-} where
 
 --import Control.Applicative ((<$>))
 import           Control.Monad
@@ -309,7 +309,7 @@ freezeAndTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
 freezeAndTraverse_ fn (Map root) = go root
   where
     go inode = do
-      freezeloop inode =<< readForCAS inode
+      freezeref inode
       main <- readIORef inode
       case main of
         CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
@@ -319,6 +319,8 @@ freezeAndTraverse_ fn (Map root) = go root
     go2 (SNode (S k v)) = fn k v
 {-# INLINE freezeAndTraverse_ #-}
 
+freezeref ref = freezeloop ref =<< readForCAS ref
+
 freezeloop ref = spinlock $ freezeIORef ref
 
 -- | Freezes, performs a fold, and returns the size of the structure as well.
@@ -327,7 +329,7 @@ freezeFold :: (a -> k -> v -> a) -> a -> Map k v -> IO a -- (Int, a)
 freezeFold fn zer (Map root) = go zer root
   where
     go acc inode = do
-      freezeloop inode =<< readForCAS inode
+      freezeref inode
       main <- readIORef inode
       case main of
         CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
@@ -336,6 +338,25 @@ freezeFold fn zer (Map root) = go zer root
     go2 acc (INode inode)   = go acc inode
     go2 acc (SNode (S k v)) = return $! fn acc k v
 {-# INLINE freezeFold #-}
+
+
+-- | Parallel freezing experiment.  This freeze is BOTTOM UP, leaves first.
+freezeRandBottom :: Map k v -> IO ()
+freezeRandBottom (Map root) = go root
+  where
+    go inode = do
+      main <- readFRef inode
+      case main of
+        Frozen _ -> return ()
+        Val x -> do
+          case x of
+            -- TODO: take a permutation and use it as the traversal order.
+            CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
+            Tomb (S _ _)  -> return ()
+            Collision _   -> return ()
+      freezeref inode
+    go2 (INode inode)   = go inode
+    go2 (SNode (S _ _)) = return ()
 
 
 -- | A non-allocating way to traverse a frozen structure.
@@ -380,7 +401,7 @@ pollFreeze poll (Map root) = go root
     go inode = do
       b <- poll
       if b then
-        do freezeloop inode =<< readForCAS inode
+        do freezeref inode
            main <- readIORef inode
            case main of
              CNode bmp arr ->
@@ -411,6 +432,7 @@ unlessM p s = p >>= \t -> if t then return () else s
 hashLength :: Int
 hashLength = finiteBitSize (undefined :: Word)
 
+-- 6 currently [2016.07.06]
 bitsPerSubkey :: Int
 bitsPerSubkey = floor . logBase (2 :: Float) . fromIntegral $ hashLength
 

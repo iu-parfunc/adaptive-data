@@ -3,9 +3,10 @@
 
 module Data.Concurrent.IORef (
     IORef,
-    IOVal,
+    IOVal(..),
     newIORef,
     readIORef,
+    readFRef,
     casIORef,
     readForCAS,
     peekTicket,
@@ -47,6 +48,12 @@ readIORef (IORef ref) = do
   case v of
     Val t    -> return t
     Frozen t -> return t
+
+-- | Read and also retain the frozen bit.
+{-# INLINABLE readFRef #-}
+readFRef :: IORef a -> IO (IOVal a)
+readFRef (IORef ref) = IR.readIORef ref
+
 
 {-# INLINABLE readForCAS #-}
 readForCAS :: IORef a -> IO (A.Ticket (IOVal a))
