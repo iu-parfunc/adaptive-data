@@ -207,7 +207,7 @@ benchmark bench-adaptive-hashmap-4
 benchmark bench-freeze
     type: exitcode-stdio-1.0
     main-is: BenchFrz.hs
-    ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-s
+    ghc-options: -O2 -Wall -threaded -rtsopts -with-rtsopts=-qa -with-rtsopts=-s -with-rtsopts=-A20M
     -- TEMP:
     ghc-options: -eventlog
     hs-source-dirs: tests/
