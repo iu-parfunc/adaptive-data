@@ -288,3 +288,36 @@ reasonable speedup:
     One FreezeRandBottom, time: 0.30203769891522825
     Par FreezeRandBottom, time: 8.890546602196991e-2
 
+Next, let's see about freezeRandConvert
+---------------------------------------
+
+Here's the horrible current, quadratic behavior on a mere 50K
+elements:
+
+    Sequential freezeFold convert, time: 4.939226899296045e-3
+    One-thread Freeze+Convert bottom-up, time: 3.7561008270131424
+
+Some of that bad behavior is due to the space leak... it's piling up
+thunks inside that IORef.  But perf is about the same with
+atomicModifiyIORef', so maybe it must be adequately forcing them:
+
+    Sequential freezeFold convert, time: 4.918021964840591e-3
+    One-thread Freeze+Convert bottom-up, time: 3.7141220229677856
+
+If we change things around and instead write to the IORef accumulator
+on each CHILD computation... and then bottom out to sequential after
+the first level....  Then our 50K number changes to:
+
+    Sequential freezeFold convert, time: 4.902540007606149e-3
+    One-thread Freeze+Convert bottom-up, time: 5.3543890826404095e-3
+
+And 100K
+
+
+
+500K:
+
+1M:
+
+
+--------------------------------------------------------------------------------

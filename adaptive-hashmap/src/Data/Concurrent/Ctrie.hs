@@ -485,6 +485,11 @@ freezeRandBottom perms (Map root) = go root
       -- change between the recursion and the freezeref call:
       (spinlock $ startFreezeIORef inode) =<< readForCAS inode
 
+      -- ALTERNATIVE: Instead of split freezing/frozen steps, this could be speculative.
+      -- That is, if we use casIORef and make sure the value has not changed when we write
+      -- (freeze) it, then I think by induction subtrees under us will be ok if we just
+      -- check&CAS our level.
+                                            
       -- Invariant: by the time we get to a leaf, everything above is FREEZING.
       let dorec x =
             case x of
@@ -518,47 +523,74 @@ freezeRandConvert :: forall k v . (Eq k, Hashable k) =>
 -- step of the tree.  It needs to be modified to only do this for the first couple
 -- recursions and then bottom out to the sequential version.
 
-freezeRandConvert perms (Map root) outref = void $ go root
+freezeRandConvert perms (Map root) outref = go root
   where
-    go :: (INode k v) -> IO (HM.HashMap k v)
+    go :: (INode k v) -> IO ()
     go inode = do
       main <- readFRef inode
 
-      -- FIXME: the structure can still change until the freezeref.  This needs either
-      -- split freezing/frozen steps, or it needs to be speculative.  Speculative: If we
-      -- use casIORef and make sure the value has not changed when we write (freeze) it,
-      -- then I think by induction subtrees under us will be ok if we just check&CAS our
-      -- level.
-              
-      tree <- case main of
+      (spinlock $ startFreezeIORef inode) =<< readForCAS inode
+
+      -- EMPIRICAL NOTE: With big tries, the first couple levels are 64-wide because the
+      -- tree gets heavily populated.  Hence it is ok if we parallelize just ONE level for
+      -- now.
+                                            
+      case main of
                -- This subtree was already frozen, AND converted:
-               Frozen _ -> return HM.empty -- Nothing to see here.
+               Frozen _ -> return ()
                Val x -> do
                  case x of
-                   -- CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
+                   CNode bmp arr -> do let len = (popCount bmp)
+                                       -- putStrLn $ "BRANCHING: "++ show len
+                                       -- foldPerm_ (\ !acc x -> fmap (HM.union acc) (go2 x))
+                                       --           HM.empty (permOf perms len) len arr
 
-                   CNode bmp arr -> let len = (popCount bmp) in
-                                    foldPerm_ (\ !acc x -> fmap (HM.union acc) (go2 x))
-                                              HM.empty (permOf perms len) len arr
-                   Tomb (S k v) -> return $! HM.singleton k v
+                                       mapPerm_ go2 (permOf perms len) len arr
+                                                   
+                   Tomb (S k v) -> I.atomicModifyIORef outref (\hm -> (HM.insert k v hm, ()))
 -- FINISHME: 
 --                   Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
 
-      -- We make exactly as many "commits" to the output as there are freezable refs.
-      new <- I.atomicModifyIORef outref (\a -> let tr = HM.union tree a
-                                               in (tr,tr))
-      -- There are several choices to make here about lazy vs strict,
-      -- speculative/wasteful vs blackhole-risk:
+      -- INVARIANT: if we return to this point, we have verified that all children are
+      -- completed, AND written to the accumulator, by us or by someone else.
 
       -- Now it's safe to mark it, to prevent further merges of redundant information:
       freezeref inode
-      return new
-    
-    go2 (INode inode)   = go inode
+      return ()
+
     go2 (SNode (S k v)) = return $! HM.singleton k v
 
+    -- Don't recur back to the parallel version, instead use the sequential.
+    -- go2 (INode inode) = go inode
+                          
+    -- Process a child node sequentially, and then add it right into the accumulator:
+    go2 (INode inode) = do
+      -- This should be strict in the accumulator:
+      hm <- go3 HM.empty inode
+      -- This is currently lazy:
+      I.atomicModifyIORef outref (\a -> let tr = HM.union hm a
+                                        in (tr,tr))
+      -- There are several choices to make here about lazy vs strict,
+      -- speculative/wasteful vs blackhole-risk:      
 
+    -- Copied from freezeFold:
+    ----------------------------------------
+    fn = (\h k v -> HM.insert k v h)
+            
+    -- Switch to full freeze-before-read here:
+    go3 !acc inode = do
+      freezeref inode
+      main <- readIORef inode
+      case main of
+        CNode bmp arr -> A.foldM' go4 acc (popCount bmp) arr
+        Tomb (S k v) -> return $! fn acc k v
+        Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+    go4 !acc (INode inode)   = go3 acc inode
+    go4 !acc (SNode (S k v)) = return $! fn acc k v
 
+       
+
+                          
 --------------------------------------------------------------------------------
 
 -- | A collection of random permutations of numbers [0..1], [0..2], ... [0..63].
