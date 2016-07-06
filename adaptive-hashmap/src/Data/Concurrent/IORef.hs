@@ -11,6 +11,7 @@ module Data.Concurrent.IORef (
     readForCAS,
     peekTicket,
     freezeIORef,
+    startFreezeIORef,
     spinlock,
     CASIORefException(CASIORefException),
     TransitionException(TransitionException),
