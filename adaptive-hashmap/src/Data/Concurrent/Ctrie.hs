@@ -35,6 +35,7 @@ module Data.Concurrent.Ctrie
 
 --import Control.Applicative ((<$>))
 import           Control.Monad
+import           Control.Concurrent
 import           Data.Bits
 import           Data.Hashable (Hashable)
 import qualified Data.Hashable as H
@@ -480,20 +481,28 @@ freezeRandBottom perms (Map root) = go root
   where
     go inode = do
       main <- readFRef inode
-      -- FIXME: need freezing/frozen state.  Otherwise inode can
-      -- change between the recursion and the freezeref call.
-      -- spinlock $ startFreezeIORef inode =<< readForCAS inode
-              
-      -- This subtree was already frozen from the bottom, don't recur:
+      -- We need this freezing/frozen state.  Otherwise inode can
+      -- change between the recursion and the freezeref call:
+      (spinlock $ startFreezeIORef inode) =<< readForCAS inode
+
+      -- Invariant: by the time we get to a leaf, everything above is FREEZING.
+      let dorec x =
+            case x of
+              CNode bmp arr -> let len = (popCount bmp) in
+                               -- assert len > 0 
+                               mapPerm_ go2 (permOf perms len) len arr
+              Tomb (S _ _)  -> return ()
+              Collision _   -> return ()
+
       case main of
+        -- This subtree was already frozen from the bottom, don't recur:
         Frozen _ -> return ()
-        Val x -> do
-          case x of
-            CNode bmp arr -> let len = (popCount bmp) in
-                             -- assert len > 0 
-                             mapPerm_ go2 (permOf perms len) len arr
-            Tomb (S _ _)  -> return ()
-            Collision _   -> return ()
+        -- Policy: For lock-freedom, we need to complete the operation
+        -- even if the other thread is stalled:
+        Freezing x -> do yield; dorec x
+        Val      x -> dorec x
+
+      -- Invariant: by the time our subtrees are processed, everything below is FROZEN.
       freezeref inode
     go2 (INode inode)   = go inode
     go2 (SNode (S _ _)) = return ()
