@@ -311,13 +311,39 @@ the first level....  Then our 50K number changes to:
     Sequential freezeFold convert, time: 4.902540007606149e-3
     One-thread Freeze+Convert bottom-up, time: 5.3543890826404095e-3
 
-And 100K
-
-
+And 100K:
+    Sequential freezeFold convert, time: 1.5236729057505727e-2
+    One-thread Freeze+Convert bottom-up, time: 1.6321051982231438e-2
 
 500K:
-
+    Sequential freezeFold convert, time: 0.11509568395558745
+    One-thread Freeze+Convert bottom-up, time: 0.11698334303218871
+    
 1M:
+    Sequential freezeFold convert, time: 0.23778499802574515
+    One-thread Freeze+Convert bottom-up, time: 0.23906447493936867
 
+That's not bad.  
 
+Next, fix the child branches to check-before-diving-in
 --------------------------------------------------------------------------------
+
+This doesn't damage the time much and should make it ready for parallelism:
+
+1M, 4 threads:
+    Sequential freezeFold convert, time: 0.2446749280206859
+    One-thread Freeze+Convert bottom-up, time: 0.2415562419919297
+
+
+Now we're ready to try parallelizing it.
+--------------------------------------------------------------------------------
+
+1M, 1 thread:
+
+
+1M, 2 threads:
+
+1M, 4 threads:
+    One-thread Freeze+Convert bottom-up, time: 0.2512275710469112
+    Parallel Freeze+Convert bottom-up, time: 0.12573220604099333
+

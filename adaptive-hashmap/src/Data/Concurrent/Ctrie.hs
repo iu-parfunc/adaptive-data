@@ -534,22 +534,25 @@ freezeRandConvert perms (Map root) outref = go root
       -- EMPIRICAL NOTE: With big tries, the first couple levels are 64-wide because the
       -- tree gets heavily populated.  Hence it is ok if we parallelize just ONE level for
       -- now.
-                                            
-      case main of
-               -- This subtree was already frozen, AND converted:
-               Frozen _ -> return ()
-               Val x -> do
-                 case x of
-                   CNode bmp arr -> do let len = (popCount bmp)
-                                       -- putStrLn $ "BRANCHING: "++ show len
-                                       -- foldPerm_ (\ !acc x -> fmap (HM.union acc) (go2 x))
-                                       --           HM.empty (permOf perms len) len arr
 
-                                       mapPerm_ go2 (permOf perms len) len arr
-                                                   
-                   Tomb (S k v) -> I.atomicModifyIORef outref (\hm -> (HM.insert k v hm, ()))
+      let dorec x =
+            case x of
+              CNode bmp arr -> do let len = (popCount bmp)
+                                  -- putStrLn $ "BRANCHING: "++ show len
+                                  -- foldPerm_ (\ !acc x -> fmap (HM.union acc) (go2 x))
+                                  --           HM.empty (permOf perms len) len arr
+
+                                  mapPerm_ go2 (permOf perms len) len arr
+
+              Tomb (S k v) -> I.atomicModifyIORef outref (\hm -> (HM.insert k v hm, ()))
 -- FINISHME: 
 --                   Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+                                            
+      case main of
+        -- case(1): This subtree was already frozen, AND converted:
+        Frozen   _ -> return ()
+        Freezing x -> do yield; dorec x
+        Val      x -> dorec x
 
       -- INVARIANT: if we return to this point, we have verified that all children are
       -- completed, AND written to the accumulator, by us or by someone else.
@@ -566,25 +569,50 @@ freezeRandConvert perms (Map root) outref = go root
     -- Process a child node sequentially, and then add it right into the accumulator:
     go2 (INode inode) = do
       -- This should be strict in the accumulator:
-      hm <- go3 HM.empty inode
+      -- hm <- go3 HM.empty inode =<< readForCAS inode
+      hm <- go3 HM.empty inode 
+
       -- This is currently lazy:
       I.atomicModifyIORef outref (\a -> let tr = HM.union hm a
                                         in (tr,tr))
       -- There are several choices to make here about lazy vs strict,
       -- speculative/wasteful vs blackhole-risk:      
+             
+    fn = (\h k v -> HM.insert k v h)
 
     -- Copied from freezeFold:
     ----------------------------------------
-    fn = (\h k v -> HM.insert k v h)
-            
-    -- Switch to full freeze-before-read here:
+    -- Switch to full freeze-before-read here.
+    -- This version cannot CHECK to see if the banch has already been handled:
+    -- go3 !acc inode = do
+    --   freezeref inode
+    --   main <- readIORef inode
+    --   case main of
+    --     CNode bmp arr -> A.foldM' go4 acc (popCount bmp) arr
+    --     Tomb (S k v) -> return $! fn acc k v
+    --     Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+
+    -- Copied from freezeRandBottom and modified:
+    ----------------------------------------         
     go3 !acc inode = do
+      main <- readFRef inode
+      (spinlock $ startFreezeIORef inode) =<< readForCAS inode
+      let dorec x =
+            case x of
+              CNode bmp arr -> A.foldM' go4 acc (popCount bmp) arr
+              Tomb (S k v)  -> return $! fn acc k v
+              Collision xs  -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+      tree <- case main of
+               -- This subtree was ALREADY frozen and added to accum:
+               Frozen _ -> return HM.empty -- Possible silly union of empty into the accum!
+               -- Policy: For lock-freedom, we need to complete the operation
+               -- even if the other thread is stalled:
+               Freezing x -> do yield; dorec x
+               Val      x -> dorec x
       freezeref inode
-      main <- readIORef inode
-      case main of
-        CNode bmp arr -> A.foldM' go4 acc (popCount bmp) arr
-        Tomb (S k v) -> return $! fn acc k v
-        Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+      return tree
+
+    ----------------------------------------
     go4 !acc (INode inode)   = go3 acc inode
     go4 !acc (SNode (S k v)) = return $! fn acc k v
 

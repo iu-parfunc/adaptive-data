@@ -24,7 +24,7 @@ import qualified Data.Concurrent.Compact.Adaptive.PureToCompact as PCM
 import qualified Data.Concurrent.Ctrie                          as CM
 import           Data.IORef
 import qualified Data.HashMap.Strict   as HM
-
+import           Data.Hashable (Hashable)
 
 
 {-# NOINLINE threads #-}
@@ -60,17 +60,25 @@ setupMap = do
   performGC; performGC
   return pm
 
+type AllPerms = V.Vector CM.Perms
 
 -- | Take a vector of perms and fork that many threads to do the
 -- freeze.
-parFreeze :: V.Vector CM.Perms -> CM.Map k v -> IO ()
+parFreeze :: AllPerms -> CM.Map k v -> IO ()
 parFreeze vec mp = do
   _ <- forkJoin (V.length vec) $ \ix -> do
          CM.freezeRandBottom (vec V.! ix) mp
   return ()
 
+parFreezeConvert :: (Hashable k, Eq k) => 
+                    AllPerms -> CM.Map k v -> IORef (HM.HashMap k v) -> IO ()
+parFreezeConvert vec mp acc = do
+  forkJoin (V.length vec) $ \ix -> do
+     CM.freezeRandConvert (vec V.! ix) mp acc
+  return ()
+
 -- | Build the perms used by all threads.
-mkAllPerms :: IO (V.Vector CM.Perms)
+mkAllPerms :: IO AllPerms
 mkAllPerms = do 
   perms <- V.generateM threads (\_ -> CM.makePerms)
   evaluate (rnf perms)
@@ -103,6 +111,11 @@ benchConvert =
         acc <- newIORef HM.empty
         timeit "One-thread Freeze+Convert bottom-up" $ 
                CM.freezeRandConvert (perms V.! 0) mp acc
+
+     do mp  <- timeit "" setupMap
+        acc <- newIORef HM.empty
+        timeit "Parallel Freeze+Convert bottom-up" $
+               parFreezeConvert perms mp acc
 
      putStrLn "Done."
 
