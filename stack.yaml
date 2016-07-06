@@ -52,5 +52,6 @@ resolver: nightly-2016-06-21
 # [2016.06.24] Currently running with ghc-mutable-cnf-0.5.
 # You can optionally build with `stack build --docker`:
 docker:
-  enable: false
+  # Enabling this is handy for emacs haskell-mode integration on Mac:
+  enable: true
   repo: "vikraman/ghc-mutable-cnf:0.5"

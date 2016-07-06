@@ -1,9 +1,10 @@
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE StrictData    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Concurrent.Ctrie
-{-    ( Map
+    ( Map
 
       -- * Construction
     , empty
@@ -22,10 +23,14 @@ module Data.Concurrent.Ctrie
     , freeze, pollFreeze
     , unsafeTraverse_
     , freezeAndTraverse_
-    , freezeFold
-
+    , freezeFold   
     --, printMap
-    )-} where
+
+    , freezeRandBottom
+    , freezeRandConvert      
+    -- Temporarily exposed:
+    , makePerms, Perms
+    ) where
 
 --import Control.Applicative ((<$>))
 import           Control.Monad
@@ -38,6 +43,7 @@ import           Data.Word
 import           Prelude       hiding (lookup)
 
 import           Data.Concurrent.IORef
+import qualified Data.IORef as I
 import qualified Data.Concurrent.Map.Array as A
 
 -- import qualified Data.Vector as V
@@ -46,6 +52,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import System.Random.Shuffle (shuffleM)
 import Data.List.Split (chunksOf)
+import qualified Data.HashMap.Strict   as HM
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.
@@ -472,21 +479,54 @@ freezeRandBottom perms (Map root) = go root
   where
     go inode = do
       main <- readFRef inode
+      -- This subtree was already frozen from the bottom, don't recur:
       case main of
-        -- This subtree was already frozen from the bottom, don't recur:
         Frozen _ -> return ()
         Val x -> do
           case x of
-            -- TODO: take a permutation and use it as the traversal order.
             CNode bmp arr -> let len = (popCount bmp) in
-                             if len==0
-                             then error "Does this happen?"
-                             else mapPerm_ go2 (permOf perms len) len arr
+                             -- assert len > 0 
+                             mapPerm_ go2 (permOf perms len) len arr
             Tomb (S _ _)  -> return ()
             Collision _   -> return ()
       freezeref inode
     go2 (INode inode)   = go inode
     go2 (SNode (S _ _)) = return ()
+
+
+-- | Bottom-up freeze in random order.  Take a HashMap reference as an
+-- OUTPUT PARAM.  This function must be reentrant, with multiple calls
+-- cooperating to build the output structure.
+freezeRandConvert :: forall k v . (Eq k, Hashable k) =>
+                     Perms -> Map k v -> I.IORef (HM.HashMap k v) -> IO ()
+freezeRandConvert perms (Map root) outref = void $ go root
+  where
+    go :: (INode k v) -> IO (HM.HashMap k v)
+    go inode = do
+      main <- readFRef inode
+      tree <- case main of
+               -- This subtree was already frozen, AND converted:
+               Frozen _ -> return HM.empty -- Nothing to see here.
+               Val x -> do
+                 case x of
+                   -- CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
+
+                   CNode bmp arr -> let len = (popCount bmp) in
+                                    foldPerm_ (\ acc x -> fmap (HM.union acc) (go2 x))
+                                              HM.empty (permOf perms len) len arr
+--                   Tomb (S k v) -> return $! HM.singleton k v
+--                   Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
+      -- We make exactly as many "commits" to the output as there are freezable refs:
+      new <- I.atomicModifyIORef outref (\a -> let tr = HM.union tree a
+                                               in (tr,tr))
+      -- Now it's safe to mark it, to prevent further merges of the same information:
+      freezeref inode
+      return new
+    
+    go2 (INode inode)   = go inode
+    go2 (SNode (S k v)) = return $! HM.singleton k v
+
+
 
 --------------------------------------------------------------------------------
 
@@ -517,6 +557,12 @@ mapPerm_ f perm n0 arr0 = go n0 arr0 0
                 _ <- f x
                 go n arr (i+1)
 {-# INLINE mapPerm_ #-}
+
+
+foldPerm_ :: (acc -> b -> IO acc) -> acc -> Perm -> Int -> A.Array a -> IO acc
+foldPerm_ f acc0 perm n0 arr0 =
+   error "FINISH FOLDPERM"
+{-# INLINE foldPerm_ #-}
 
 unpackPerms :: Perms -> [[Int]]
 unpackPerms v =

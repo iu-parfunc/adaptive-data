@@ -20,6 +20,9 @@ import           Types                       (for_, forkJoin, rand, timeit)
 import qualified Data.Vector as V
 import qualified Data.Concurrent.Compact.Adaptive.PureToCompact as PCM
 import qualified Data.Concurrent.Ctrie                          as CM
+import           Data.IORef
+import qualified Data.HashMap.Strict   as HM
+
 
 
 {-# NOINLINE threads #-}
@@ -52,6 +55,7 @@ setupMap = do
     for_ 1 sz $ \v -> do
       k <- rand g range
       CM.insert k v pm
+  performGC; performGC
   return pm
 
 
@@ -63,18 +67,38 @@ parFreeze vec mp = do
          CM.freezeRandBottom (vec V.! ix) mp
   return ()
 
-main = do
+-- | Build the perms used by all threads.
+mkAllPerms :: IO (V.Vector CM.Perms)
+mkAllPerms = do 
   perms <- V.generateM threads (\_ -> CM.makePerms)
   evaluate (rnf perms)
-  do mp  <- timeit "Fill map" setupMap
+  return perms
+
+
+-- TODO: Criterionize.... but we need per-batch env initialization.
+benchFreeze :: IO ()
+benchFreeze = do
+  perms <- mkAllPerms
+  do mp  <- timeit "Fill map, first round" setupMap
      timeit "Freeze" (CM.freeze mp)
 
-  performGC; performGC
   do mp  <- timeit "" setupMap
      timeit "One FreezeRandBottom" (CM.freezeRandBottom (perms V.! 0) mp)
-
-  performGC; performGC
+  
   do mp  <- timeit "" setupMap
      timeit "Par FreezeRandBottom" (parFreeze perms mp)
-
   putStrLn "Done."
+
+benchConvert :: IO ()
+benchConvert = 
+  do perms <- mkAllPerms
+     do mp  <- timeit "" setupMap
+        acc <- newIORef HM.empty
+        timeit "One-thread Freeze+Convert combined" $ 
+               CM.freezeRandConvert (perms V.! 0) mp acc
+
+     putStrLn "Done."
+
+
+main :: IO ()
+main = benchConvert
