@@ -92,13 +92,19 @@ benchFreeze = do
 benchConvert :: IO ()
 benchConvert = 
   do perms <- mkAllPerms
+
+     do mp  <- timeit "" setupMap
+        timeit "Sequential freezeFold convert" $ void $
+           CM.freezeFold (\h k v -> HM.insert k v h) HM.empty mp
+
      do mp  <- timeit "" setupMap
         acc <- newIORef HM.empty
-        timeit "One-thread Freeze+Convert combined" $ 
+        timeit "One-thread Freeze+Convert bottom-up" $ 
                CM.freezeRandConvert (perms V.! 0) mp acc
 
      putStrLn "Done."
 
 
 main :: IO ()
-main = benchConvert
+main = do -- benchFreeze
+          benchConvert

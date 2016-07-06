@@ -2,6 +2,7 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE StrictData    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Data.Concurrent.Ctrie
     ( Map
@@ -342,15 +343,15 @@ freezeloop ref = spinlock $ freezeIORef ref
 freezeFold :: (a -> k -> v -> a) -> a -> Map k v -> IO a -- (Int, a)
 freezeFold fn zer (Map root) = go zer root
   where
-    go acc inode = do
+    go !acc inode = do
       freezeref inode
       main <- readIORef inode
       case main of
         CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
         Tomb (S k v) -> return $! fn acc k v
         Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
-    go2 acc (INode inode)   = go acc inode
-    go2 acc (SNode (S k v)) = return $! fn acc k v
+    go2 !acc (INode inode)   = go acc inode
+    go2 !acc (SNode (S k v)) = return $! fn acc k v
 {-# INLINE freezeFold #-}
 
 
@@ -479,6 +480,9 @@ freezeRandBottom perms (Map root) = go root
   where
     go inode = do
       main <- readFRef inode
+      -- FIXME: need freezing/frozen state.  Otherwise inode can
+      -- change between the recursion and the freezeref call.
+      
       -- This subtree was already frozen from the bottom, don't recur:
       case main of
         Frozen _ -> return ()
@@ -499,11 +503,23 @@ freezeRandBottom perms (Map root) = go root
 -- cooperating to build the output structure.
 freezeRandConvert :: forall k v . (Eq k, Hashable k) =>
                      Perms -> Map k v -> I.IORef (HM.HashMap k v) -> IO ()
+
+-- FIXME: This first parallel version is QUADRATIC.  It does an expensive union at each
+-- step of the tree.  It needs to be modified to only do this for the first couple
+-- recursions and then bottom out to the sequential version.
+
 freezeRandConvert perms (Map root) outref = void $ go root
   where
     go :: (INode k v) -> IO (HM.HashMap k v)
     go inode = do
       main <- readFRef inode
+
+      -- FIXME: the structure can still change until the freezeref.  This needs either
+      -- split freezing/frozen steps, or it needs to be speculative.  Speculative: If we
+      -- use casIORef and make sure the value has not changed when we write (freeze) it,
+      -- then I think by induction subtrees under us will be ok if we just check&CAS our
+      -- level.
+              
       tree <- case main of
                -- This subtree was already frozen, AND converted:
                Frozen _ -> return HM.empty -- Nothing to see here.
@@ -512,14 +528,19 @@ freezeRandConvert perms (Map root) outref = void $ go root
                    -- CNode bmp arr -> A.foldM' go2 acc (popCount bmp) arr
 
                    CNode bmp arr -> let len = (popCount bmp) in
-                                    foldPerm_ (\ acc x -> fmap (HM.union acc) (go2 x))
+                                    foldPerm_ (\ !acc x -> fmap (HM.union acc) (go2 x))
                                               HM.empty (permOf perms len) len arr
---                   Tomb (S k v) -> return $! HM.singleton k v
+                   Tomb (S k v) -> return $! HM.singleton k v
+-- FINISHME: 
 --                   Collision xs -> return $! List.foldl' (\ a (S k v) -> fn a k v) acc xs
-      -- We make exactly as many "commits" to the output as there are freezable refs:
+
+      -- We make exactly as many "commits" to the output as there are freezable refs.
       new <- I.atomicModifyIORef outref (\a -> let tr = HM.union tree a
                                                in (tr,tr))
-      -- Now it's safe to mark it, to prevent further merges of the same information:
+      -- There are several choices to make here about lazy vs strict,
+      -- speculative/wasteful vs blackhole-risk:
+
+      -- Now it's safe to mark it, to prevent further merges of redundant information:
       freezeref inode
       return new
     
@@ -559,9 +580,16 @@ mapPerm_ f perm n0 arr0 = go n0 arr0 0
 {-# INLINE mapPerm_ #-}
 
 
-foldPerm_ :: (acc -> b -> IO acc) -> acc -> Perm -> Int -> A.Array a -> IO acc
-foldPerm_ f acc0 perm n0 arr0 =
-   error "FINISH FOLDPERM"
+foldPerm_ :: (acc -> a -> IO acc) -> acc -> Perm -> Int -> A.Array a -> IO acc
+foldPerm_ fn acc0 perm n0 arr0 = go acc0 n0 arr0 0
+    where
+        go !acc n arr i
+            | i >= n = return acc
+            | otherwise = do
+                let ix = permGet perm i
+                x    <- A.indexArrayM arr ix
+                acc' <- fn acc x
+                go acc' n arr (i+1)
 {-# INLINE foldPerm_ #-}
 
 unpackPerms :: Perms -> [[Int]]
