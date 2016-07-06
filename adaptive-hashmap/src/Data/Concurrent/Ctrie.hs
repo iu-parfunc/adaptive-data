@@ -482,7 +482,8 @@ freezeRandBottom perms (Map root) = go root
       main <- readFRef inode
       -- FIXME: need freezing/frozen state.  Otherwise inode can
       -- change between the recursion and the freezeref call.
-      
+      spinlock $ startFreezeIORef inode =<< readForCAS inode
+              
       -- This subtree was already frozen from the bottom, don't recur:
       case main of
         Frozen _ -> return ()
