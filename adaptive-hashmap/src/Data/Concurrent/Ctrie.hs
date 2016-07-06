@@ -45,6 +45,7 @@ import qualified Data.Vector.Unboxed as UV
 -- import qualified Data.Vector.Unboxed.Mutable as UM
 
 import System.Random.Shuffle (shuffleM)
+import Data.List.Split (chunksOf)
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.
@@ -490,22 +491,27 @@ freezeRandBottom perms (Map root) = go root
 --------------------------------------------------------------------------------
 
 -- | A collection of random permutations of numbers [0..1], [0..2], ... [0..63].
+--   This is a FLATTENED vector of groups of 64 bytes.
+--   Each 64 bytes expresses ONE permutation, with mostly wasted bits for the smaller ones.
 type Perms = UV.Vector Perm
 
--- | Permutation of numbers [0..N] where N<64
+-- | A vector of exactly 64 bytes.
+-- type Perm = UV.Vector Word8
+
 type Perm = Word
--- Here we use 6 bits for each perm.
+
+bitsPerPerm = bitsPerSubkey
 
 -- | Take+drop the next number from a permutation.
 popPerm :: Perm -> (Int,Perm)
 popPerm p =
   ( fromIntegral (p .&. subkeyMask)
-   , p `unsafeShiftR` bitsPerSubkey)
+   , p `unsafeShiftR` bitsPerPerm)
 
 -- | Inverse of popPerm
 pushPerm :: Int -> Perm -> Perm
 pushPerm n p =
-   p `unsafeShiftL` bitsPerSubkey .|. fromIntegral n
+   p `unsafeShiftL` bitsPerPerm .|. fromIntegral n
 
 -- | Map in an order designated by the given permutation.
 mapPerm_ :: (a -> IO b) -> Perm -> Int -> A.Array a -> IO ()
@@ -534,9 +540,15 @@ numPerms :: Int
 numPerms = 10
 
 makePerms :: IO Perms
-makePerms =
-  UV.generateM numPerms
-   (\n -> do
-     -- There's no point in permuting 0 elements:
-     ls <- shuffleM [0..n]
-     return $! foldr pushPerm 0 ls)
+makePerms = do
+  vs <- sequence $
+   [ do -- There's no point in permuting 0 elements:
+        ls <- shuffleM [0..n]
+        -- This goes up to 8 chunks of 8:
+        let ps = map (foldr pushPerm 0) 
+               $ chunksOf 8 ls
+        return $ UV.fromList 
+               $ ps ++ replicate (8 - length ps) 0
+   | n <- [] ]
+  return $! UV.concat vs
+
