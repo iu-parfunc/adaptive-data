@@ -39,9 +39,13 @@ seed = 4096
 range :: Int64
 range = maxBound
 
-{-# NOINLINE size #-}
-size :: Int64
-size = unsafePerformIO $ read <$> getEnv "SIZE"
+{-# NOINLINE fromSize #-}
+fromSize :: Int64
+fromSize = unsafePerformIO $ read <$> getEnv "FROMSIZE"
+
+{-# NOINLINE toSize #-}
+toSize :: Int64
+toSize = unsafePerformIO $ read <$> getEnv "TOSIZE"
 
 {-# NOINLINE incr #-}
 incr :: Int64
@@ -58,7 +62,7 @@ measure f = do
   return $! T.rescale m
 
 nopBench :: IO [(Int64, Measured)]
-nopBench = T.fori' 0 size incr $
+nopBench = T.fori' fromSize toSize incr $
   \n -> measure . T.forkJoin threads $
     \chunk -> do
       g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
@@ -67,7 +71,7 @@ nopBench = T.fori' 0 size incr $
         return ()
 
 pureBench :: IO [(Int64, Measured)]
-pureBench = T.fori' 0 size incr $ \n -> do
+pureBench = T.fori' fromSize toSize incr $ \n -> do
   pm <- PM.newMap
   void . T.forkJoin threads $ \chunk -> do
     g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
@@ -82,7 +86,7 @@ pureBench = T.fori' 0 size incr $ \n -> do
         PM.get ix pm
 
 cnfpureBench :: IO [(Int64, Measured)]
-cnfpureBench = T.fori' 0 size incr $ \n -> do
+cnfpureBench = T.fori' fromSize toSize incr $ \n -> do
   pcm <- PCM.newMap
   void . T.forkJoin threads $ \chunk -> do
     g <- PCG.restore $ PCG.initFrozen (seed + fromIntegral chunk)
@@ -110,7 +114,7 @@ main = do
 
   let points = map (map (\(s, m) -> (s, measBytesCopied m))) zs
       term = SVG.cons "report.svg"
-      frameOpts = Opts.xLabel "Size" $ Opts.yLabel "GC time in seconds" $
+      frameOpts = Opts.xLabel "Ops" $ Opts.yLabel "Bytes copie during GC" $
         Opts.title "cold GC" $ Opts.grid True $ Opts.yFormat "%g" Opts.deflt
       lineSpecs = (\s -> LineSpec.lineWidth 1.5 $ LineSpec.pointSize 1 $
                      LineSpec.pointType s LineSpec.deflt) `map` ([4, 7, 8, 5, 1, 1] ++ [1,1 ..])
