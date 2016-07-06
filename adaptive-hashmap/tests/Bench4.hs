@@ -5,6 +5,7 @@
 
 module Main where
 
+import           Control.DeepSeq
 import           Control.Monad
 import           Data.Int
 import           Data.Word
@@ -36,7 +37,7 @@ seed :: Word64
 seed = 4096
 
 range :: Int64
-range = 2 ^ 10
+range = maxBound
 
 {-# NOINLINE size #-}
 size :: Int64
@@ -51,10 +52,10 @@ iters :: Int64
 iters = unsafePerformIO $ read <$> getEnv "ITERS"
 
 {-# INLINE measure #-}
-measure :: IO a -> IO Measured
+measure :: NFData a => IO a -> IO Measured
 measure f = do
   m <- T.measure iters f
-  return $ T.rescale m
+  return $! T.rescale m
 
 nopBench :: IO [(Int64, Measured)]
 nopBench = T.fori' 0 size incr $
