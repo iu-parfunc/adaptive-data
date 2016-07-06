@@ -118,7 +118,7 @@ hotCold GenericImpl { newMap, get, insert, transition } splits = do
                                                 else rand g range >>= \k -> insert k i m
       transition m
       tid <- myThreadId
-      putStrLn $ "[debug] Thread ID "++show tid++" out of transition..."
+      -- putStrLn $ "[debug] Thread ID "++show tid++" out of transition..."
       for_ offset2 (offset2 + phase2) $ \i ->
         if precompute
         then get (vec VU.! fromIntegral (i `mod` len)) m

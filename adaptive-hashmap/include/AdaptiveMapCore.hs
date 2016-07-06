@@ -116,57 +116,64 @@ transition m = do
         B  _ -> return ()
 
   -- We only measure time on the first thread to initiate:
-  gofreeze False cm = helper False cm
-  gofreeze True cm = do
+  -- gofreeze False cm = helper False cm
+  -- gofreeze True cm = do
+  gofreeze b cm = do
       st <- getCurrentTime
-      traceMarkerIO "StartFreeze"
-      helper True cm
-      traceMarkerIO "EndFreeze"
+      -- traceMarkerIO "StartFreeze"
+      helper b cm
+      -- traceMarkerIO "EndFreeze"
       en <- getCurrentTime
       -- This would be better as an event trace or something that doesn't mangle parallel output:
       putStrLn $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
   helper leader cm = 
    do
-      -- The basic algorithm:
-      -----------------------
-      -- This is about 115ms on 12 thread magramal, with the same command as above.
-      -- CM.freeze cm
-      -- pm <- PM.newMap
-      -- CM.unsafeTraverse_ (\ k v -> PM.ins k v pm) cm
+      pm <- case 3 of
+       -- The basic algorithm:
+       -----------------------
+       0 -> do 
+        -- This is about 115ms on 12 thread magramal, with the same command as above.
+        CM.freeze cm
+        pm <- PM.newMap
+        CM.unsafeTraverse_ (\ k v -> PM.ins k v pm) cm
+        return pm
 
-      -- A small optimization.  Single-pass version.
-      ------------------------
-      -- -- Huh, this one is about the same time.
-      -- -- pm <- PM.newMap
-      -- -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
-      -- hm <- CM.freezeFold (\h k v -> HM.insert k v h) HM.empty cm
-      -- pm <- PM.fromMap hm -- TODO: use fromMapSized
+       -- A small optimization.  Single-pass version.
+       ------------------------
+       1 -> do 
+        -- Huh, this one is about the same time.
+        -- pm <- PM.newMap
+        -- CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+        hm <- CM.freezeFold (\h k v -> HM.insert k v h) HM.empty cm
+        PM.fromMap hm -- TODO: use fromMapSized
 
-      -- Unfinished: polling, assymetric version:
-      -------------------------
-      let poller = do x <- readIORef m
-                      case x of
-                        A _  -> return True
-                        AB _ -> return True
-                        B _  -> return False -- Give up.  Someone else did it.
-      -- TODO: pollFreeze version:
-      -- if I-am-thread-zero-or-something
-      -- then normalFreeze
-      -- else pollFreeze poller
+       -- Unfinished: polling, assymetric version:
+       -------------------------
+       2 -> do 
+        let poller = do x <- readIORef m
+                        case x of
+                          A _  -> return True
+                          AB _ -> return True
+                          B _  -> return False -- Give up.  Someone else did it.
+        -- TODO: pollFreeze version:
+        -- if I-am-thread-zero-or-something
+        -- then normalFreeze
+        -- else pollFreeze poller
+        error "FINISHME: missing polling case in adaptive map"
 
-      -- [2016.07.06] A new, helping-based lock-free version:
-      -------------------------------------------------------
-
-      tid <- myThreadId
-      putStrLn$ "About to get my perms, tid = "++show tid++", leader? "++show leader
-      perms <- getTLS myPerms
-      putStrLn$ "My perms, tid = "++show tid++": "++take 40 (show (CM.unpackPerms perms))
-      acc   <- newIORef HM.empty
-      CM.freezeRandConvert perms cm acc
-      putStrLn$ "All done with freezeRandConvert, tid = "++show tid
-      hm <- readIORef acc
-      pm <- PM.fromMap hm -- TODO: use fromMapSized
+       -- [2016.07.06] A new, helping-based lock-free version:
+       -------------------------------------------------------
+       3 -> do 
+        tid <- myThreadId
+        debugPrint$ "About to get my perms, tid = "++show tid++", leader? "++show leader
+        perms <- getTLS myPerms
+        debugPrint$ "My perms, tid = "++show tid++": "++take 40 (show (CM.unpackPerms perms))
+        acc   <- newIORef HM.empty
+        CM.freezeRandConvert perms cm acc
+        debugPrint$ "All done with freezeRandConvert, tid = "++show tid
+        hm <- readIORef acc
+        PM.fromMap hm -- TODO: use fromMapSized
 
       --------------------------
       let install tik =
@@ -181,6 +188,9 @@ transition m = do
       tik <- readForCAS m
       install tik
 
+
+-- debugPrint m = putStrLn m
+debugPrint m = return ()
 
 {-# INLINE fromList #-}
 fromList :: (Eq k, Hashable k) => [(k, v)] -> IO (AdaptiveMap k v)
