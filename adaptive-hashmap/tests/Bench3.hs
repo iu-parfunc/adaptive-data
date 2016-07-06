@@ -38,7 +38,7 @@ seed :: Word64
 seed = 4096
 
 range :: Int64
-range = 2 ^ 63
+range = maxBound
 
 {-# NOINLINE size #-}
 size :: Int64

@@ -141,6 +141,14 @@ measured = Measured
 getTime :: IO Double
 getTime = ((1.0e-9 *) . fromInteger . C.toNanoSecs) `fmap` C.getTime C.Monotonic
 
+timeit :: String -> IO a -> IO a
+timeit msg act = do
+  st <- getTime
+  x  <- act
+  en <- getTime
+  putStrLn $ msg ++ ", time: " ++ show (en-st)
+  return x
+
 getCPUTime :: IO Double
 getCPUTime = ((1.0e-9 *) . fromInteger . C.toNanoSecs) `fmap` C.getTime C.ProcessCPUTime
 

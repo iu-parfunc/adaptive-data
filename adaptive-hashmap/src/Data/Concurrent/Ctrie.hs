@@ -354,6 +354,7 @@ unsafeTraverse_ fn (Map root) = go root
 
 -- | A blocking O(N) freeze operation that proceeds from root to leaves.
 freeze :: Map k v -> IO ()
+-- Can't use freezeAndTraverse_ here because of the Collision/mapM_ case.
 freeze (Map root) = go root
   where
     go inode = do
