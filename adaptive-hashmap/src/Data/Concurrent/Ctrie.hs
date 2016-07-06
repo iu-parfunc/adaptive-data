@@ -39,6 +39,12 @@ import           Prelude       hiding (lookup)
 
 import           Data.Concurrent.IORef
 import qualified Data.Concurrent.Map.Array as A
+
+-- import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
+-- import qualified Data.Vector.Unboxed.Mutable as UM
+
+import System.Random.Shuffle (shuffleM)
 -----------------------------------------------------------------------
 
 -- | A map from keys @k@ to values @v@.
@@ -340,25 +346,6 @@ freezeFold fn zer (Map root) = go zer root
 {-# INLINE freezeFold #-}
 
 
--- | Parallel freezing experiment.  This freeze is BOTTOM UP, leaves first.
-freezeRandBottom :: Map k v -> IO ()
-freezeRandBottom (Map root) = go root
-  where
-    go inode = do
-      main <- readFRef inode
-      case main of
-        Frozen _ -> return ()
-        Val x -> do
-          case x of
-            -- TODO: take a permutation and use it as the traversal order.
-            CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
-            Tomb (S _ _)  -> return ()
-            Collision _   -> return ()
-      freezeref inode
-    go2 (INode inode)   = go inode
-    go2 (SNode (S _ _)) = return ()
-
-
 -- | A non-allocating way to traverse a frozen structure.
 unsafeTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
 unsafeTraverse_ fn (Map root) = go root
@@ -477,3 +464,79 @@ prevLevel = subtract bitsPerSubkey
 --        goM (Collision xs) = putStr $ "(Collision " ++ show xs ++ ")"
 --        goB (INode i) = putStr "\n" >> goI i
 --        goB (SNode (S k v)) = putStr $ "(" ++ (show k) ++ "," ++ (show v) ++ ")"
+
+-- | Parallel freezing experiment.  This freeze is BOTTOM UP, leaves first.
+freezeRandBottom :: Perms -> Map k v -> IO ()
+freezeRandBottom perms (Map root) = go root
+  where
+    go inode = do
+      main <- readFRef inode
+      case main of
+        -- This subtree was already frozen from the bottom, don't recur:
+        Frozen _ -> return ()
+        Val x -> do
+          case x of
+            -- TODO: take a permutation and use it as the traversal order.
+            CNode bmp arr -> let len = (popCount bmp) in
+                             if len==0
+                             then error "Does this happen?"
+                             else mapPerm_ go2 (perms UV.! len-1) len arr
+            Tomb (S _ _)  -> return ()
+            Collision _   -> return ()
+      freezeref inode
+    go2 (INode inode)   = go inode
+    go2 (SNode (S _ _)) = return ()
+
+--------------------------------------------------------------------------------
+
+-- | A collection of random permutations of numbers [0..1], [0..2], ... [0..63].
+type Perms = UV.Vector Perm
+
+-- | Permutation of numbers [0..N] where N<64
+type Perm = Word
+-- Here we use 6 bits for each perm.
+
+-- | Take+drop the next number from a permutation.
+popPerm :: Perm -> (Int,Perm)
+popPerm p =
+  ( fromIntegral (p .&. subkeyMask)
+   , p `unsafeShiftR` bitsPerSubkey)
+
+-- | Inverse of popPerm
+pushPerm :: Int -> Perm -> Perm
+pushPerm n p =
+   p `unsafeShiftL` bitsPerSubkey .|. fromIntegral n
+
+-- | Map in an order designated by the given permutation.
+mapPerm_ :: (a -> IO b) -> Perm -> Int -> A.Array a -> IO ()
+mapPerm_ f p_ n_ arr_ = go p_ n_ arr_ 0
+    where
+        go p n arr i
+            | i >= n = return ()
+            | otherwise = do
+                let (ix,p') = popPerm p
+                x <- A.indexArrayM arr ix
+                _ <- f x
+                go p' n arr (i+1)
+{-# INLINE mapPerm_ #-}
+
+unpackPerms :: Perms -> [[Int]]
+unpackPerms v =
+  [ loop (i+1) (v UV.! i)
+  | i <- [0 .. numPerms-1] ]
+  where
+   loop 0 _ = []
+   loop n p = let (x,y) = popPerm p in
+              x : loop (n-1) y
+
+-- FIXME: this needs to change to 64 to complete this algorithm...
+numPerms :: Int
+numPerms = 10
+
+makePerms :: IO Perms
+makePerms =
+  UV.generateM numPerms
+   (\n -> do
+     -- There's no point in permuting 0 elements:
+     ls <- shuffleM [0..n]
+     return $! foldr pushPerm 0 ls)

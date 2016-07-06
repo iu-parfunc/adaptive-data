@@ -12,6 +12,7 @@ import           Data.Word
 import           GHC.Generics
 import           System.Environment
 import           System.IO.Unsafe
+import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 import           Types                       (for_, forkJoin, rand, timeit)
 
@@ -52,8 +53,13 @@ setupMap = do
   return pm
 
 main = do
-  mp  <- timeit "Fill map" setupMap
+  -- TODO: Make this one per thread:
+  perms <- CM.makePerms
+  do mp  <- timeit "Fill map" setupMap
+     timeit "Freeze" (CM.freeze mp)
 
-  timeit "Freeze" (CM.freeze mp)
+  performGC; performGC
+  do mp  <- timeit "Fill map" setupMap
+     timeit "FreezeRandBottom" (CM.freezeRandBottom perms mp)
 
   putStrLn "Done."

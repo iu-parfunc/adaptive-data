@@ -8,6 +8,8 @@ module Data.Concurrent.Map.Array
     , head, index
     , insert, update, delete
     , mapM, mapM_, foldM'
+    -- Reexport:
+    , indexArrayM
     ) where
 
 import Control.Monad.Primitive
