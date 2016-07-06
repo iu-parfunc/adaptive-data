@@ -11,7 +11,7 @@ import           Data.IORef
 import           Data.Time.Clock
 import           Debug.Trace (traceEventIO, traceMarkerIO)
 import           Control.DeepSeq
-import           GHC.Conc (yield)
+import           GHC.Conc (yield, myThreadId)
 import           System.IO.Unsafe (unsafePerformIO)
 
 -- import qualified Data.Map as M
@@ -103,10 +103,10 @@ transition m = do
   -- Option (0) just let transition return even if we're not in B state:
   -- wait _ = return ()
   -- Option (1), spin until we reach the B state.  NOT LOCK FREE!  
-  wait _ = sleepWait
+  -- wait _ = sleepWait
   -- Option (2): block on an MVar.  TODO!
   -- Option (3): Help by also calling freeze!
-  -- wait = gofreeze False
+  wait = gofreeze False
 
   sleepWait =
    do t <- readIORef m
@@ -116,17 +116,17 @@ transition m = do
         B  _ -> return ()
 
   -- We only measure time on the first thread to initiate:
-  gofreeze False cm = helper cm
+  gofreeze False cm = helper False cm
   gofreeze True cm = do
       st <- getCurrentTime
       traceMarkerIO "StartFreeze"
-      helper cm
+      helper True cm
       traceMarkerIO "EndFreeze"
       en <- getCurrentTime
       -- This would be better as an event trace or something that doesn't mangle parallel output:
       putStrLn $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
-  helper cm = 
+  helper leader cm = 
    do
       -- The basic algorithm:
       -----------------------
@@ -157,10 +157,14 @@ transition m = do
 
       -- [2016.07.06] A new, helping-based lock-free version:
       -------------------------------------------------------
-      
+
+      tid <- myThreadId
+      putStrLn$ "About to get my perms, tid = "++show tid++", leader? "++show leader
       perms <- getTLS myPerms
+      putStrLn$ "My perms, tid = "++show tid++": "++take 40 (show (CM.unpackPerms perms))
       acc   <- newIORef HM.empty
       CM.freezeRandConvert perms cm acc
+      putStrLn$ "All done with freezeRandConvert, tid = "++show tid
       hm <- readIORef acc
       pm <- PM.fromMap hm -- TODO: use fromMapSized
 
@@ -188,7 +192,7 @@ fromList l = do
 {-# NOINLINE myPerms #-}
 myPerms :: TLS CM.Perms
 myPerms = unsafePerformIO $
-          mkTLS (do putStrLn "YAY, making perms!"
+          mkTLS (do -- putStrLn "YAY, making perms!"
                     CM.makePerms)
 
 -- permTable :: IORef (M.Map ThreadId CM.Perms)

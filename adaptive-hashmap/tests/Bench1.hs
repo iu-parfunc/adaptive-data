@@ -38,9 +38,14 @@ import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
 import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
 import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
+import System.Mem
+import GHC.Conc
 import GHC.Stats (getGCStats)
+import Data.TLS.PThread
 
 import Types
+
+import qualified Data.Concurrent.Adaptive.AdaptiveMap            as AM
 
 {-# INLINABLE forkNIns #-}
 forkNIns :: GenericImpl m -> Int -> Bench Measured
@@ -112,10 +117,19 @@ hotCold GenericImpl { newMap, get, insert, transition } splits = do
                                                 then insert (vec VU.! fromIntegral (i `mod` len)) i m
                                                 else rand g range >>= \k -> insert k i m
       transition m
-      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+      tid <- myThreadId
+      putStrLn $ "[debug] Thread ID "++show tid++" out of transition..."
+      for_ offset2 (offset2 + phase2) $ \i ->
         if precompute
-          then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand g range >>= \k -> get k m
+        then get (vec VU.! fromIntegral (i `mod` len)) m
+        else do k <- rand g range
+                get k m
+
+-- Again, this is non-tail recursive and may be quadratic due to deep strictness:
+      -- fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+      --   if precompute
+      --     then get (vec VU.! fromIntegral (i `mod` len)) m
+      --     else rand g range >>= \k -> get k m
 
 {-# INLINABLE hotPhase #-}
 hotPhase :: GenericImpl m -> Int -> Bench Measured
@@ -200,7 +214,7 @@ coldPhase GenericImpl { newMap, get, insert, transition, state, size } splits = 
             do ix <- rand g range
                get ix m
 
--- [2016.06.25] This is non-tail-recursive:
+-- [2016.06.25] This fold is non-tail-recursive:
       -- fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
       --   if precompute
       --     then get (vec VU.! fromIntegral (i `mod` len)) m
@@ -239,7 +253,9 @@ runAll !fn = do
   !runs <- reader runs
   !flag <- ask
   liftIO $! fori minthreads maxthreads $! \i -> do
-    putStrLn $ "  Running threads = " ++ show i
+    setNumCapabilities i
+    putStrLn $ "  Running threads = " ++ show i ++".  NumCapabilities set."
+    performGC
     hFlush stdout
     t <- run runs $! runReaderT (fn i) flag
     putStrLn $ "\n  Time reported: " ++ show (measTime t)
@@ -330,22 +346,26 @@ main = do
   args <- CA.cmdArgs flag
   caps <- getNumCapabilities
 
-  _ <- forkIO gcWorkMaker
+-- Experiment in sharing the RTS with a high allocating background task.
+--  _ <- forkIO gcWorkMaker
 
-  putStrLn $ "Creating random Ints of size: "++show (maxsize args)
+  (randomInts,randomPairs) <-
+        if (precompute args) then do 
+          putStrLn $ "Creating random Ints of size: "++show (maxsize args)
 
-  !gen <- PCG.createSystemRandom
-  -- !randomInts <- VU.replicateM (maxsize args) (PCG.uniformR (0, range args) gen :: IO Int64)
-  -- !randomPairs <- VU.replicateM (initial args)
-  --                   (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
-  let howMuchRandomness = 10000
+          !gen <- PCG.createSystemRandom
+          -- !randomInts <- VU.replicateM (maxsize args) (PCG.uniformR (0, range args) gen :: IO Int64)
+          -- !randomPairs <- VU.replicateM (initial args)
+          --                   (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
+          let howMuchRandomness = 10000
 
-  !randomInts <- VU.replicateM howMuchRandomness (PCG.uniformR (0, range args) gen :: IO Int64)
-  !randomPairs <- VU.replicateM howMuchRandomness
-                    (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
+          !ints  <- VU.replicateM howMuchRandomness (PCG.uniformR (0, range args) gen :: IO Int64)
+          !pairs <- VU.replicateM howMuchRandomness
+                      (PCG.uniformR ((0, 0), (range args, range args)) gen :: IO (Int64, Int64))
+          return (ints,pairs)
 
-  -- let randomInts = error "don't use randomInts"
-  --     randomPairs = error "don't use randomPairs"
+        else -- (error "don't use randomInts", error "don't use randomPairs")
+             return (VU.empty, VU.empty)
 
   let !opts = args
         { maxthreads = if maxthreads args <= 0
@@ -369,6 +389,12 @@ main = do
   putStrLn $ "MaxThreads:    " ++ show (maxthreads opts)
   putStrLn $ "Key range:     " ++ show (range opts)
   putStrLn $ "Precompute:    " ++ show (precompute opts)
+  hFlush stdout
+
+  forkJoin (maxthreads opts) $ \_ -> do
+    v <- getTLS AM.myPerms
+    evaluate v
+  putStrLn "Initialized thread-local permutation state." 
   hFlush stdout
 
   !zs <- forM vs $! \variant -> do

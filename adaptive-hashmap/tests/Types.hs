@@ -262,6 +262,7 @@ for_ start end fn = loop start
       | i > end = return ()
       | otherwise = fn i >>= liftIO . E.evaluate . rnf >> loop (i + 1)
 
+-- WARNING!! THIS IS NOT TAIL RECURSIVE!
 {-# INLINABLE fold #-}
 fold :: (Num n, Ord n, Monad m, NFData b) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b
 fold start end _ _ _
@@ -273,6 +274,7 @@ fold start end !z fld fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
+          -- Doesn't this deep strictness at each iter make this QUADRATIC!
           return $!! fld xs x
 
 for :: (Num n, Ord n, Monad m, NFData a) => n -> n -> (n -> m a) -> m [a]

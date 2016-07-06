@@ -30,7 +30,7 @@ module Data.Concurrent.Ctrie
     , freezeRandBottom
     , freezeRandConvert      
     -- Temporarily exposed:
-    , makePerms, Perms
+    , makePerms, Perms, unpackPerms
     ) where
 
 --import Control.Applicative ((<$>))
