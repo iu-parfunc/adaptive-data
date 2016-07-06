@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE RecordWildCards      #-}
@@ -18,6 +19,7 @@ import           Control.Monad.Reader
 import           Data.Int
 import           Data.List                   (sort)
 import qualified Data.Vector.Unboxed         as VU
+import           GHC.Generics
 import           GHC.Stats                   (GCStats (..))
 import qualified GHC.Stats                   as Stats
 import           GHC.Word
@@ -25,8 +27,8 @@ import qualified System.Clock                as C
 import           System.Console.CmdArgs      (def, help, ignore, (&=))
 import qualified System.Console.CmdArgs      as CA
 import           System.CPUTime.Rdtsc
-import           System.Mem
 import           System.IO
+import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import qualified Data.Concurrent.Adaptive.AdaptiveMap            as AM
@@ -120,7 +122,7 @@ data Measured =
          , measGcWallSeconds      :: !Double
          , measGcCpuSeconds       :: !Double
          }
-  deriving (Eq, Ord, Read, Show)
+  deriving (Eq, Ord, Read, Show, Generic, NFData)
 
 measured :: Measured
 measured = Measured
@@ -147,7 +149,7 @@ timeit msg act = do
   st <- getTime
   x  <- act
   en <- getTime
-  when (msg /= "") $  do 
+  when (msg /= "") $  do
     putStrLn $ msg ++ ", time: " ++ show (en-st)
     hFlush stdout
   return x
@@ -261,7 +263,7 @@ for_ start end fn = loop start
       | otherwise = fn i >>= liftIO . E.evaluate . rnf >> loop (i + 1)
 
 {-# INLINABLE fold #-}
-fold :: (Num n, Ord n, Monad m) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b
+fold :: (Num n, Ord n, Monad m, NFData b) => n -> n -> b -> (b -> a -> b) -> (n -> m a) -> m b
 fold start end _ _ _
   | start > end = error "start greater than end"
 fold start end !z fld fn = loop start
@@ -271,9 +273,9 @@ fold start end !z fld fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $! fld xs x
+          return $!! fld xs x
 
-for :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [a]
+for :: (Num n, Ord n, Monad m, NFData a) => n -> n -> (n -> m a) -> m [a]
 for start end _
   | start > end = error "start greater than end"
 for start end fn = loop start
@@ -283,10 +285,10 @@ for start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $! x : xs
+          return $!! x : xs
 
 {-# INLINABLE fori #-}
-fori :: (Num n, Ord n, Monad m) => n -> n -> (n -> m a) -> m [(n, a)]
+fori :: (Num n, Ord n, MonadIO m, NFData n, NFData a) => n -> n -> (n -> m a) -> m [(n, a)]
 fori start end _
   | start > end = error "start greater than end"
 fori start end fn = loop start
@@ -296,10 +298,10 @@ fori start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $! (i, x) : xs
+          return $!! (i, x) : xs
 
 {-# INLINABLE fori' #-}
-fori' :: (Num n, Ord n, Monad m) => n -> n -> n -> (n -> m a) -> m [(n, a)]
+fori' :: (Num n, Ord n, MonadIO m, NFData n, NFData a) => n -> n -> n -> (n -> m a) -> m [(n, a)]
 fori' start end _ _
   | start > end = error "start greater than end"
 fori' start end step fn = loop start
@@ -309,7 +311,7 @@ fori' start end step fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + step)
-          return $! (i, x) : xs
+          return $!! (i, x) : xs
 
 data GenericImpl m =
   GenericImpl
@@ -326,6 +328,7 @@ data GenericImpl m =
 nop :: Applicative m => a -> m ()
 nop _ = pure ()
 
+nopImpl :: GenericImpl ()
 nopImpl = GenericImpl
             (return ())
             (\_ _ -> return Nothing)
@@ -338,8 +341,10 @@ nopImpl = GenericImpl
 pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
 pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
 
+ctrieImpl :: GenericImpl (CM.Map Int64 Int64)
 ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
 
+adaptiveImpl :: GenericImpl (AM.AdaptiveMap Int64 Int64)
 adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size AM.getState
 -- Quick hack below, start in B state
 -- ----------------------------------
@@ -349,6 +354,8 @@ adaptiveImpl = GenericImpl AM.newMap AM.get AM.ins AM.del AM.transition AM.size 
 -- adaptiveImpl = GenericImpl AM.newBMap AM.get AM.ins AM.del AM.transition AM.size
 -- ----------------------------------
 
+ccadaptiveImpl :: GenericImpl (CCM.AdaptiveMap Int64 Int64)
 ccadaptiveImpl = GenericImpl CCM.newMap CCM.get CCM.ins CCM.del CCM.transition CCM.size CCM.getState
 
+pcadaptiveImpl :: GenericImpl (PCM.AdaptiveMap Int64 Int64)
 pcadaptiveImpl = GenericImpl PCM.newMap PCM.get PCM.ins PCM.del PCM.transition PCM.size PCM.getState
