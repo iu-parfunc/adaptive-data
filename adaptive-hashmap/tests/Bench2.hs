@@ -20,6 +20,7 @@ import qualified Data.Vector.Unboxed         as VU
 import qualified System.Console.CmdArgs      as CA
 import           System.Directory
 import           System.IO
+import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import           Graphics.Gnuplot.Advanced
