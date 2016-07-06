@@ -53,5 +53,5 @@ resolver: nightly-2016-06-21
 # You can optionally build with `stack build --docker`:
 docker:
   # Enabling this is handy for emacs haskell-mode integration on Mac:
-  enable: true
+  enable: false
   repo: "vikraman/ghc-mutable-cnf:0.5"
