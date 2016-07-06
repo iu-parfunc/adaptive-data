@@ -259,3 +259,32 @@ calls and may have been thunks.  Running again with precompute=true:
   pure: Time reported: 33.825190771371126, cycles: 77797588694, numGcs: 14021, allocated: 16656209160, gcCpuSeconds: 567.7881035549999, copied: 23,132,503,216
 
 WHAT!?  It was precompute=true, but now the numbers shot way back up compared to the run abve with "one" GC.
+
+
+
+
+
+
+[2016.07.06] {Working on parallel freezing and possibly converting}
+-------------------------------------------------------------------
+
+Parallel freezing works fine.
+
+About to add the freezing->frozen step to it.  Before that, running
+with SIZE=10M gives:
+
+    Set numCap to 4
+    Fill map, first round, time: 5.677610912942328
+    Freeze, time: 0.17408160504419357
+    One FreezeRandBottom, time: 0.3177041580202058
+    Par FreezeRandBottom, time: 9.450231201481074e-2
+
+That's from veronica, not in a totally quiet state.
+Ok with the two phase freezing/frozen modification, it still gets a
+reasonable speedup:
+
+    Fill map, first round, time: 7.328612233977765
+    Freeze, time: 0.17265749897342175
+    One FreezeRandBottom, time: 0.30203769891522825
+    Par FreezeRandBottom, time: 8.890546602196991e-2
+

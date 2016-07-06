@@ -27,6 +27,7 @@ import qualified System.Clock                as C
 import           System.Console.CmdArgs      (def, help, ignore, (&=))
 import qualified System.Console.CmdArgs      as CA
 import           System.CPUTime.Rdtsc
+import           System.IO
 import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
@@ -148,8 +149,9 @@ timeit msg act = do
   st <- getTime
   x  <- act
   en <- getTime
-  when (msg /= "") $
+  when (msg /= "") $  do
     putStrLn $ msg ++ ", time: " ++ show (en-st)
+    hFlush stdout
   return x
 
 getCPUTime :: IO Double

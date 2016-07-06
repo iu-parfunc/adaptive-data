@@ -11,6 +11,7 @@ module Data.Concurrent.IORef (
     readForCAS,
     peekTicket,
     freezeIORef,
+    startFreezeIORef,
     spinlock,
     CASIORefException(CASIORefException),
     TransitionException(TransitionException),
@@ -25,8 +26,9 @@ import           Data.Typeable
 newtype IORef t = IORef (IR.IORef (IOVal t))
   deriving (Eq, Typeable)
 
-data IOVal t = Val t
-             | Frozen t
+data IOVal t = Val      t
+             | Freezing t
+             | Frozen   t
   deriving (Show, Typeable)
 
 data CASIORefException = CASIORefException deriving (Show, Typeable)
@@ -46,10 +48,11 @@ readIORef :: IORef a -> IO a
 readIORef (IORef ref) = do
   v <- IR.readIORef ref
   case v of
-    Val t    -> return t
-    Frozen t -> return t
+    Val      t -> return t
+    Freezing t -> return t
+    Frozen   t -> return t
 
--- | Read and also retain the frozen bit.
+-- | Read and also retain the frozen bit(s).
 {-# INLINABLE readFRef #-}
 readFRef :: IORef a -> IO (IOVal a)
 readFRef (IORef ref) = IR.readIORef ref
@@ -63,22 +66,35 @@ readForCAS (IORef ref) = A.readForCAS ref
 peekTicket :: A.Ticket (IOVal a) -> a
 peekTicket tik =
   case A.peekTicket tik of
-    Val t    -> t
-    Frozen t -> t
+    Val      t -> t
+    Freezing t -> t
+    Frozen   t -> t
 
 {-# INLINABLE casIORef #-}
 casIORef :: IORef a -> A.Ticket (IOVal a) -> a -> IO(Bool, A.Ticket (IOVal a))
 casIORef (IORef ref) tik a =
   case A.peekTicket tik of
-    Frozen _ -> throwIO CASIORefException
-    Val _    -> A.casIORef ref tik $ Val a
+    Freezing _ -> throwIO CASIORefException
+    Frozen   _ -> throwIO CASIORefException
+    Val   _    -> A.casIORef ref tik $ Val a
 
+-- | Take it all the way to the Frozen state.
 {-# INLINABLE freezeIORef #-}
 freezeIORef :: IORef a -> A.Ticket (IOVal a) -> IO(Bool, A.Ticket (IOVal a))
 freezeIORef (IORef ref) tik =
+  case A.peekTicket tik of    
+    Val      a -> A.casIORef ref tik $ Frozen a
+    Freezing a -> A.casIORef ref tik $ Frozen a
+    Frozen   _ -> return (True, tik)
+
+-- | Put it into the freezing state, unless its already frozen.
+startFreezeIORef :: IORef a -> A.Ticket (IOVal a) -> IO(Bool, A.Ticket (IOVal a))
+startFreezeIORef (IORef ref) tik =
   case A.peekTicket tik of
-    Frozen _ -> return (True, tik)
-    Val a    -> A.casIORef ref tik $ Frozen a
+    Val  a    -> A.casIORef ref tik $ Freezing a
+    Freezing _ -> return (True, tik)
+    Frozen  _ -> return (True, tik)
+
 
 -- FIXME: this looks likely to be alloc-free.  A good spinlock
 -- should back off after a little while to do thread yield.
