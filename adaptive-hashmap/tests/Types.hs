@@ -275,7 +275,7 @@ fold start end !z fld fn = loop start
           !x <- fn i
           !xs <- loop (i + 1)
           -- Doesn't this deep strictness at each iter make this QUADRATIC!
-          return $!! fld xs x
+          return $! fld xs x
 
 for :: (Num n, Ord n, Monad m, NFData a) => n -> n -> (n -> m a) -> m [a]
 for start end _
@@ -287,7 +287,7 @@ for start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $!! x : xs
+          return $! x : xs
 
 {-# INLINABLE fori #-}
 fori :: (Num n, Ord n, MonadIO m, NFData n, NFData a) => n -> n -> (n -> m a) -> m [(n, a)]
@@ -300,7 +300,7 @@ fori start end fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + 1)
-          return $!! (i, x) : xs
+          return $! (i, x) : xs
 
 {-# INLINABLE fori' #-}
 fori' :: (Num n, Ord n, MonadIO m, NFData n, NFData a) => n -> n -> n -> (n -> m a) -> m [(n, a)]
@@ -313,7 +313,7 @@ fori' start end step fn = loop start
       | otherwise = do
           !x <- fn i
           !xs <- loop (i + step)
-          return $!! (i, x) : xs
+          return $! (i, x) : xs
 
 data GenericImpl m =
   GenericImpl
