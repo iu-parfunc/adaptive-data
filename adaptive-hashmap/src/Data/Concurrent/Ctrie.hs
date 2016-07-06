@@ -481,7 +481,7 @@ freezeRandBottom perms (Map root) = go root
             CNode bmp arr -> let len = (popCount bmp) in
                              if len==0
                              then error "Does this happen?"
-                             else mapPerm_ go2 (perms UV.! len-1) len arr
+                             else mapPerm_ go2 (permOf perms len) len arr
             Tomb (S _ _)  -> return ()
             Collision _   -> return ()
       freezeref inode
@@ -493,47 +493,36 @@ freezeRandBottom perms (Map root) = go root
 -- | A collection of random permutations of numbers [0..1], [0..2], ... [0..63].
 --   This is a FLATTENED vector of groups of 64 bytes.
 --   Each 64 bytes expresses ONE permutation, with mostly wasted bits for the smaller ones.
-type Perms = UV.Vector Perm
+type Perms = UV.Vector Word8
 
 -- | A vector of exactly 64 bytes.
--- type Perm = UV.Vector Word8
+type Perm = UV.Vector Word8
 
-type Perm = Word
+-- | Extract the permutation of N elements from a full deck of permutations.
+permOf :: Perms -> Int -> Perm
+permOf p n = UV.slice (64*(n-1)) 64 p
 
-bitsPerPerm = bitsPerSubkey
-
--- | Take+drop the next number from a permutation.
-popPerm :: Perm -> (Int,Perm)
-popPerm p =
-  ( fromIntegral (p .&. subkeyMask)
-   , p `unsafeShiftR` bitsPerPerm)
-
--- | Inverse of popPerm
-pushPerm :: Int -> Perm -> Perm
-pushPerm n p =
-   p `unsafeShiftL` bitsPerPerm .|. fromIntegral n
+permGet :: Perms -> Int -> Int
+permGet p i = fromIntegral $! p UV.! i 
 
 -- | Map in an order designated by the given permutation.
 mapPerm_ :: (a -> IO b) -> Perm -> Int -> A.Array a -> IO ()
-mapPerm_ f p_ n_ arr_ = go p_ n_ arr_ 0
+mapPerm_ f perm n0 arr0 = go n0 arr0 0
     where
-        go p n arr i
+        go n arr i
             | i >= n = return ()
             | otherwise = do
-                let (ix,p') = popPerm p
+                let ix = permGet perm i
                 x <- A.indexArrayM arr ix
                 _ <- f x
-                go p' n arr (i+1)
+                go n arr (i+1)
 {-# INLINE mapPerm_ #-}
 
 unpackPerms :: Perms -> [[Int]]
 unpackPerms v =
-  [ loop (i+1) (v UV.! i)
-  | i <- [0 .. numPerms-1] ]
-  where
-   loop 0 _ = []
-   loop n p = let (x,y) = popPerm p in
-              x : loop (n-1) y
+  let ll = chunksOf 64 $ UV.toList v in
+  [ map fromIntegral $ take n l
+  | (n,l) <- zip [1..] ll ]
 
 -- FIXME: this needs to change to 64 to complete this algorithm...
 numPerms :: Int
@@ -543,12 +532,8 @@ makePerms :: IO Perms
 makePerms = do
   vs <- sequence $
    [ do -- There's no point in permuting 0 elements:
-        ls <- shuffleM [0..n]
-        -- This goes up to 8 chunks of 8:
-        let ps = map (foldr pushPerm 0) 
-               $ chunksOf 8 ls
-        return $ UV.fromList 
-               $ ps ++ replicate (8 - length ps) 0
-   | n <- [] ]
+        ls <- shuffleM [0 .. fromIntegral n]
+        return $ UV.fromList $ ls ++ replicate (63 - n) 0 
+   | n <- [0..63] ]
   return $! UV.concat vs
 
