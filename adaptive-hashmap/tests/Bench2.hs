@@ -70,10 +70,11 @@ hotCold GenericImpl { newMap, get, insert, transition } ops = do
                                                 then insert (vec VU.! fromIntegral (i `mod` len)) i m
                                                 else rand g range >>= \k -> insert k i m
       transition m
-      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+      for_ offset2 (offset2 + phase2) $ \i ->
         if precompute
-          then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand g range >>= \k -> get k m
+        then get (vec VU.! fromIntegral (i `mod` len)) m
+        else do k <- rand g range
+                get k m
 
 {-# INLINE runAll #-}
 runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
