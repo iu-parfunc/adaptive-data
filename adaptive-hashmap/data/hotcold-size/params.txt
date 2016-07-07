@@ -1,0 +1,1 @@
+stack bench adaptive-hashmap:bench-adaptive-hashmap-2 '--benchmark-arguments=--doplot --export --initial=0 --range=4294967296 --ops=10000000 --maxsize=100000000 --stepsize=10000000 --bench=hotcold --runs=25 --maxthreads=16 --ratio=200 --variants=pure --variants=ctrie --variants=adaptive +RTS -qa'
