@@ -117,8 +117,7 @@ transition m = do
         B  _  -> return ()
 
   -- We only measure time on the first thread to initiate:
-  -- gofreeze False cm = helper False cm
-  -- gofreeze True cm = do
+  gofreeze False cm pm = helper False cm pm -- Comment this line to get more output.
   gofreeze b cm pm = do
       st <- getCurrentTime
       -- traceMarkerIO "StartFreeze"
