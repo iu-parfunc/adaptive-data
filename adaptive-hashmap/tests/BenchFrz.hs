@@ -124,6 +124,6 @@ main :: IO ()
 main = do setNumCapabilities threads
           putStrLn $ "Set numCap to "++show threads
           hFlush stdout
-          benchFreeze
+          -- benchFreeze
           hFlush stdout
           benchConvert

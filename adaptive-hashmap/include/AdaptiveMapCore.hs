@@ -17,8 +17,8 @@ import           System.IO.Unsafe (unsafePerformIO)
 -- import qualified Data.Map as M
 import Data.TLS.PThread
 
-data Hybrid k v = A (CM.Map k v)
-                | AB (CM.Map k v)
+data Hybrid k v = A  (CM.Map k v)
+                | AB (CM.Map k v) (PM.PureMap k v)
                 | B (PM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
@@ -28,7 +28,7 @@ getState r =
   do m <- readIORef r
      case m of
        A _  -> return "A"
-       AB _ -> return "AB"
+       AB {} -> return "AB"
        B _  -> return "B"
 
 {-# INLINE newMap #-}
@@ -49,18 +49,18 @@ get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
 get k m = do
   state <- readIORef m
   case state of
-    A cm  -> CM.lookup k cm
-    AB cm -> CM.lookup k cm
-    B pm  -> PM.get k pm
+    A  cm   -> CM.lookup k cm
+    AB cm _ -> CM.lookup k cm
+    B  pm   -> PM.get k pm
 
 {-# INLINE size #-}
 size :: AdaptiveMap k v -> IO Int
 size m = do
   state <- readIORef m
   case state of
-    A cm  -> CM.size cm
-    AB cm -> CM.size cm
-    B pm  -> PM.size pm
+    A  cm   -> CM.size cm
+    AB cm _ -> CM.size cm
+    B  pm   -> PM.size pm
 
 {-# INLINE ins #-}
 ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> AdaptiveMap k v -> IO ()
@@ -68,7 +68,7 @@ ins k v m = do
   state <- readIORef m
   case state of
     A cm -> CM.insert k v cm
-    AB _ -> do transition m; ins k v m
+    AB {} -> do transition m; ins k v m
     B pm -> PM.ins k v pm
   `catches`
   [Handler (\(_ :: FIR.CASIORefException) -> ins k v m)]
@@ -79,7 +79,7 @@ del k m = do
   state <- readIORef m
   case state of
     A cm -> CM.delete k cm
-    AB _ -> do transition m; del k m
+    AB {} -> do transition m; del k m
     B pm -> PM.del k pm
   `catches`
   [Handler (\(_ :: FIR.CASIORefException) -> del k m)]
@@ -90,14 +90,15 @@ transition m = do
   tik <- readForCAS m
   case peekTicket tik of
     A cm -> do
-      (success, _tik) <- casIORef m tik (AB cm)
+      pm <- PM.newMap
+      (success, _tik) <- casIORef m tik (AB cm pm)
       -- TODO: if not success, should probably verify that someone else has actually got
       -- it into the AB state, if only for debugging/sanity checking.
-      if success then gofreeze True cm
-                 else wait cm
+      if success then gofreeze True cm pm
+                 else wait cm pm
 
     -- Warning, the full lock-free version needs to call freeze/conversion here:
-    AB cm -> wait cm
+    AB cm pm -> wait cm pm
     B  _  -> return ()
  where
   -- Option (0) just let transition return even if we're not in B state:
@@ -111,31 +112,33 @@ transition m = do
   sleepWait =
    do t <- readIORef m
       case t of
-        A  _ -> do yield; sleepWait
-        AB _ -> do yield; sleepWait
-        B  _ -> return ()
+        A  _  -> do yield; sleepWait
+        AB {} -> do yield; sleepWait
+        B  _  -> return ()
 
   -- We only measure time on the first thread to initiate:
   -- gofreeze False cm = helper False cm
   -- gofreeze True cm = do
-  gofreeze b cm = do
+  gofreeze b cm pm = do
       st <- getCurrentTime
       -- traceMarkerIO "StartFreeze"
-      helper b cm
+      helper b cm pm
       -- traceMarkerIO "EndFreeze"
       en <- getCurrentTime
       -- This would be better as an event trace or something that doesn't mangle parallel output:
       putStrLn $ "(freezeTravTime "++show (diffUTCTime en st)++") "
 
-  helper leader cm = 
+  helper leader cm pm = 
    do
-      pm <- case 3 of
+      pm' <- case 3 of
+       -- The first several of these options assume that this is ONLY running once, not
+       -- reetrant:
+
        -- The basic algorithm:
        -----------------------
        0 -> do 
         -- This is about 115ms on 12 thread magramal, with the same command as above.
         CM.freeze cm
-        pm <- PM.newMap
         CM.unsafeTraverse_ (\ k v -> PM.ins k v pm) cm
         return pm
 
@@ -153,17 +156,17 @@ transition m = do
        2 -> do 
         let poller = do x <- readIORef m
                         case x of
-                          A _  -> return True
-                          AB _ -> return True
-                          B _  -> return False -- Give up.  Someone else did it.
+                          A _   -> return True
+                          AB {} -> return True
+                          B _   -> return False -- Give up.  Someone else did it.
         -- TODO: pollFreeze version:
         -- if I-am-thread-zero-or-something
         -- then normalFreeze
         -- else pollFreeze poller
         error "FINISHME: missing polling case in adaptive map"
 
-       -- [2016.07.06] A new, helping-based lock-free version:
-       -------------------------------------------------------
+       -- [2016.07.06] A new, helping-based lock-free version.  Reentrant!
+       -------------------------------------------------------------------
        3 -> do 
         tid <- myThreadId
         debugPrint$ "About to get my perms, tid = "++show tid++", leader? "++show leader
@@ -177,11 +180,11 @@ transition m = do
 
       --------------------------
       let install tik =
-            do (b,tik2) <- casIORef m tik (B pm)
+            do (b,tik2) <- casIORef m tik (B pm')
                unless b $
                  case peekTicket tik2 of
-                   A _  -> error "this is impossible"
-                   AB _ -> error "transition: should not happen"
+                   A  _  -> error "this is impossible"
+                   AB {} -> error "transition: should not happen"
                            -- install tik' -- This should not actually happen, should it?
                    -- Someone else beat us to the punch and that's just fine:
                    B _  -> return ()

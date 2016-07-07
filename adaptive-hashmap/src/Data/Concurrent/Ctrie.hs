@@ -519,9 +519,9 @@ freezeRandBottom perms (Map root) = go root
 freezeRandConvert :: forall k v . (Eq k, Hashable k) =>
                      Perms -> Map k v -> I.IORef (HM.HashMap k v) -> IO ()
 
--- FIXME: This first parallel version is QUADRATIC.  It does an expensive union at each
--- step of the tree.  It needs to be modified to only do this for the first couple
--- recursions and then bottom out to the sequential version.
+-- NOTE: A full parallel version is QUADRATIC.  It does an expensive union at each step of
+-- the tree.  Thus we instead limit the number of parallel recursions and then bottom out
+-- to the sequential version.
 
 freezeRandConvert perms (Map root) outref = go root
   where
