@@ -171,10 +171,9 @@ transition m = do
         debugPrint$ "About to get my perms, tid = "++show tid++", leader? "++show leader
         perms <- getTLS myPerms
         debugPrint$ "My perms, tid = "++show tid++": "++take 40 (show (CM.unpackPerms perms))
-        acc   <- newIORef HM.empty
-        CM.freezeRandConvert perms cm acc
+        CM.freezeRandConvert perms cm pm
         debugPrint$ "All done with freezeRandConvert, tid = "++show tid
-        hm <- readIORef acc
+        hm <- readIORef pm
         PM.fromMap hm -- TODO: use fromMapSized
 
       --------------------------
