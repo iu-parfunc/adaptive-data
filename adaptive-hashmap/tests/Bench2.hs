@@ -20,6 +20,7 @@ import qualified Data.Vector.Unboxed         as VU
 import qualified System.Console.CmdArgs      as CA
 import           System.Directory
 import           System.IO
+import           System.Mem
 import qualified System.Random.PCG.Fast.Pure as PCG
 
 import           Graphics.Gnuplot.Advanced
@@ -69,10 +70,11 @@ hotCold GenericImpl { newMap, get, insert, transition } ops = do
                                                 then insert (vec VU.! fromIntegral (i `mod` len)) i m
                                                 else rand g range >>= \k -> insert k i m
       transition m
-      fold offset2 (offset2 + phase2) 0 (\b -> maybe b (+ b)) $ \i ->
+      for_ offset2 (offset2 + phase2) $ \i ->
         if precompute
-          then get (vec VU.! fromIntegral (i `mod` len)) m
-          else rand g range >>= \k -> get k m
+        then get (vec VU.! fromIntegral (i `mod` len)) m
+        else do k <- rand g range
+                get k m
 
 {-# INLINE runAll #-}
 runAll :: (Int -> Bench Measured) -> Bench [(Int, Measured)]
@@ -82,8 +84,13 @@ runAll !fn = do
   !stepsize <- reader stepsize
   !runs <- reader runs
   !flag <- ask
+
+  !threads <- reader maxthreads
+  liftIO $! setNumCapabilities threads
+
   liftIO $! fori' size maxsize stepsize $! \i -> do
     putStrLn $ "  Running size = " ++ show i
+    performGC
     hFlush stdout
     t <- run runs $! runReaderT (fn i) flag
     putStrLn $ "\n  Time reported: " ++ show (measTime t)
