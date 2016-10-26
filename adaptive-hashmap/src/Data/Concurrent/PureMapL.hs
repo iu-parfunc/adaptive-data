@@ -9,6 +9,7 @@ module Data.Concurrent.PureMapL
        , get
        , ins
        , del
+       , size
        )
        where
 
@@ -50,3 +51,7 @@ del k r = do
   writeIORef r (HM.delete k m, l)
   L.release l
   return ()
+
+{-# INLINE size #-}
+size :: PureMapL k v -> IO Int
+size r = HM.size . fst <$> readIORef r
