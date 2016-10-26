@@ -16,17 +16,17 @@
 module Main where
 
 import           Control.Exception
-import qualified Data.Sequence as Seq 
+import qualified Data.Sequence                         as Seq
 
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Int
-import qualified Data.Vector.Unboxed         as VU
-import qualified System.Console.CmdArgs      as CA
+import qualified Data.Vector.Unboxed                   as VU
+import qualified System.Console.CmdArgs                as CA
 import           System.Directory
 import           System.IO
-import qualified System.Random.PCG.Fast.Pure as PCG
+import qualified System.Random.PCG.Fast.Pure           as PCG
 
 import           Graphics.Gnuplot.Advanced
 import qualified Graphics.Gnuplot.File                 as File
@@ -38,14 +38,14 @@ import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
 import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
 import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
-import System.Mem
-import GHC.Conc
-import GHC.Stats (getGCStats)
-import Data.TLS.PThread
+import           Data.TLS.PThread
+import           GHC.Conc
+import           GHC.Stats                             (getGCStats)
+import           System.Mem
 
-import Types
+import           Types
 
-import qualified Data.Concurrent.Adaptive.AdaptiveMap            as AM
+import qualified Data.Concurrent.Adaptive.AdaptiveMap  as AM
 
 {-# INLINABLE forkNIns #-}
 forkNIns :: GenericImpl m -> Int -> Bench Measured
@@ -285,6 +285,15 @@ benchmark "pure" =
     "hot"        -> runAll $ hotPhase pureImpl
     "cold"       -> runAll $ coldPhase pureImpl
     "transition" -> runAll $ transitionPhase pureImpl
+benchmark "purel" =
+  reader bench >>= \bench -> case bench of
+    "ins"        -> runAll $ forkNIns purelImpl
+    "insdel"     -> runAll $ forkNInsDel purelImpl
+    "random"     -> runAll $ fork5050 purelImpl
+    "hotcold"    -> runAll $ hotCold purelImpl
+    "hot"        -> runAll $ hotPhase purelImpl
+    "cold"       -> runAll $ coldPhase purelImpl
+    "transition" -> runAll $ transitionPhase purelImpl
 benchmark "ctrie" =
   reader bench >>= \bench -> case bench of
     "ins"        -> runAll $ forkNIns ctrieImpl
@@ -331,7 +340,7 @@ gcWorkMaker = loop [1 .. 10^6]
  where
   loop !ls = do l2 <- evaluate (reverse ls)
                 loop l2
-{-   
+{-
   loop :: Seq.Seq Int -> IO ()
   loop !s =
     do let (s1,s2) = Seq.splitAt 1 s
@@ -340,7 +349,7 @@ gcWorkMaker = loop [1 .. 10^6]
        loop s3
 -}
 
-                
+
 main :: IO ()
 main = do
   args <- CA.cmdArgs flag
@@ -350,7 +359,7 @@ main = do
 --  _ <- forkIO gcWorkMaker
 
   (randomInts,randomPairs) <-
-        if (precompute args) then do 
+        if (precompute args) then do
           putStrLn $ "Creating random Ints of size: "++show (maxsize args)
 
           !gen <- PCG.createSystemRandom
@@ -394,7 +403,7 @@ main = do
   forkJoin (maxthreads opts) $ \_ -> do
     v <- getTLS AM.myPerms
     evaluate v
-  putStrLn "Initialized thread-local permutation state." 
+  putStrLn "Initialized thread-local permutation state."
   hFlush stdout
 
   !zs <- forM vs $! \variant -> do

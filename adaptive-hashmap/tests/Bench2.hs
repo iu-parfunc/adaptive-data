@@ -16,12 +16,12 @@ import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Int
-import qualified Data.Vector.Unboxed         as VU
-import qualified System.Console.CmdArgs      as CA
+import qualified Data.Vector.Unboxed                   as VU
+import qualified System.Console.CmdArgs                as CA
 import           System.Directory
 import           System.IO
 import           System.Mem
-import qualified System.Random.PCG.Fast.Pure as PCG
+import qualified System.Random.PCG.Fast.Pure           as PCG
 
 import           Graphics.Gnuplot.Advanced
 import qualified Graphics.Gnuplot.File                 as File
@@ -32,7 +32,7 @@ import qualified Graphics.Gnuplot.LineSpecification    as LineSpec
 import qualified Graphics.Gnuplot.Plot.TwoDimensional  as Plot2D
 import qualified Graphics.Gnuplot.Terminal.SVG         as SVG
 
-import Types
+import           Types
 
 transitionPhase :: GenericImpl m -> Int -> Bench Measured
 transitionPhase GenericImpl { newMap, insert, transition } size = do
@@ -105,27 +105,31 @@ benchmark :: String -> Bench [(Int, Measured)]
 benchmark "nop" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase nopImpl
-    "hotcold" -> runAll $ hotCold nopImpl
+    "hotcold"    -> runAll $ hotCold nopImpl
 benchmark "pure" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase pureImpl
-    "hotcold" -> runAll $ hotCold pureImpl
+    "hotcold"    -> runAll $ hotCold pureImpl
+benchmark "purel" =
+  reader bench >>= \bench -> case bench of
+    "transition" -> runAll $ transitionPhase purelImpl
+    "hotcold"    -> runAll $ hotCold purelImpl
 benchmark "ctrie" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase ctrieImpl
-    "hotcold" -> runAll $ hotCold ctrieImpl
+    "hotcold"    -> runAll $ hotCold ctrieImpl
 benchmark "adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase adaptiveImpl
-    "hotcold" -> runAll $ hotCold adaptiveImpl
+    "hotcold"    -> runAll $ hotCold adaptiveImpl
 benchmark "cc-adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase ccadaptiveImpl
-    "hotcold" -> runAll $ hotCold ccadaptiveImpl
+    "hotcold"    -> runAll $ hotCold ccadaptiveImpl
 benchmark "pc-adaptive" =
   reader bench >>= \bench -> case bench of
     "transition" -> runAll $ transitionPhase pcadaptiveImpl
-    "hotcold" -> runAll $ hotCold pcadaptiveImpl
+    "hotcold"    -> runAll $ hotCold pcadaptiveImpl
 benchmark x =
   reader bench >>= \y -> error $ "benchmark: unknown arguments: " ++ show x ++ " " ++ show y
 

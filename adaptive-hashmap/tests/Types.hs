@@ -343,6 +343,9 @@ nopImpl = GenericImpl
 pureImpl :: GenericImpl (PM.PureMap Int64 Int64)
 pureImpl = GenericImpl PM.newMap PM.get PM.ins PM.del nop PM.size (\_ -> return "_")
 
+purelImpl :: GenericImpl (PML.PureMapL Int64 Int64)
+purelImpl = GenericImpl PML.newMap PML.get PML.ins PML.del nop PML.size (\_ -> return "_")
+
 ctrieImpl :: GenericImpl (CM.Map Int64 Int64)
 ctrieImpl = GenericImpl CM.empty CM.lookup CM.insert CM.delete nop CM.size (\_ -> return "_")
 
