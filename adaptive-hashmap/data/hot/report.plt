@@ -4,6 +4,7 @@ set format y "%g"
 set grid xtics
 set grid ytics
 set grid ztics
+set yrange [0:0.6]
 set xlabel "Threads"
 set xtics 1
 set ylabel "Time in seconds"
