@@ -6,6 +6,11 @@
 
 module Data.Concurrent.DBgz (
   Map
+  , empty
+  , insert
+  , delete
+  , lookup
+  , transition
   ) where
 
 import Data.Concurrent.DB
@@ -13,13 +18,14 @@ import qualified Control.Concurrent.Map as CM
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (fromStrict, toStrict)
 import Codec.Compression.GZip
+import Prelude hiding (lookup)
 
 type Map = CM.Map Int ByteString
 
-instance DB Map where
-  empty :: IO Map
-  empty = CM.empty
-  
+empty :: IO Map
+empty = CM.empty
+
+instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
   insert !k !v !m = CM.insert k (toStrict $ compress $ fromStrict v) m
 
@@ -32,3 +38,5 @@ instance DB Map where
     case res of
       Nothing -> return Nothing
       Just s  -> return $ Just $ toStrict $ decompress $ fromStrict s
+
+  transition = \_ -> return ()

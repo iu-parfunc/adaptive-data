@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 module Main where
 import Control.Concurrent
@@ -7,21 +8,32 @@ import System.Console.CmdArgs
 import System.IO
 import System.Mem
 import Data.Time.Clock
+import qualified Data.Vector as V
 import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 import Data.Int
 import Data.Concurrent.DB (DB)
 import Data.Concurrent.DBctrie as DBC
 import Data.Concurrent.DBgz as DBZ
-import System.Directory
+import System.Directory 
 
-run :: Int -> Flag -> IO()
+performOp :: DB m => PCG.GenIO -> m -> IO ()
+performOp m r = undefined
+
+run :: Int -> Flag -> IO ()
 run thn opt = do
+  !gen <- PCG.restore $ PCG.initFrozen $ seed opt
   let fileName = (file opt) ++ "_" ++ (bench opt)
 --  outh <- openFile (fileName ++ ".csv") AppendMode
   lst <- getDirectoryContents $ dir opt
   let files = drop 2 lst
-  putStrLn $ show files
+  let lstDB = map (\_ -> do
+                      !m <- case (bench opt) of
+                        "ctrie" -> DBC.empty
+                        "gz" -> DBZ.empty
+                      return m)
+                  [1..(nDB opt)]
+  let vec = V.fromList lstDB
   return ()
 
 main :: IO ()
