@@ -135,7 +135,7 @@ run :: Int -> Flag -> IO ()
 run thn opt = do
   !gen <- PCG.restore $ PCG.initFrozen $ seed opt
   let fileName = (file opt) ++ "_" ++ (bench opt)
-  outh <- openFile (fileName ++ ".csv") AppendMode
+  outh <- openFile (fileName ++ ".csv") WriteMode
   lst <- getDirectoryContents $ dir opt
   let files = drop 2 lst
   case (bench opt) of
