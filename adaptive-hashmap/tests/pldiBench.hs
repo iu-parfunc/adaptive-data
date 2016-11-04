@@ -24,7 +24,7 @@ import Control.DeepSeq
 chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
   !n <- PCG.uniformB (length files) rng
-  !s <-readFile $ datadir ++ "/" ++ (files !! n)
+  !s <- readFile $ datadir ++ "/" ++ (files !! n)
   return s
 
 chooseOp :: Double -> [() -> IO ()] -> [Double] -> IO (() -> IO ())
@@ -87,12 +87,15 @@ unitOps !n !rng !vec !opt !files !prob !tran = do
 
 phase :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
       -> [Double] -> IO (V.Vector Double)
-phase !n !rng !vec !opt !files !prob = do
-  let len = ((ops opt) `div` (unit opt))
-  foldM (\v i -> do
-            mean <- unitOps n rng vec opt files prob (i >= len)
-            return $ V.snoc v mean)
-        V.empty [1..len]
+phase !n !rng !vec !opt !files !prob =
+  loop V.empty 0
+  where
+    len = ((ops opt) `div` (unit opt))
+    loop v i = 
+      if i < len
+      then do mean <- unitOps n rng vec opt files prob (i < len - 1)
+              loop (V.snoc v mean) (i + 1)
+      else return v
 
 thread :: DB m => Int -> Flag -> [String] -> V.Vector m -> Word64 -> IO (V.Vector Double)
 thread tid opt files vec seed = do
@@ -127,7 +130,21 @@ benchmark thn rng files opt empty out = do
             hPutStrLn out $ show i ++ "," ++ show m)
   hClose out
   return ()
-
+{-
+benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
+          -> IO m -> Handle -> IO ()
+benchmark thn rng files opt empty out = do
+  vec <- initDB empty (nDB opt)
+  V.forM_ vec (\m ->
+                 forM_ [1..(ops opt)]
+                       (\_ -> 
+                          forM_ files
+                                (\f -> do
+                                    s <- readFile $ (dir opt) ++ "/" ++ f
+                                    i <- PCG.uniform rng
+                                    insert i s m)))
+  return ()
+-}
 run :: Int -> Flag -> IO ()
 run thn opt = do
   !gen <- PCG.restore $ PCG.initFrozen $ seed opt
