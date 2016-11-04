@@ -6,3 +6,4 @@ class DB a where
   delete :: Int -> a -> IO ()
   lookup :: Int -> a -> IO (Maybe ByteString)
   transition :: a -> IO ()
+  output :: a -> IO ()

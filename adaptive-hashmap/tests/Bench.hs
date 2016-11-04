@@ -64,7 +64,7 @@ test !threadn !ops !ratios !option !gen = do
   writeIORef ref False
   !end <- getCurrentTime
   !res <- mapM wait asyncs
-  return $ ((fromIntegral $ sum res)::Double) / ((realToFrac $ diffUTCTime end start) * 1000.0 ::Double)
+  return $ ((fromIntegral $ sum res)::Double) / ((realToFrac $ diffUTCTime end start) * 1000000.0 ::Double)
 
 mean :: [Double] -> Double
 mean xs = (sum xs) / ((realToFrac $ length xs) :: Double)

@@ -20,23 +20,25 @@ import Data.ByteString.Lazy (fromStrict, toStrict)
 import Codec.Compression.GZip
 import Prelude hiding (lookup)
 
-type Map = CM.Map Int ByteString
+newtype Map = DBZ (CM.Map Int ByteString)
 
 empty :: IO Map
-empty = CM.empty
+empty = CM.empty >>= (return . DBZ)
 
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v !m = CM.insert k (toStrict $ compress $ fromStrict v) m
+  insert !k !v (DBZ !m) = CM.insert k (toStrict $ compress $ fromStrict v) m
 
   delete :: Int -> Map -> IO ()
-  delete = CM.delete
+  delete !k (DBZ !m) = CM.delete k m
 
   lookup :: Int -> Map -> IO (Maybe ByteString)
-  lookup !k !m = do
+  lookup !k !(DBZ m) = do
     !res <- CM.lookup k m
     case res of
       Nothing -> return Nothing
       Just s  -> return $ Just $ toStrict $ decompress $ fromStrict s
 
-  transition = \_ -> return ()
+  transition (DBZ !m) = CM.lookup 1024 m >>= (\_ -> return ())
+
+  output (DBZ !m) = CM.unsafeToList m >>= putStrLn . show
