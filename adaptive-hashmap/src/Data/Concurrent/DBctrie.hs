@@ -15,8 +15,9 @@ module Data.Concurrent.DBctrie (
 
 import Data.Concurrent.DB
 import qualified Control.Concurrent.Map as CM
-import Data.ByteString (ByteString)
+import Data.ByteString.Lazy (ByteString)
 import Prelude hiding (lookup)
+import Control.DeepSeq
 
 newtype Map = DBC (CM.Map Int ByteString)
 
@@ -25,13 +26,19 @@ empty = CM.empty >>= (return . DBC)
 
 instance DB Map where
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBC !m) = CM.insert k v m
+  insert !k !v (DBC !m) = deepseq v $ CM.insert k v m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBC !m) = CM.delete k m
 
   lookup :: Int -> Map -> IO (Maybe ByteString)
-  lookup !k (DBC !m) = CM.lookup k m
+  lookup !k (DBC !m) = do
+    !res <- CM.lookup k m
+    case res of
+      Nothing -> return Nothing
+      Just s  -> do
+        deepseq s $ return $ Just s
+
   
   transition (DBC !m) = CM.lookup 1024 m >>= (\_ -> return ())
 

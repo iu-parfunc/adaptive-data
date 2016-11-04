@@ -4,13 +4,10 @@
 module Main where
 import Control.Concurrent
 import Control.Concurrent.Async
-import Control.Concurrent.Extra
 import Control.Monad
-import Data.ByteString (readFile, ByteString)
-import Data.ByteString.Char8 (pack)
+import Data.ByteString.Lazy (readFile, ByteString)
 import System.Console.CmdArgs hiding (opt)
 import System.IO hiding (readFile)
-import System.Mem
 import Data.Time.Clock
 import Data.List (findIndex)
 import qualified Data.Vector as V
@@ -21,8 +18,8 @@ import Data.Concurrent.DB
 import qualified Data.Concurrent.DBctrie as DBC
 import qualified Data.Concurrent.DBgz as DBZ
 import System.Directory
-import GHC.TypeLits
 import Prelude hiding (lookup, readFile)
+import Control.DeepSeq
 
 chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
@@ -46,13 +43,13 @@ createOp !rng !opt !m !files !prob = do
         else return ""
   let ops = [(\_ -> do
                  !v <- insert (fromIntegral k) s m
-                 return ())
+                 deepseq v $ return ())
             ,(\_ -> do
                  !v <- delete (fromIntegral k) m
-                 return ())
+                 deepseq v $ return ())
             ,(\_ -> do
                  !v <- lookup (fromIntegral k) m
-                 return ())]
+                 deepseq v $ return ())]
   chooseOp r ops prob
 
 performOp :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]

@@ -15,10 +15,10 @@ module Data.Concurrent.DBgz (
 
 import Data.Concurrent.DB
 import qualified Control.Concurrent.Map as CM
-import Data.ByteString (ByteString)
-import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.ByteString.Lazy (ByteString)
 import Codec.Compression.GZip
 import Prelude hiding (lookup)
+import Control.DeepSeq
 
 newtype Map = DBZ (CM.Map Int ByteString)
 
@@ -27,7 +27,7 @@ empty = CM.empty >>= (return . DBZ)
 
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBZ !m) = CM.insert k (toStrict $ compress $ fromStrict v) m
+  insert !k !v (DBZ !m) = deepseq v $ CM.insert k (compress v) m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBZ !m) = CM.delete k m
@@ -37,7 +37,9 @@ instance DB Map where
     !res <- CM.lookup k m
     case res of
       Nothing -> return Nothing
-      Just s  -> return $ Just $ toStrict $ decompress $ fromStrict s
+      Just s  -> do
+        let ns = decompress s
+        deepseq ns $ return $ Just $ ns
 
   transition (DBZ !m) = CM.lookup 1024 m >>= (\_ -> return ())
 
