@@ -27,7 +27,9 @@ empty = CM.empty >>= (return . DBZ)
 
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBZ !m) = deepseq v $ CM.insert k (compress v) m
+  insert !k !v (DBZ !m) =
+    let z = compress v
+    in deepseq z $ CM.insert k z m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBZ !m) = CM.delete k m
