@@ -26,7 +26,7 @@ empty = CM.empty >>= (return . DBC)
 
 instance DB Map where
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBC !m) = deepseq v $ CM.insert k v m
+  insert !k !v (DBC !m) = CM.insert k (force v) m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBC !m) = CM.delete k m
@@ -36,8 +36,7 @@ instance DB Map where
     !res <- CM.lookup k m
     case res of
       Nothing -> return Nothing
-      Just s  -> do
-        deepseq s $ return $ Just s
+      Just s  -> return $ Just $ force s
 
   
   transition (DBC !m) = CM.lookup 1024 m >>= (\_ -> return ())
