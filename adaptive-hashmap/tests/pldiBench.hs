@@ -5,7 +5,8 @@ module Main where
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
-import Data.ByteString.Lazy (readFile, ByteString)
+import Data.ByteString (readFile)
+import Data.ByteString.Lazy (ByteString, fromStrict)
 import System.Console.CmdArgs hiding (opt)
 import System.IO hiding (readFile)
 import Data.Time.Clock
@@ -25,7 +26,7 @@ chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
   !n <- PCG.uniformB (length files) rng
   !s <- readFile $ datadir ++ "/" ++ (files !! n)
-  return s
+  return $ fromStrict s
 
 chooseOp :: Double -> [() -> IO ()] -> [Double] -> IO (() -> IO ())
 chooseOp !r !ops !prob = do
