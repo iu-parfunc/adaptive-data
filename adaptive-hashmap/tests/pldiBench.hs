@@ -131,18 +131,28 @@ benchmark thn rng files opt empty out = do
   hClose out
   return ()
 -}
+
+test :: DB m => Int -> PCG.GenIO -> V.Vector m -> [String] -> Flag -> IO ()
+test thn rng vec files opt =
+    V.forM_ vec (\m ->
+                   forM_ [1..((ops opt) `div` thn)]
+                   (\_ -> 
+                       forM_ files
+                       (\f -> do
+                           s <- readFile $ (dir opt) ++ "/" ++ f
+                           i <- PCG.uniform rng
+                           insert i s m)))
+
+
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
 benchmark thn rng files opt empty out = do
   vec <- initDB empty (nDB opt)
-  V.forM_ vec (\m ->
-                 forM_ [1..(ops opt)]
-                       (\_ -> 
-                          forM_ files
-                                (\f -> do
-                                    s <- readFile $ (dir opt) ++ "/" ++ f
-                                    i <- PCG.uniform rng
-                                    insert i s m)))
+  !asyncs <- mapM (\tid -> do
+                       s <- PCG.uniformW64 rng
+                       async $ test thn rng vec files opt)
+                  [1..thn]
+  !res <- mapM wait asyncs
   return ()
 
 run :: Int -> Flag -> IO ()
