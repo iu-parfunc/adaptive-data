@@ -114,7 +114,7 @@ initDB empty n = do
 
 mean :: [Double] -> Double
 mean xs = (sum xs) / ((realToFrac $ length xs) :: Double)
-
+{-
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
 benchmark thn rng files opt empty out = do
@@ -131,7 +131,7 @@ benchmark thn rng files opt empty out = do
             hPutStrLn out $ show i ++ "," ++ show m)
   hClose out
   return ()
-{-
+-}
 test :: DB m => Int -> PCG.GenIO -> V.Vector m -> [String] -> Flag -> IO ()
 test thn rng vec files opt =
     V.forM_ vec (\m ->
@@ -141,8 +141,7 @@ test thn rng vec files opt =
                        (\f -> do
                            s <- readFile $ (dir opt) ++ "/" ++ f
                            i <- PCG.uniform rng
-                           insert i s m)))
-
+                           insert i (fromStrict s) m)))
 
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
@@ -154,7 +153,7 @@ benchmark thn rng files opt empty out = do
                   [1..thn]
   !res <- mapM wait asyncs
   return ()
--}
+
 run :: Int -> Flag -> IO ()
 run thn opt = do
   !gen <- PCG.restore $ PCG.initFrozen $ seed opt
