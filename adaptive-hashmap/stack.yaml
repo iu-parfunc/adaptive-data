@@ -9,5 +9,6 @@ extra-deps:
  - thread-local-storage-0.1.0.3
  - pcg-random-0.1.3.4
  - quicklz-1.5.0.11
-
+ - bytestring-mmap-0.2.2
+ 
 resolver: lts-7.7

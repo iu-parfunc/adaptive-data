@@ -3,8 +3,10 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Main where
 import Control.Concurrent
+import Control.Exception
 import Control.Concurrent.Async
 import Control.Monad
+import qualified Data.ByteString as B
 import Data.ByteString (ByteString, readFile)
 --import Data.ByteString.Lazy (ByteString, fromStrict)
 import System.Console.CmdArgs hiding (opt)
@@ -22,6 +24,12 @@ import System.Directory
 import Prelude hiding (lookup, readFile)
 import Control.DeepSeq
 
+import Data.IORef
+import System.IO.Posix.MMap
+import Data.Word
+
+-- import Codec.Compression.QuickLZ
+    
 chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
   !n <- PCG.uniformB (length files) rng
@@ -139,16 +147,27 @@ test thn rng vec files opt =
                    (\_ -> 
                        forM_ files
                        (\f -> do
-                           s <- readFile $ (dir opt) ++ "/" ++ f
+--                           s <- readFile $ (dir opt) ++ "/" ++ f
+                           s <- unsafeMMapFile $ (dir opt) ++ "/" ++ f
+                           evaluate (bsSum s)
+--                           putStrLn$ "Read file, num bytes: "++ show (B.length s)
                            i <- PCG.uniform rng
                            insert i s m)))
 
+newtype LSBS = LSBS (IORef [ByteString])
+                                  
+instance DB LSBS where
+  -- insert :: Int -> ByteString -> a -> IO ()
+  insert key bs (LSBS ref) = do
+      modifyIORef' ref (\ls -> (bs:ls))
+      return ()
+                                  
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
 benchmark thn rng files opt empty out = do
   vec <- initDB empty (nDB opt)
   !asyncs <- mapM (\tid -> do
-                       s <- PCG.uniformW64 rng
+                       !s <- PCG.uniformW64 rng
                        async $ test thn rng vec files opt)
                   [1..thn]
   !res <- mapM wait asyncs
@@ -160,10 +179,12 @@ run thn opt = do
   let fileName = (file opt) ++ "_" ++ (bench opt)
   outh <- openFile (fileName ++ ".csv") WriteMode
   lst <- getDirectoryContents $ dir opt
-  let files = drop 2 lst
+  let files = filter (/= "..") $ filter (/= ".") $ lst
+  putStrLn $ "Number of files: "++show (length files)
   case (bench opt) of
     "ctrie" -> benchmark thn gen files opt DBC.empty outh
     "gz" -> benchmark thn gen files opt DBZ.empty outh
+    "list" -> benchmark thn gen files opt (LSBS <$> newIORef []) outh
     _ -> undefined
   return ()
 
@@ -191,6 +212,29 @@ main = do
 
   return ()
 
+----------------------------------------
+
+bsSum bs = (B.foldr' (\ c acc -> acc + fromIntegral c) (0::Word64) bs)
+
+-- -- Should use ~0 bytes
+-- main :: IO ()
+-- main = do
+--   bs <- unsafeMMapFile "./data/fair.c"
+--   -- putStrLn $ "Character number 100K: "++ show (B.index bs 100000)
+--   putStrLn $ "Sum of chars "++ show (bsSum bs)
+--   return ()
+
+         
+-- main :: IO ()
+-- main = do
+--   bs <- unsafeMMapFile "./data/fair.c"
+--   putStrLn $ "Character number 100K: "++ show (B.index bs 100000)
+--   return ()
+
+         
+
+         
+         
 data Flag
   = Flag {nDB :: Int,
           gratio :: Double,
