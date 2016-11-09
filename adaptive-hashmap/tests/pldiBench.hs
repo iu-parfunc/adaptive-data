@@ -5,8 +5,8 @@ module Main where
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
-import Data.ByteString (readFile)
-import Data.ByteString.Lazy (ByteString, fromStrict)
+import Data.ByteString (ByteString, readFile)
+--import Data.ByteString.Lazy (ByteString, fromStrict)
 import System.Console.CmdArgs hiding (opt)
 import System.IO hiding (readFile)
 import Data.Time.Clock
@@ -26,7 +26,7 @@ chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
   !n <- PCG.uniformB (length files) rng
   !s <- readFile $ datadir ++ "/" ++ (files !! n)
-  return $ fromStrict s
+  return $ s
 
 chooseOp :: Double -> [() -> IO ()] -> [Double] -> IO (() -> IO ())
 chooseOp !r !ops !prob = do
@@ -141,7 +141,7 @@ test thn rng vec files opt =
                        (\f -> do
                            s <- readFile $ (dir opt) ++ "/" ++ f
                            i <- PCG.uniform rng
-                           insert i (fromStrict s) m)))
+                           insert i s m)))
 
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()

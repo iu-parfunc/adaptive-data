@@ -1,5 +1,5 @@
 module Data.Concurrent.DB where
-import Data.ByteString.Lazy
+import Data.ByteString
 
 class DB a where
   insert :: Int -> ByteString -> a -> IO ()

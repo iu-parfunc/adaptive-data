@@ -15,8 +15,9 @@ module Data.Concurrent.DBgz (
 
 import Data.Concurrent.DB
 import qualified Control.Concurrent.Map as CM
-import Data.ByteString.Lazy (ByteString)
-import Codec.Compression.GZip
+import Data.ByteString (ByteString)
+--import Codec.Compression.GZip
+import Codec.Compression.QuickLZ
 import Prelude hiding (lookup)
 import Control.DeepSeq
 
@@ -27,7 +28,9 @@ empty = CM.empty >>= (return . DBZ)
 
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBZ !m) = CM.insert k (force $ compress v) m
+  insert !k !v (DBZ !m) =
+    let !v' = force compress v
+    in CM.insert k v' m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBZ !m) = CM.delete k m
