@@ -1,3 +1,6 @@
 #!/bin/bash
-stack bench adaptive-hashmap:pldi-bench --benchmark-arguments "--bench ctrie --dir data --seed `date +'%s'` --ops 10000 --unit 100 +RTS -N16"
-stack bench adaptive-hashmap:pldi-bench --benchmark-arguments "--bench gz --dir data --seed `date +'%s'` --ops 10000 --unit 100 +RTS -N16"
+set -o xtrace
+.stack-work/dist/x86_64-linux/Cabal-1.24.0.0/build/pldi-bench/pldi-bench --ops 160 --dir data --bench ctrie +RTS -N1 -s
+.stack-work/dist/x86_64-linux/Cabal-1.24.0.0/build/pldi-bench/pldi-bench --ops 160 --dir data --bench ctrie +RTS -N16 -s
+.stack-work/dist/x86_64-linux/Cabal-1.24.0.0/build/pldi-bench/pldi-bench --ops 160 --dir data --bench gz +RTS -N1 -s
+.stack-work/dist/x86_64-linux/Cabal-1.24.0.0/build/pldi-bench/pldi-bench --ops 160 --dir data --bench gz +RTS -N16 -s
