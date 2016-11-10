@@ -17,7 +17,8 @@ import Data.Concurrent.DB
 import qualified Control.Concurrent.Map as CM
 import Data.ByteString (ByteString)
 --import Codec.Compression.GZip
-import Codec.Compression.QuickLZ
+--import Codec.Compression.QuickLZ
+import Codec.Compression.LZ4
 import Prelude hiding (lookup)
 import Control.DeepSeq
 
@@ -29,8 +30,10 @@ empty = CM.empty >>= (return . DBZ)
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
   insert !k !v (DBZ !m) =
-    let !v' = force compress v
-    in CM.insert k v' m
+    let !v' = force $ compress v
+    in case v' of
+         Just bs -> CM.insert k bs m
+         Nothing -> undefined
 
   delete :: Int -> Map -> IO ()
   delete !k (DBZ !m) = CM.delete k m
@@ -40,7 +43,10 @@ instance DB Map where
     !res <- CM.lookup k m
     case res of
       Nothing -> return Nothing
-      Just s  -> return $ Just $ force $ decompress s
+      Just s  -> let !bs = decompress s
+                 in case bs of
+                   Just bs -> deepseq bs $ return $ Just bs
+                   Nothing -> undefined
 
   transition (DBZ !m) = CM.lookup 1024 m >>= (\_ -> return ())
 

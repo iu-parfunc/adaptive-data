@@ -6,7 +6,6 @@ import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
 import Data.ByteString (ByteString, readFile)
---import Data.ByteString.Lazy (ByteString, fromStrict)
 import System.Console.CmdArgs hiding (opt)
 import System.IO hiding (readFile)
 import Data.Time.Clock
@@ -114,7 +113,7 @@ initDB empty n = do
 
 mean :: [Double] -> Double
 mean xs = (sum xs) / ((realToFrac $ length xs) :: Double)
-{-
+
 benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
 benchmark thn rng files opt empty out = do
@@ -130,28 +129,6 @@ benchmark thn rng files opt empty out = do
             let !m = mean $ map (\v -> v V.! i) res
             hPutStrLn out $ show i ++ "," ++ show m)
   hClose out
-  return ()
--}
-test :: DB m => Int -> PCG.GenIO -> V.Vector m -> [String] -> Flag -> IO ()
-test thn rng vec files opt =
-    V.forM_ vec (\m ->
-                   forM_ [1..((ops opt) `div` thn)]
-                   (\_ -> 
-                       forM_ files
-                       (\f -> do
-                           s <- readFile $ (dir opt) ++ "/" ++ f
-                           i <- PCG.uniform rng
-                           insert i s m)))
-
-benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
-          -> IO m -> Handle -> IO ()
-benchmark thn rng files opt empty out = do
-  vec <- initDB empty (nDB opt)
-  !asyncs <- mapM (\tid -> do
-                       s <- PCG.uniformW64 rng
-                       async $ test thn rng vec files opt)
-                  [1..thn]
-  !res <- mapM wait asyncs
   return ()
 
 run :: Int -> Flag -> IO ()
