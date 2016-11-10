@@ -54,7 +54,8 @@ library
                        zlib >= 0.6,
                        vector >= 0.11,
                        deepseq >= 1.4,
-                       quicklz
+                       quicklz,
+                       bytestring-mmap
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options: -O2 -Wall
