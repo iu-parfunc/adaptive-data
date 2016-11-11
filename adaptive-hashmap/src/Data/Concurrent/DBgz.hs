@@ -13,6 +13,7 @@ module Data.Concurrent.DBgz (
   , transition
   ) where
 
+import Control.Exception
 import Data.Concurrent.DB
 import qualified Control.Concurrent.Map as CM
 import Data.ByteString (ByteString)
@@ -28,9 +29,9 @@ empty = CM.empty >>= (return . DBZ)
 
 instance DB Map where  
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBZ !m) =
-    let !v' = force compress v
-    in CM.insert k v' m
+  insert !k !v (DBZ !m) = do 
+    v' <- evaluate (force compress v)
+    CM.insert k v' m
 
   delete :: Int -> Map -> IO ()
   delete !k (DBZ !m) = CM.delete k m
@@ -38,9 +39,10 @@ instance DB Map where
   lookup :: Int -> Map -> IO (Maybe ByteString)
   lookup !k !(DBZ m) = do
     !res <- CM.lookup k m
-    case res of
-      Nothing -> return Nothing
-      Just s  -> return $ Just $ force $ decompress s
+    return res
+    -- case res of
+    --   Nothing -> return Nothing
+--      Just s  -> return $ Just $ force $ decompress s
 
   transition (DBZ !m) = CM.lookup 1024 m >>= (\_ -> return ())
 
