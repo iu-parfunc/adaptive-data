@@ -59,7 +59,7 @@ performOp :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
 performOp !n !rng !vec !opt !files !prob = do
   !r <- PCG.uniformBD 1.0 rng
   !rn <- PCG.uniformB ((V.length vec) - 1) rng
-  let isHot = r <= 0.9
+  let isHot = r <= 0.8
   let m = if isHot
           then vec V.! n
           else vec V.! (if rn >= n then rn + 1 else rn)
@@ -185,8 +185,8 @@ data Flag
   deriving (Eq, Show, Data, Typeable)
 
 flag :: Flag
-flag = Flag {nDB = 32 &= help "number of DBs",
-             iratio = 0.6 &= help "Insert ratio",
+flag = Flag {nDB = 10 &= help "number of DBs",
+             iratio = 0.8 &= help "Insert ratio",
              range = 65536 &= help "Key range",
              seed = 8192 &= help "Seed",
              file = "report" &= help "Report file prefix",
