@@ -32,7 +32,9 @@ library
                        AdaptiveMap,
                        Data.Concurrent.DB,
                        Data.Concurrent.DBctrie,
-                       Data.Concurrent.DBgz
+                       Data.Concurrent.DBgz,
+                       Data.Concurrent.DBpure,
+                       Data.Concurrent.DBadaptive
 
   -- other-modules:
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable

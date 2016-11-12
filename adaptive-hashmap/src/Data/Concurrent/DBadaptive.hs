@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Data.Concurrent.DBctrie (
+module Data.Concurrent.DBadaptive (
   Map
   , empty
   , insert
@@ -14,30 +14,30 @@ module Data.Concurrent.DBctrie (
   ) where
 
 import Data.Concurrent.DB
-import qualified Control.Concurrent.Map as CM
+import qualified AdaptiveMap as AM
 import Data.ByteString (ByteString)
 import Prelude hiding (lookup)
 import Control.DeepSeq
 
-newtype Map = DBC (CM.Map Int ByteString)
+newtype Map = DBA (AM.AdaptiveMap Int ByteString)
 
 empty :: IO Map
-empty = CM.empty >>= (return . DBC)
+empty = AM.newMap >>= (return . DBA)
 
 instance DB Map where
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBC !m) = deepseq v $ CM.insert k v m
+  insert !k !v (DBA !m) = deepseq v $ AM.ins k v m
 
   -- delete :: Int -> Map -> IO ()
-  -- delete !k (DBC !m) = CM.delete k m
+  -- delete !k (DBP !m) = PM.del k m
 
   lookup :: Int -> Map -> IO (Maybe ByteString)
-  lookup !k (DBC !m) = do
-    !res <- CM.lookup k m
+  lookup !k (DBA !m) = do
+    !res <- AM.get k m
     case res of
       Nothing -> return Nothing
       Just s  -> deepseq s $ return $ Just s
   
-  transition (DBC !m) = CM.lookup 1024 m >>= (\_ -> return ())
+  transition (DBA !m) = AM.transition m
 
-  output (DBC !m) = CM.unsafeToList m >>= putStrLn . show
+  output (DBA !_) = undefined

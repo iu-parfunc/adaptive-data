@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Data.Concurrent.DBctrie (
+module Data.Concurrent.DBpure (
   Map
   , empty
   , insert
@@ -14,30 +14,30 @@ module Data.Concurrent.DBctrie (
   ) where
 
 import Data.Concurrent.DB
-import qualified Control.Concurrent.Map as CM
+import qualified Control.Concurrent.PureMap as PM
 import Data.ByteString (ByteString)
 import Prelude hiding (lookup)
 import Control.DeepSeq
 
-newtype Map = DBC (CM.Map Int ByteString)
+newtype Map = DBP (PM.PureMap Int ByteString)
 
 empty :: IO Map
-empty = CM.empty >>= (return . DBC)
+empty = PM.newMap >>= (return . DBP)
 
 instance DB Map where
   insert :: Int -> ByteString -> Map -> IO ()
-  insert !k !v (DBC !m) = deepseq v $ CM.insert k v m
+  insert !k !v (DBP !m) = deepseq v $ PM.ins k v m
 
   -- delete :: Int -> Map -> IO ()
-  -- delete !k (DBC !m) = CM.delete k m
+  -- delete !k (DBP !m) = PM.del k m
 
   lookup :: Int -> Map -> IO (Maybe ByteString)
-  lookup !k (DBC !m) = do
-    !res <- CM.lookup k m
+  lookup !k (DBP !m) = do
+    !res <- PM.get k m
     case res of
       Nothing -> return Nothing
       Just s  -> deepseq s $ return $ Just s
   
-  transition (DBC !m) = CM.lookup 1024 m >>= (\_ -> return ())
+  transition (DBP !m) = PM.get 1024 m >>= (\_ -> return ())
 
-  output (DBC !m) = CM.unsafeToList m >>= putStrLn . show
+  output (DBP !_) = undefined

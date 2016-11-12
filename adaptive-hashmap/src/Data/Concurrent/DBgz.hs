@@ -8,7 +8,7 @@ module Data.Concurrent.DBgz (
   Map
   , empty
   , insert
-  , delete
+  -- , delete
   , lookup
   , transition
   ) where
@@ -32,11 +32,11 @@ instance DB Map where
   insert !k !v (DBZ !m) =
     let !v' = force $ compress v
     in case v' of
-         Just bs -> CM.insert k bs m
+         Just bs -> deepseq bs $ CM.insert k bs m
          Nothing -> undefined
 
-  delete :: Int -> Map -> IO ()
-  delete !k (DBZ !m) = CM.delete k m
+  -- delete :: Int -> Map -> IO ()
+  -- delete !k (DBZ !m) = CM.delete k m
 
   lookup :: Int -> Map -> IO (Maybe ByteString)
   lookup !k !(DBZ m) = do
@@ -45,7 +45,7 @@ instance DB Map where
       Nothing -> return Nothing
       Just s  -> let !bs = decompress s
                  in case bs of
-                   Just bs -> deepseq bs $ return $ Just bs
+                   Just bs' -> deepseq bs' $ return $ Just bs'
                    Nothing -> undefined
 
   transition (DBZ !m) = CM.lookup 1024 m >>= (\_ -> return ())

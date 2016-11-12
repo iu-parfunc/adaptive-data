@@ -17,6 +17,7 @@ import Data.Int
 import Data.Concurrent.DB
 import qualified Data.Concurrent.DBctrie as DBC
 import qualified Data.Concurrent.DBgz as DBZ
+import qualified Data.Concurrent.DBadaptive as DBA
 import System.Directory
 import Prelude hiding (lookup, readFile)
 import Control.DeepSeq
@@ -27,40 +28,42 @@ chooseFile !rng !datadir !files = do
   !s <- readFile $ datadir ++ "/" ++ (files !! n)
   return $ s
 
-chooseOp :: Double -> [() -> IO ()] -> [Double] -> IO (() -> IO ())
-chooseOp !r !ops !prob = do
+chooseOp :: Double -> [() -> IO ()] -> [Double] -> Bool -> IO (() -> IO ())
+chooseOp !r !op !prob !isHot = do
+  let op' = if isHot then op else reverse op
   return $ case findIndex (\p -> r <= p) prob of
-             Just i -> ops !! i
-             Nothing -> ops !! 2
+             Just i -> op' !! i
+             Nothing -> undefined
 
 createOp :: DB m => PCG.GenIO -> Flag -> m -> [String]
-         -> [Double] ->IO (() -> IO ())
-createOp !rng !opt !m !files !prob = do
+         -> [Double] -> Bool -> IO (() -> IO ())
+createOp !rng !opt !m !files !prob !isHot = do
   !r <- PCG.uniformBD 1.0 rng
   !k <- PCG.uniformB (range opt) rng
-  !s <- if r <= iratio opt
+  !s <- if r <= iratio opt || (not isHot)
         then chooseFile rng (dir opt) files
         else return ""
-  let ops = [(\_ -> do
-                 !v <- insert (fromIntegral k) s m
-                 deepseq v $ return ())
-            ,(\_ -> do
-                 !v <- delete (fromIntegral k) m
-                 deepseq v $ return ())
-            ,(\_ -> do
-                 !v <- lookup (fromIntegral k) m
-                 deepseq v $ return ())]
-  chooseOp r ops prob
+  let oplst = [(\_ -> do
+                   !v <- insert (fromIntegral k) s m
+                   deepseq v $ return ())
+            -- ,(\_ -> do
+            --      !v <- delete (fromIntegral k) m
+            --      deepseq v $ return ())
+              ,(\_ -> do
+                   !v <- lookup (fromIntegral k) m
+                   deepseq v $ return ())]
+  chooseOp r oplst prob isHot
 
 performOp :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
           -> [Double] -> IO Double
 performOp !n !rng !vec !opt !files !prob = do
   !r <- PCG.uniformBD 1.0 rng
   !rn <- PCG.uniformB ((V.length vec) - 1) rng
-  let m = if r <= 0.9
+  let isHot = r <= 0.9
+  let m = if isHot
           then vec V.! n
           else vec V.! (if rn >= n then rn + 1 else rn)
-  op <- createOp rng opt m files prob
+  op <- createOp rng opt m files prob isHot
   measure op
 
 measure :: (() -> IO ()) -> IO Double
@@ -73,10 +76,10 @@ measure op = do
 unitOps :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
         -> [Double] -> Bool -> IO Double
 unitOps !n !rng !vec !opt !files !prob !tran = do
-  sum <- loop 0 0.0
-  return $ sum / (fromIntegral (unit opt) + (if tran then 1 else 0))
+  s <- loop 0 0.0
+  return $ s / (fromIntegral (unit opt) + (if tran then 1 else 0))
   where
-    loop i acc = 
+    loop i acc = do
       if i < unit opt
         then do l <- performOp n rng vec opt files prob
                 loop (i + 1) (acc + l)
@@ -91,16 +94,16 @@ phase !n !rng !vec !opt !files !prob =
   loop V.empty 0
   where
     len = ((ops opt) `div` (unit opt))
-    loop v i = 
+    loop v i = do
       if i < len
-      then do mean <- unitOps n rng vec opt files prob (i < len - 1)
-              loop (V.snoc v mean) (i + 1)
+      then do m <- unitOps n rng vec opt files prob (i < len - 1)
+              loop (V.snoc v m) (i + 1)
       else return v
 
 thread :: DB m => Int -> Flag -> [String] -> V.Vector m -> Word64 -> IO (V.Vector Double)
-thread tid opt files vec seed = do
-  let prob = [(iratio opt), (iratio opt) + (gratio opt), 1.0]
-  !rng <- PCG.restore $ PCG.initFrozen $ seed
+thread _ opt files vec initseed = do
+  let prob = [(iratio opt), 1.0]
+  !rng <- PCG.restore $ PCG.initFrozen $ initseed
   foldM (\v n -> do
             v' <- phase n rng vec opt files prob
             return $ v V.++ v')
@@ -141,6 +144,7 @@ run thn opt = do
   case (bench opt) of
     "ctrie" -> benchmark thn gen files opt DBC.empty outh
     "gz" -> benchmark thn gen files opt DBZ.empty outh
+    "adaptive" -> benchmark thn gen files opt DBA.empty outh
     _ -> undefined
   return ()
 
@@ -151,8 +155,8 @@ main = do
   putStrLn $ "Thread number:  " ++ show threadn
   putStrLn $ "number of DB:   " ++ show (nDB option)
   putStrLn $ "number of ops:  " ++ show (ops option)
-  putStrLn $ "Get Ratio:      " ++ show (gratio option)
-  putStrLn $ "Delete Ratio:   " ++ show (1.0 - (gratio option) - (iratio option))
+  putStrLn $ "Get Ratio:      " ++ show (1.0 - iratio option)
+  -- putStrLn $ "Delete Ratio:   " ++ show (1.0 - (gratio option) - (iratio option))
   putStrLn $ "Insert Ratio:   " ++ show (iratio option)
   putStrLn $ "Seed:           " ++ show (seed option)
   putStrLn $ "Report File:    " ++ show (file option)
@@ -170,7 +174,6 @@ main = do
 
 data Flag
   = Flag {nDB :: Int,
-          gratio :: Double,
           iratio :: Double,
           seed :: Word64,
           file :: String,
@@ -183,7 +186,6 @@ data Flag
 
 flag :: Flag
 flag = Flag {nDB = 32 &= help "number of DBs",
-             gratio = 0.2 &= help "Get Ratio",
              iratio = 0.6 &= help "Insert ratio",
              range = 65536 &= help "Key range",
              seed = 8192 &= help "Seed",

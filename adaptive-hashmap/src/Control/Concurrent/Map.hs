@@ -32,17 +32,18 @@ module Control.Concurrent.Map
       -- * Lists
     , fromList
     , unsafeToList
-
+    , freezeAndTraverse_
     --, printMap
     ) where
 
 import Control.Applicative ((<$>))
 import Control.Monad
-import Data.Atomics
+--import Data.Atomics
 import Data.Bits
 import Data.Hashable (Hashable)
 import qualified Data.Hashable as H
-import Data.IORef
+--import Data.IORef
+import Data.Concurrent.IORef
 import qualified Data.List as List
 import Data.Maybe
 import Data.Word
@@ -297,6 +298,27 @@ unsafeToList (Map root) = go root
         go2 xs (INode inode) = go inode >>= \ys -> return (ys ++ xs)
         go2 xs (SNode (S k v)) = return $ (k,v) : xs
 {-# INLINABLE unsafeToList #-}
+
+-- | A procedure that combines freezing and traversal.
+freezeAndTraverse_ :: (k -> v -> IO ()) -> Map k v -> IO ()
+freezeAndTraverse_ fn (Map root) = go root
+  where
+    go inode = do
+      freezeloop inode
+      main <- readIORef inode
+      case main of
+        CNode bmp arr -> A.mapM_ go2 (popCount bmp) arr
+        Tomb (S k v) -> fn k v
+        Collision xs -> mapM_ (\ (S k v) -> fn k v) xs
+    go2 (INode inode) = go inode
+    go2 (SNode (S k v)) = fn k v
+
+    freezeloop ref = do
+      tik <- readForCAS ref
+      (success, _) <- freezeIORef ref tik
+      unless success $ freezeloop ref
+      
+{-# INLINE freezeAndTraverse_ #-}
 
 -----------------------------------------------------------------------
 

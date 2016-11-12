@@ -6,6 +6,7 @@ module AdaptiveMap
        , get
        , ins
        , del
+       , transition
        )
        where
 
@@ -14,95 +15,72 @@ import Data.IORef
 import Data.Hashable
 import Control.Exception
 import qualified Data.Concurrent.IORef as FIR
-import qualified PureMap as PM
+import qualified Control.Concurrent.PureMap as PM
 import qualified Control.Concurrent.Map as CM
-import Data.Time.Clock
-import System.IO
+import Control.Monad
 
-data Hybrid k v = A !(PM.PureMap k v) String Int
-                | AB !(PM.PureMap k v) !(CM.Map k v)
-                | B !(CM.Map k v)
+data Hybrid k v = A !(CM.Map k v)
+                | AB !(CM.Map k v) !(PM.PureMap k v)
+                | B !(PM.PureMap k v)
 
 type AdaptiveMap k v = IORef (Hybrid k v)
 
 {-# INLINABLE newMap #-}
-newMap :: (Eq k, Hashable k) => String -> Int -> IO (AdaptiveMap k v)
-newMap fileName thn = do
-  !m <- PM.newMap
-  newIORef $ A m (fileName ++ "_tran.csv") thn
+newMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
+newMap = do
+  !m <- CM.empty
+  newIORef $ A m
 
 {-# INLINABLE get #-}
 get :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO (Maybe v)
 get !k !m = do
   state <- readIORef m
   case state of
-    A pm _ _ -> PM.get k pm
-    AB pm _ -> PM.get k pm
-    B cm -> CM.lookup k cm
-  `catches`
-  [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in get k m),
-   Handler (\e -> let _ = (e :: FIR.TransitionException)
-                  in do tik <- readForCAS m
-                        transition m tik
-                        get k m)]
+    A cm -> CM.lookup k cm
+    AB cm _ -> CM.lookup k cm
+    B pm -> PM.get k pm
 
 {-# INLINABLE ins #-}
 ins :: (Eq k, Hashable k) => k -> v -> AdaptiveMap k v -> IO ()
 ins !k !v !m = do
   state <- readIORef m
   case state of
-    A pm _ _ -> PM.ins k v pm
-    AB _ _ -> ins k v m
-    B cm -> CM.insert k v cm
+    A cm -> CM.insert k v cm
+    AB _ _ -> do transition m; ins k v m
+    B pm -> PM.ins k v pm
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in ins k v m),
-   Handler (\e -> let _ = (e :: FIR.TransitionException)
-                  in do tik <- readForCAS m
-                        transition m tik
-                        ins k v m)]
+                  in ins k v m)]
 
 {-# INLINABLE del #-}
 del :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO ()
 del !k !m = do
   state <- readIORef m
   case state of
-    A pm _ _ -> PM.del k pm
-    AB _ _ -> del k m
-    B cm -> CM.delete k cm
+    A cm -> CM.delete k cm
+    AB _ _ -> do transition m ; del k m
+    B pm -> PM.del k pm
   `catches`
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
-                  in del k m),
-   Handler (\e -> let _ = (e :: FIR.TransitionException)
-                  in do tik <- readForCAS m
-                        transition m tik
-                        del k m)]
+                  in del k m)]
 
-transition :: (Eq k, Hashable k) => AdaptiveMap k v -> Ticket (Hybrid k v) -> IO ()
-transition m tick = do
+transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
+transition m = do
+  tick <- readForCAS m
   case peekTicket tick of
-    A pm fileName thn -> do
-      cm <- CM.empty
-      (success, tick') <- casIORef m tick (AB pm cm)
+    A cm -> do
+      pm <- PM.newMap
+      (success, _) <- casIORef m tick (AB cm pm)
       if success
-        then do outh <- openFile fileName AppendMode
-                !start <- getCurrentTime
-                
-                let loop tik = do
-                      (s, tik') <- casIORef m tik (B cm)
-                      if s
-                        then return ()
-                        else loop tik'
-                PM.freeze pm
-                l <- PM.toList pm
-                mapM_ (\(k, v) -> CM.insert k v cm) l
-                loop tick'
-                
-                !end <- getCurrentTime
-                hPutStrLn outh $ (show thn) ++ "," ++ (show ((realToFrac $ diffUTCTime end start) * 1000.0 ::Double))
-                hClose outh
-        else return ()
+        then do CM.freezeAndTraverse_ (\ k v -> PM.ins k v pm) cm
+                casloop pm
+        else transition m
     AB _ _ -> return ()
     B _ ->  return ()
+  where
+    casloop pm = do
+      tik <- readForCAS m
+      (success, _) <- casIORef m tik (B pm)
+      unless success $ casloop pm
+
 
