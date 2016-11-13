@@ -90,7 +90,9 @@ unitOps !n !rng !vec !opt !files !prob !tran = do
 
 phase :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
       -> [Double] -> IO (V.Vector Double)
-phase !n !rng !vec !opt !files !prob =
+phase !n !rng !vec !opt !files !prob = do
+  putStrLn $ "phase: " ++ show n
+  hFlush stdout
   loop V.empty 0
   where
     len = ((ops opt) `div` (unit opt))

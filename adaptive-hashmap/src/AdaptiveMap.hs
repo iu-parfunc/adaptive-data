@@ -15,7 +15,9 @@ import Data.IORef
 import Data.Hashable
 import Control.Exception
 import qualified Data.Concurrent.IORef as FIR
-import qualified Control.Concurrent.PureMap as PM
+--import qualified Control.Concurrent.PureMap as PM
+import qualified Data.Concurrent.Compact.PureMap as PM
+import Control.DeepSeq
 import qualified Control.Concurrent.Map as CM
 import Control.Monad
 
@@ -26,7 +28,7 @@ data Hybrid k v = A !(CM.Map k v)
 type AdaptiveMap k v = IORef (Hybrid k v)
 
 {-# INLINABLE newMap #-}
-newMap :: (Eq k, Hashable k) => IO (AdaptiveMap k v)
+newMap :: (Eq k, Hashable k, NFData k, NFData v) => IO (AdaptiveMap k v)
 newMap = do
   !m <- CM.empty
   newIORef $ A m
@@ -41,7 +43,7 @@ get !k !m = do
     B pm -> PM.get k pm
 
 {-# INLINABLE ins #-}
-ins :: (Eq k, Hashable k) => k -> v -> AdaptiveMap k v -> IO ()
+ins :: (Eq k, Hashable k, NFData k, NFData v) => k -> v -> AdaptiveMap k v -> IO ()
 ins !k !v !m = do
   state <- readIORef m
   case state of
@@ -53,7 +55,7 @@ ins !k !v !m = do
                   in ins k v m)]
 
 {-# INLINABLE del #-}
-del :: (Eq k, Hashable k) => k -> AdaptiveMap k v -> IO ()
+del :: (Eq k, Hashable k, NFData k, NFData v) => k -> AdaptiveMap k v -> IO ()
 del !k !m = do
   state <- readIORef m
   case state of
@@ -64,7 +66,7 @@ del !k !m = do
   [Handler (\e -> let _ = (e :: FIR.CASIORefException)
                   in del k m)]
 
-transition :: (Eq k, Hashable k) => AdaptiveMap k v -> IO ()
+transition :: (Eq k, Hashable k, NFData k, NFData v) => AdaptiveMap k v -> IO ()
 transition m = do
   tick <- readForCAS m
   case peekTicket tick of

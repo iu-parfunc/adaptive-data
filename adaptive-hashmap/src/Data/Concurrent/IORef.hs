@@ -10,7 +10,8 @@ module Data.Concurrent.IORef
          peekTicket,
          freezeIORef,
          CASIORefException(CASIORefException),
-         TransitionException(TransitionException)
+         TransitionException(TransitionException),
+         spinlock
        )
        where
 
@@ -18,6 +19,7 @@ import qualified Data.IORef as IR
 import qualified Data.Atomics as A
 import Control.Exception
 import Data.Typeable
+import Control.Monad
 
 newtype IORef t = IORef (IR.IORef (IOVal t)) deriving (Eq, Typeable)
 data IOVal t = Val !t | Frozen !t deriving (Show, Typeable)
@@ -67,3 +69,11 @@ freezeIORef (IORef !ref) !tik = do
     Frozen _ -> return (True, tik)
     Val    a -> A.casIORef ref tik $ Frozen a
 
+{-# INLINE spinlock #-}
+spinlock :: (A.Ticket a -> IO (Bool, A.Ticket a))
+         -> A.Ticket a -> IO ()
+spinlock f tik = go tik
+  where
+    go tik =
+      do (success, tik') <- f tik
+         unless success $ go tik'

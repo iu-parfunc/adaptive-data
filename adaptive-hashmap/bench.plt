@@ -5,7 +5,7 @@ set output 'report.eps'
 
 plot 'report_ctrie.csv' using 1:2 title 'ctrie' \
      with linespoints, \
-     'report_gz.csv' using 1:2 title 'gz'\
+     'report_adaptive.csv' using 1:2 title 'adaptive'\
      with linespoints
 
 exit
