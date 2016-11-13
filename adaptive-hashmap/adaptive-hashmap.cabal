@@ -34,8 +34,8 @@ library
                        Data.Concurrent.DBctrie,
                        Data.Concurrent.DBgz,
                        Data.Concurrent.DBpure,
-                       Data.Concurrent.DBadaptive,
-                       Data.Concurrent.Compact.PureMap
+                       Data.Concurrent.DBadaptive
+--                       Data.Concurrent.Compact.PureMap
 
   -- other-modules:
   other-extensions:    BangPatterns, NamedFieldPuns, CPP, DeriveDataTypeable
@@ -58,8 +58,8 @@ library
                        vector >= 0.11,
                        deepseq >= 1.4,
                        quicklz,
-                       lz4,
-                       compact
+                       lz4
+--                       compact
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options: -O2 -Wall

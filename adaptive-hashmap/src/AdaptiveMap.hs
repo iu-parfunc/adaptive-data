@@ -15,8 +15,8 @@ import Data.IORef
 import Data.Hashable
 import Control.Exception
 import qualified Data.Concurrent.IORef as FIR
---import qualified Control.Concurrent.PureMap as PM
-import qualified Data.Concurrent.Compact.PureMap as PM
+import qualified Control.Concurrent.PureMap as PM
+--import qualified Data.Concurrent.Compact.PureMap as PM
 import Control.DeepSeq
 import qualified Control.Concurrent.Map as CM
 import Control.Monad
