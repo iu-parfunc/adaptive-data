@@ -24,6 +24,7 @@ import Control.Monad
 import Data.IORef
 import Data.Atomics
 import System.Mem
+import System.IO
 import qualified Data.Concurrent.IORef as FIR
 import qualified Control.Concurrent.Map as CM
 
@@ -66,7 +67,12 @@ instance DB Map where
         case res of
           Nothing -> return Nothing
           Just s  -> deepseq s $ return $ Just s
-  
+{-
+  transition !ref = do
+    putStrLn $ "transition"
+    hFlush stdout
+    return ()
+-}
   transition !ref = do
     tick <- readForCAS ref
     case peekTicket tick of
@@ -74,7 +80,10 @@ instance DB Map where
         zm <- DBZ.empty
         (success, _) <- casIORef ref tick (AB dbc zm)
         if success
-          then do CM.freezeAndTraverse_ (\k v -> insert k v zm) cm
+          then do putStrLn $ "transition"
+                  hFlush stdout
+                  CM.freezeAndTraverse_ (\k v -> do
+                                            insert k v zm) cm
                   casloop zm
                   performMajorGC
           else transition ref

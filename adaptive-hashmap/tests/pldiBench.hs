@@ -99,7 +99,7 @@ phase !n !rng !vec !opt !files !prob = do
     len = ((ops opt) `div` (unit opt))
     loop v i = do
       if i < len
-      then do m <- unitOps n rng vec opt files prob (i < len - 1)
+      then do m <- unitOps n rng vec opt files prob (i == len - 1)
               loop (V.snoc v m) (i + 1)
       else return v
 

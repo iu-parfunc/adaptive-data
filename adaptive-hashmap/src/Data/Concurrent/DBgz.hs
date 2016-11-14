@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Concurrent.DBgz (
-  Map
+  Map (..)
   , empty
   , insert
   -- , delete
