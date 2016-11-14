@@ -23,6 +23,7 @@ import System.Directory
 import Prelude hiding (lookup, readFile)
 import Control.DeepSeq
 import Data.Atomics.Counter
+import GHC.Conc.Sync
 
 chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
@@ -90,8 +91,8 @@ unitOps !n !rng !vec !opt !files !prob = do
 phase :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
       -> [Double] -> V.Vector AtomicCounter -> IO (V.Vector Double)
 phase !n !rng !vec !opt !files !prob !ac = do
-  putStrLn $ "phase: " ++ show n
-  hFlush stdout
+--  putStrLn $ "phase: " ++ show n
+--  hFlush stdout
   loop V.empty 0
   where
     len = ((ops opt) `div` (unit opt))
@@ -100,8 +101,10 @@ phase !n !rng !vec !opt !files !prob !ac = do
         then do m <- unitOps n rng vec opt files prob
                 loop (V.snoc v m) (i + 1)
         else do n' <- incrCounter 1 $ ac V.! n
-                if n' >= (nDB opt) -1
-                  then transition $ vec V.! n
+                if n' == numCapabilities
+                  then do putStrLn $ "transition " ++ show n
+                          hFlush stdout
+                          transition $ vec V.! n
                   else return ()
                 return v
 
