@@ -85,7 +85,6 @@ instance DB Map where
                   CM.freezeAndTraverse_ (\k v -> do
                                             insert k v zm) cm
                   casloop zm
-                  performMajorGC
           else transition ref
       AB _ _ -> return ()
       B _ ->  return ()

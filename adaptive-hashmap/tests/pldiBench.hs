@@ -22,6 +22,7 @@ import qualified Data.Concurrent.DBagz as DBAZ
 import System.Directory
 import Prelude hiding (lookup, readFile)
 import Control.DeepSeq
+import Data.Atomics.Counter
 
 chooseFile :: PCG.GenIO -> String -> [String] -> IO ByteString
 chooseFile !rng !datadir !files = do
@@ -60,7 +61,7 @@ performOp :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
 performOp !n !rng !vec !opt !files !prob = do
   !r <- PCG.uniformBD 1.0 rng
   !rn <- PCG.uniformB ((V.length vec) - 1) rng
-  let isHot = r <= 0.8
+  let isHot = r <= (hratio opt)
   let m = if isHot
           then vec V.! n
           else vec V.! (if rn >= n then rn + 1 else rn)
@@ -75,23 +76,20 @@ measure op = do
   return $ (realToFrac $ diffUTCTime end start) * 1000.0
 
 unitOps :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
-        -> [Double] -> Bool -> IO Double
-unitOps !n !rng !vec !opt !files !prob !tran = do
+        -> [Double] -> IO Double
+unitOps !n !rng !vec !opt !files !prob = do
   s <- loop 0 0.0
-  return $ s / (fromIntegral (unit opt) + (if tran then 1 else 0))
+  return $ s / (fromIntegral (unit opt))
   where
     loop i acc = do
       if i < unit opt
         then do l <- performOp n rng vec opt files prob
                 loop (i + 1) (acc + l)
-        else if tran
-             then do l <- measure (\_ -> transition $ vec V.! n)
-                     return $ acc + l
-             else return acc
+        else return acc
 
 phase :: DB m => Int -> PCG.GenIO -> V.Vector m -> Flag -> [String]
-      -> [Double] -> IO (V.Vector Double)
-phase !n !rng !vec !opt !files !prob = do
+      -> [Double] -> V.Vector AtomicCounter -> IO (V.Vector Double)
+phase !n !rng !vec !opt !files !prob !ac = do
   putStrLn $ "phase: " ++ show n
   hFlush stdout
   loop V.empty 0
@@ -99,22 +97,32 @@ phase !n !rng !vec !opt !files !prob = do
     len = ((ops opt) `div` (unit opt))
     loop v i = do
       if i < len
-      then do m <- unitOps n rng vec opt files prob (i == len - 1)
-              loop (V.snoc v m) (i + 1)
-      else return v
+        then do m <- unitOps n rng vec opt files prob
+                loop (V.snoc v m) (i + 1)
+        else do n' <- incrCounter 1 $ ac V.! n
+                if n' >= (nDB opt) -1
+                  then transition $ vec V.! n
+                  else return ()
+                return v
 
-thread :: DB m => Int -> Flag -> [String] -> V.Vector m -> Word64 -> IO (V.Vector Double)
-thread _ opt files vec initseed = do
+thread :: DB m => Int -> Flag -> [String] -> V.Vector m
+       -> Word64 -> V.Vector AtomicCounter -> IO (V.Vector Double)
+thread _ opt files vec initseed ac = do
   let prob = [(iratio opt), 1.0]
   !rng <- PCG.restore $ PCG.initFrozen $ initseed
   foldM (\v n -> do
-            v' <- phase n rng vec opt files prob
+            v' <- phase n rng vec opt files prob ac
             return $ v V.++ v')
         V.empty [0..((nDB opt) - 1)]
   
 initDB :: DB m => IO m -> Int -> IO (V.Vector m)
 initDB empty n = do
   lst <- sequence $ map (\_ -> empty) [1..n]
+  return $ V.fromList lst
+
+initAC :: Int -> IO (V.Vector AtomicCounter)
+initAC n = do
+  lst <- sequence $ map (\_ -> newCounter 0) [1..n]
   return $ V.fromList lst
 
 mean :: [Double] -> Double
@@ -124,9 +132,10 @@ benchmark :: DB m => Int -> PCG.GenIO -> [String] -> Flag
           -> IO m -> Handle -> IO ()
 benchmark thn rng files opt empty out = do
   vec <- initDB empty (nDB opt)
+  ac  <- initAC (nDB opt)
   !asyncs <- mapM (\tid -> do
                        s <- PCG.uniformW64 rng
-                       async $ thread tid opt files vec s)
+                       async $ thread tid opt files vec s ac)
                   [1..thn]
   !res <- mapM wait asyncs
   let len = (nDB opt) * ((ops opt) `div` (unit opt))
@@ -162,6 +171,7 @@ main = do
   putStrLn $ "Get Ratio:      " ++ show (1.0 - iratio option)
   -- putStrLn $ "Delete Ratio:   " ++ show (1.0 - (gratio option) - (iratio option))
   putStrLn $ "Insert Ratio:   " ++ show (iratio option)
+  putStrLn $ "Hot Ratio:      " ++ show (hratio option)
   putStrLn $ "Seed:           " ++ show (seed option)
   putStrLn $ "Report File:    " ++ show (file option)
   putStrLn $ "Input Directory:" ++ show (dir option)
@@ -179,6 +189,7 @@ main = do
 data Flag
   = Flag {nDB :: Int,
           iratio :: Double,
+          hratio :: Double,
           seed :: Word64,
           file :: String,
           bench :: String,
@@ -191,6 +202,7 @@ data Flag
 flag :: Flag
 flag = Flag {nDB = 10 &= help "number of DBs",
              iratio = 0.8 &= help "Insert ratio",
+             hratio = 0.8 &= help "Hot ratio",
              range = 65536 &= help "Key range",
              seed = 8192 &= help "Seed",
              file = "report" &= help "Report file prefix",
