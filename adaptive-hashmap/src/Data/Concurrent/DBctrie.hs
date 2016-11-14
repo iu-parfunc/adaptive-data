@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Concurrent.DBctrie (
-  Map
+  Map (..)
   , empty
   , insert
   -- , delete

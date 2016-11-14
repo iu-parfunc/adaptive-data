@@ -34,7 +34,8 @@ library
                        Data.Concurrent.DBctrie,
                        Data.Concurrent.DBgz,
                        Data.Concurrent.DBpure,
-                       Data.Concurrent.DBadaptive
+                       Data.Concurrent.DBadaptive,
+                       Data.Concurrent.DBagz
 --                       Data.Concurrent.Compact.PureMap
 
   -- other-modules:

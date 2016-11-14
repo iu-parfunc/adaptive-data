@@ -18,6 +18,7 @@ import Data.Concurrent.DB
 import qualified Data.Concurrent.DBctrie as DBC
 import qualified Data.Concurrent.DBgz as DBZ
 import qualified Data.Concurrent.DBadaptive as DBA
+import qualified Data.Concurrent.DBagz as DBAZ
 import System.Directory
 import Prelude hiding (lookup, readFile)
 import Control.DeepSeq
@@ -147,6 +148,7 @@ run thn opt = do
     "ctrie" -> benchmark thn gen files opt DBC.empty outh
     "gz" -> benchmark thn gen files opt DBZ.empty outh
     "adaptive" -> benchmark thn gen files opt DBA.empty outh
+    "agz" -> benchmark thn gen files opt DBAZ.empty outh
     _ -> undefined
   return ()
 
@@ -166,7 +168,7 @@ main = do
   putStrLn $ "unit:           " ++ show (unit option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={gz, ctrie, adaptive})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={gz, ctrie, adaptive, agz})"
     else 
       if length (dir option) == 0
         then putStrLn $ "Need to specify input directory. (By --dir)"
