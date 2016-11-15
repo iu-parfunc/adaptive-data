@@ -19,26 +19,28 @@ import Control.DeepSeq
 import Data.IORef
 import Data.Atomics
 
-type Set = IORef (BS.BitSet Int)
+newtype Set = SB (IORef (BS.BitSet Int))
 
 empty :: IO Set
-empty = newIORef $ BS.empty
+empty = do
+  r <- newIORef $ BS.empty
+  return $ SB r
 
 instance DSet Set where
   insert :: Int -> Set -> IO ()
-  insert !k !ref = deepseq k $ loop (\s -> BS.insert k s) ref
+  insert !k !(SB ref) = deepseq k $ loop (\s -> BS.insert k s) ref
 
   delete :: Int -> Set -> IO ()
-  delete !k !ref = deepseq k $ loop (\s -> BS.delete k s) ref
+  delete !k !(SB ref) = deepseq k $ loop (\s -> BS.delete k s) ref
 
   member :: Int -> Set -> IO Bool
-  member !k !ref = do
+  member !k !(SB ref) = do
     s <- readIORef ref
     return $ BS.member k s
   
   transition _ = return ()
 
-  output !ref = readIORef ref >>= putStrLn . show . BS.toList
+  output !(SB ref) = readIORef ref >>= putStrLn . show . BS.toList
 
 loop :: (a -> a) -> IORef a -> IO ()
 loop fn ref = do

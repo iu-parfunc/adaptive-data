@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 module Main where
@@ -58,7 +57,7 @@ performOp !n !rng !vec !opt !prob = do
           then vec V.! n
           else vec V.! (if rn >= n then rn + 1 else rn)
 --  op <- createOp rng opt m prob isHot
-  op <- chooseOp rop [1..(length prob)] prob isHot
+  op <- chooseOp rop [1..3] prob isHot
   measure op k m
 
 measure :: DSet m => Int -> Int64 -> m -> IO Double
@@ -71,6 +70,7 @@ measure op k m = do
             return ()
     3 -> do !v <- member (fromIntegral k) m
             return ()
+    _ -> undefined
   !end <- getCurrentTime
   return $ (realToFrac $ diffUTCTime end start) * 1000.0
 

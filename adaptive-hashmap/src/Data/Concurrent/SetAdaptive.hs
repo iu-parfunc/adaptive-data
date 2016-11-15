@@ -40,7 +40,7 @@ instance DSet Set where
     state <- readIORef ref
     case state of
       A sc -> insert k sc
-      AB _ _ -> do transition ref; insert k ref
+      AB _ _ -> insert k ref
       B sb -> insert k sb
     `catches`
     [Handler (\e -> let _ = (e :: FIR.CASIORefException)
@@ -51,7 +51,7 @@ instance DSet Set where
     state <- readIORef ref
     case state of
       A sc -> delete k sc
-      AB _ _ -> do transition ref; delete k ref
+      AB _ _ -> delete k ref
       B sb -> delete k sb
     `catches`
     [Handler (\e -> let _ = (e :: FIR.CASIORefException)
