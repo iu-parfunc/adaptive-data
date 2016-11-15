@@ -22,13 +22,13 @@ import Control.DeepSeq
 import Data.Atomics.Counter
 import GHC.Conc.Sync
 
-chooseOp :: Double -> [() -> IO ()] -> [Double] -> Bool -> IO (() -> IO ())
+chooseOp :: Double -> [Int] -> [Double] -> Bool -> IO Int
 chooseOp !r !op !prob !isHot = do
   let op' = if isHot then op else reverse op
   return $ case findIndex (\p -> r <= p) prob of
              Just i -> op' !! i
              Nothing -> undefined
-
+{-
 createOp :: DSet m => PCG.GenIO -> Flag -> m
          -> [Double] -> Bool -> IO (() -> IO ())
 createOp !rng !opt !m !prob !isHot = do
@@ -44,23 +44,33 @@ createOp !rng !opt !m !prob !isHot = do
                    !v <- member (fromIntegral k) m
                    deepseq v $ return ())]
   chooseOp r oplst prob isHot
-
+-}
 performOp :: DSet m => Int -> PCG.GenIO -> V.Vector m -> Flag
           -> [Double] -> IO Double
 performOp !n !rng !vec !opt !prob = do
   !r <- PCG.uniformBD 1.0 rng
   !rn <- PCG.uniformB ((V.length vec) - 1) rng
+  !rop <- PCG.uniformBD 1.0 rng
+  !k <- PCG.uniformB (range opt) rng
+
   let isHot = r <= (hratio opt)
   let m = if isHot
           then vec V.! n
           else vec V.! (if rn >= n then rn + 1 else rn)
-  op <- createOp rng opt m prob isHot
-  measure op
+--  op <- createOp rng opt m prob isHot
+  op <- chooseOp rop [1..(length prob)] prob isHot
+  measure op k m
 
-measure :: (() -> IO ()) -> IO Double
-measure op = do
+measure :: DSet m => Int -> Int64 -> m -> IO Double
+measure op k m = do
   !start <- getCurrentTime
-  op ()
+  case op of
+    1 -> do !v <- insert (fromIntegral k) m
+            return ()
+    2 -> do !v <- delete (fromIntegral k) m
+            return ()
+    3 -> do !v <- member (fromIntegral k) m
+            return ()
   !end <- getCurrentTime
   return $ (realToFrac $ diffUTCTime end start) * 1000.0
 
