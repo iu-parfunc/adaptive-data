@@ -2,18 +2,20 @@ flags: {}
 
 packages:
  - '.'
- - location:
-    git: https://github.com/kputnam/bitset-llama.git
-    commit: afb6a2cfd43b16ac25e625292afc533ddbd2cd95
+ # - location:
+ #    git: https://github.com/kputnam/bitset-llama.git
+ #    commit: afb6a2cfd43b16ac25e625292afc533ddbd2cd95
 
 extra-deps:
  - thread-local-storage-0.1.0.3
  - pcg-random-0.1.3.4
  - quicklz-1.5.0.11
  - lz4-0.2.3.1
+ - bitset-1.4.8
+ - atomic-primops-0.8.0.4
 
 #allow-newer: true
 
 #compiler: ghc-8.1.20160531
 #resolver: nightly-2016-06-21
-resolver: lts-3.0
+resolver: lts-2.22
