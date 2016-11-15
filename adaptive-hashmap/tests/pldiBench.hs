@@ -155,7 +155,7 @@ run thn opt = do
   let fileName = (file opt) ++ "_" ++ (bench opt)
   outh <- openFile (fileName ++ ".csv") WriteMode
   lst <- getDirectoryContents $ dir opt
-  let files = drop 2 lst
+  let files = filter (/= "..") $ filter (/= ".") $ lst
   case (bench opt) of
     "ctrie" -> benchmark thn gen files opt DBC.empty outh
     "gz" -> benchmark thn gen files opt DBZ.empty outh
