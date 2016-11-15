@@ -5,7 +5,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Data.Concurrent.SetBit (
-  empty
+  Set
+  , empty
   , insert
   , delete
   , member

@@ -17,6 +17,7 @@ import Data.Int
 import Data.Concurrent.Set
 import qualified Data.Concurrent.SetCtrie as DSC
 import qualified Data.Concurrent.SetBit as DSB
+import qualified Data.Concurrent.SetAdaptive as DSA
 import Control.DeepSeq
 import Data.Atomics.Counter
 import GHC.Conc.Sync
@@ -148,6 +149,7 @@ run thn opt = do
   case (bench opt) of
     "ctrie" -> benchmark thn gen opt DSC.empty outh
     "bset" -> benchmark thn gen opt DSB.empty outh
+    "adaptive" -> benchmark thn gen opt DSA.empty outh
     _ -> undefined
   return ()
 
@@ -167,7 +169,7 @@ main = do
   putStrLn $ "unit:           " ++ show (unit option)
 
   if length (bench option) == 0
-    then putStrLn $ "Need to specify benchvariant. (By --bench={ctrie, bset})"
+    then putStrLn $ "Need to specify benchvariant. (By --bench={ctrie, bset, adaptive})"
     else run threadn option
 
   return ()

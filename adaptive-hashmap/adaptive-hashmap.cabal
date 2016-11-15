@@ -38,7 +38,8 @@ library
                        Data.Concurrent.DBagz,
                        Data.Concurrent.Set,
                        Data.Concurrent.SetCtrie,
-                       Data.Concurrent.SetBit
+                       Data.Concurrent.SetBit,
+                       Data.Concurrent.SetAdaptive
 --                       Data.Concurrent.Compact.PureMap
 
   -- other-modules:
