@@ -10,6 +10,7 @@ import System.IO hiding (readFile)
 import Data.Time.Clock
 import Data.List (findIndex)
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as VM
 import GHC.Word
 import qualified System.Random.PCG.Fast.Pure as PCG
 import Data.Int
@@ -75,34 +76,37 @@ unitOps !n !rng !vec !opt !prob = do
         else return acc
 
 phase :: DSet m => Int -> PCG.GenIO -> V.Vector m -> Flag
-      -> [Double] -> V.Vector AtomicCounter -> IO (V.Vector Double)
-phase !n !rng !vec !opt !prob !ac = do
+      -> [Double] -> V.Vector AtomicCounter -> VM.IOVector Double
+      -> Int -> IO ()
+phase !n !rng !vec !opt !prob !ac !v !offset = do
 --  putStrLn $ "phase: " ++ show n
 --  hFlush stdout
-  loop V.empty 0
+  loop 0
   where
     len = ((ops opt) `div` (unit opt))
-    loop v i = do
+    loop i = do
       if i < len
         then do m <- unitOps n rng vec opt prob
-                loop (V.snoc v m) (i + 1)
+                VM.write v (i + offset) m
+                loop (i + 1)
         else do n' <- incrCounter 1 $ ac V.! n
                 if n' == numCapabilities
                   then do putStrLn $ "phase " ++ show n
                           hFlush stdout
                           transition $ vec V.! n
                   else return ()
-                return v
 
 thread :: DSet m => Int -> Flag -> V.Vector m -> Word64
-       -> V.Vector AtomicCounter -> IO (V.Vector Double)
+       -> V.Vector AtomicCounter -> IO (VM.IOVector Double)
 thread _ opt vec initseed ac = do
   let prob = [(iratio opt), 1.0]
+      len  = ((ops opt) `div` (unit opt))
   !rng <- PCG.restore $ PCG.initFrozen $ initseed
-  foldM (\v n -> do
-            v' <- phase n rng vec opt prob ac
-            return $ v V.++ v')
-        V.empty [0..((nDB opt) - 1)]
+  !v <- VM.new $ (nDB opt) * len
+  foldM_ (\_ n -> do
+             phase n rng vec opt prob ac v (n * len))
+         () [0..((nDB opt) - 1)]
+  return v
   
 initDB :: DSet m => IO m -> Int -> IO (V.Vector m)
 initDB empty n = do
@@ -128,10 +132,11 @@ benchmark thn rng opt empty out = do
                   [1..thn]
   !res <- mapM wait asyncs
   let len = (nDB opt) * ((ops opt) `div` (unit opt))
+  putStrLn "Collect results"
   forM_ [0..(len - 1)]
         (\i -> do
-            let !m = mean $ map (\v -> v V.! i) res
-            hPutStrLn out $ show i ++ "," ++ show m)
+            !m <- sequence $ map (\v -> VM.read v i) res 
+            hPutStrLn out $ show i ++ "," ++ (show $ mean m))
   hClose out
   return ()
 
