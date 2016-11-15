@@ -16,4 +16,4 @@ extra-deps:
 
 #compiler: ghc-8.1.20160531
 #resolver: nightly-2016-06-21
-resolver: lts-6.22
+resolver: lts-3.0
